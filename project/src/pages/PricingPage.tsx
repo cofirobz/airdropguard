@@ -172,7 +172,7 @@ function PlanCard({ plan, onCheckout, checkoutLoading }: { plan: Plan; onCheckou
       {plan.enterprise ? (
         <a
           href="mailto:cofirobz@googlemail.com"
-          className="w-full py-2.5 rounded-xl text-sm font-semibold text-center border border-white/10 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+          className="w-full inline-flex items-center justify-center py-2.5 rounded-xl text-sm font-semibold text-center border border-white/10 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
         >
           {plan.cta}
         </a>
