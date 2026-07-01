@@ -172,10 +172,6 @@ function PlanCard({ plan, onCheckout, checkoutLoading }: { plan: Plan; onCheckou
       {plan.enterprise ? (
         <a
           href="mailto:cofirobz@googlemail.com"
-          onClick={() => {
-            console.log('Paid API button clicked');
-            console.log('Selected plan', 'enterprise');
-          }}
           className="w-full py-2.5 rounded-xl text-sm font-semibold text-center border border-white/10 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
         >
           {plan.cta}
