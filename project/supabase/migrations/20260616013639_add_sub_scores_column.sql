@@ -1,0 +1,1 @@
+ALTER TABLE airdrops ADD COLUMN IF NOT EXISTS sub_scores JSONB;

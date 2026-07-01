@@ -1,0 +1,1 @@
+ALTER TABLE airdrops ADD COLUMN IF NOT EXISTS contract_address TEXT NOT NULL DEFAULT '';

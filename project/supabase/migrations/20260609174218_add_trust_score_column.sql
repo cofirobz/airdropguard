@@ -1,0 +1,1 @@
+ALTER TABLE airdrops ADD COLUMN IF NOT EXISTS trust_score INTEGER DEFAULT NULL CHECK (trust_score IS NULL OR (trust_score >= 0 AND trust_score <= 100));

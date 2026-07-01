@@ -1,0 +1,1 @@
+ALTER TABLE airdrops ADD COLUMN IF NOT EXISTS last_analyzed_at TIMESTAMPTZ;
