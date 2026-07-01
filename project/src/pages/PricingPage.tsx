@@ -1,6 +1,6 @@
-import { Key, Check, Zap, Shield, Building2, Star, Users } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { Key, Check, Zap, Shield, Building2, Star, Users, Loader2 } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -172,6 +172,10 @@ function PlanCard({ plan, onCheckout, checkoutLoading }: { plan: Plan; onCheckou
       {plan.enterprise ? (
         <a
           href="mailto:cofirobz@googlemail.com"
+          onClick={() => {
+            console.log('Paid API button clicked');
+            console.log('Selected plan', 'enterprise');
+          }}
           className="w-full py-2.5 rounded-xl text-sm font-semibold text-center border border-white/10 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
         >
           {plan.cta}
@@ -182,6 +186,8 @@ function PlanCard({ plan, onCheckout, checkoutLoading }: { plan: Plan; onCheckou
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
+            console.log('Paid API button clicked');
+            console.log('Selected plan', plan.name.toLowerCase());
             onCheckout(plan.name.toLowerCase() as 'pro' | 'business');
           }}
           disabled={checkoutLoading !== null}
@@ -191,7 +197,12 @@ function PlanCard({ plan, onCheckout, checkoutLoading }: { plan: Plan; onCheckou
               : 'border border-white/10 text-gray-300 hover:text-white hover:bg-white/5'
           } ${checkoutLoading !== null ? 'opacity-70 cursor-not-allowed' : ''}`}
         >
-          {checkoutLoading === plan.name.toLowerCase() ? 'Redirecting…' : plan.cta}
+          {checkoutLoading === plan.name.toLowerCase() ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Redirecting…
+            </span>
+          ) : plan.cta}
         </button>
       ) : (
         <Link
@@ -213,6 +224,8 @@ function PlanCard({ plan, onCheckout, checkoutLoading }: { plan: Plan; onCheckou
 
 export default function PricingPage() {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
@@ -220,8 +233,9 @@ export default function PricingPage() {
     console.log('Starting checkout', plan);
 
     if (!user) {
-      setCheckoutError('Please sign in before starting checkout.');
-      setCheckoutLoading(null);
+      setCheckoutLoading(plan);
+      setCheckoutError(null);
+      navigate(`/auth?checkout=${plan}`);
       return;
     }
 
@@ -253,6 +267,21 @@ export default function PricingPage() {
       setCheckoutLoading(null);
     }
   };
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+
+    const checkoutPlan = searchParams.get('checkout');
+    if (!checkoutPlan || (checkoutPlan !== 'pro' && checkoutPlan !== 'business')) return;
+    if (checkoutLoading === checkoutPlan) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('checkout');
+    const nextSearch = nextParams.toString();
+
+    navigate({ pathname: '/api-pricing', search: nextSearch ? `?${nextSearch}` : '' }, { replace: true });
+    void handleCheckout(checkoutPlan as 'pro' | 'business');
+  }, [authLoading, checkoutLoading, navigate, searchParams, user]);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">

@@ -19,10 +19,26 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const checkout = searchParams.get('checkout');
+
+  const buildDestination = (baseRedirect: string | null, isAdminUser: boolean) => {
+    if (baseRedirect) {
+      const separator = baseRedirect.includes('?') ? '&' : '?';
+      return checkout && (checkout === 'pro' || checkout === 'business')
+        ? `${baseRedirect}${separator}checkout=${checkout}`
+        : baseRedirect;
+    }
+
+    if (checkout && (checkout === 'pro' || checkout === 'business')) {
+      return `/api-pricing?checkout=${checkout}`;
+    }
+
+    return isAdminUser ? '/admin' : '/dashboard';
+  };
 
   // Redirect already-authenticated users to the right destination
   if (!authLoading && user) {
-    const dest = redirect ?? (isAdmin ? '/admin' : '/dashboard');
+    const dest = buildDestination(redirect, isAdmin);
     navigate(dest);
     return null;
   }
@@ -49,9 +65,9 @@ export default function AuthPage() {
       if (freshUser) {
         const { data: adminRow } = await supabase
           .from('admin_users').select('id').eq('id', freshUser.id).maybeSingle();
-        navigate(redirect ?? (adminRow ? '/admin' : '/dashboard'));
+        navigate(buildDestination(redirect, !!adminRow));
       } else {
-        navigate(redirect ?? '/dashboard');
+        navigate(buildDestination(redirect, false));
       }
     }
     setLoading(false);

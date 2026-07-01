@@ -57,6 +57,7 @@ function App() {
               <Route path="auth" element={<LazyPage><AuthPage /></LazyPage>} />
               <Route path="dashboard" element={<LazyPage><CustomerDashboard /></LazyPage>} />
               <Route path="learn" element={<LazyPage><LearnPage /></LazyPage>} />
+              <Route path="api-pricing" element={<LazyPage><PricingPage /></LazyPage>} />
               <Route path="pricing" element={<LazyPage><PricingPage /></LazyPage>} />
               <Route path="scam-alerts" element={<LazyPage><ScamAlertsPage /></LazyPage>} />
               <Route path="submit" element={<LazyPage><SubmitAirdropPage /></LazyPage>} />
