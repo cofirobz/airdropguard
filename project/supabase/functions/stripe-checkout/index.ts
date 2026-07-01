@@ -8,19 +8,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const PLANS: Record<string, { name: string; description: string; unit_amount: number; currency: string }> = {
-  pro: {
-    name: "Airdrop Guard API – Pro",
-    description: "10,000 API requests/month · Score, risk, summary & category breakdown",
-    unit_amount: 1900,
-    currency: "gbp",
-  },
-  business: {
-    name: "Airdrop Guard API – Business",
-    description: "100,000 API requests/month · Full API access including review history",
-    unit_amount: 9900,
-    currency: "gbp",
-  },
+const PRICE_ID_BY_PLAN: Record<string, string> = {
+  pro: Deno.env.get("STRIPE_API_PRO_PRICE_ID") ?? "",
+  business: Deno.env.get("STRIPE_API_BUSINESS_PRICE_ID") ?? "",
+  featured_listing: Deno.env.get("STRIPE_AD_FEATURED_PRICE_ID") ?? "",
+  banner_ad: Deno.env.get("STRIPE_AD_BANNER_PRICE_ID") ?? "",
 };
 
 Deno.serve(async (req: Request) => {
@@ -47,7 +39,12 @@ Deno.serve(async (req: Request) => {
     if (authError || !user) throw new Error("Invalid or expired token");
 
     const { plan, successUrl, cancelUrl } = await req.json();
-    if (!plan || !PLANS[plan]) throw new Error("Invalid plan. Must be 'pro' or 'business'");
+    const normalizedPlan = typeof plan === "string" ? plan.toLowerCase() : "";
+    const priceId = PRICE_ID_BY_PLAN[normalizedPlan];
+
+    if (!normalizedPlan || !priceId) {
+      throw new Error("Invalid plan. Must be 'pro', 'business', 'featured_listing', or 'banner_ad'.");
+    }
 
     const { data: sub } = await supabase
       .from("api_subscriptions")
@@ -64,28 +61,20 @@ Deno.serve(async (req: Request) => {
       customerId = customer.id;
     }
 
-    const planData = PLANS[plan];
     const origin = req.headers.get("origin") || "https://airdropguard.com";
+    const purchaseType = normalizedPlan === "pro" || normalizedPlan === "business" ? "api" : "advertising";
+    const mode = purchaseType === "advertising" ? "payment" : "subscription";
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      mode: "subscription",
-      line_items: [{
-        price_data: {
-          currency: planData.currency,
-          product_data: {
-            name: planData.name,
-            description: planData.description,
-          },
-          unit_amount: planData.unit_amount,
-          recurring: { interval: "month" },
-        },
-        quantity: 1,
-      }],
+      mode,
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl || `${origin}/dashboard?success=1`,
       cancel_url: cancelUrl || `${origin}/pricing`,
-      metadata: { user_id: user.id, plan },
-      subscription_data: { metadata: { user_id: user.id, plan } },
+      metadata: { user_id: user.id, plan: normalizedPlan, purchase_type: purchaseType },
+      ...(mode === "subscription" ? {
+        subscription_data: { metadata: { user_id: user.id, plan: normalizedPlan, purchase_type: purchaseType } },
+      } : {}),
       allow_promotion_codes: true,
     });
 

@@ -1,5 +1,8 @@
 import { Key, Check, Zap, Shield, Building2, Star, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 // ─── Plan data ────────────────────────────────────────────────────────────────
 
@@ -101,7 +104,7 @@ const TRUST = [
 
 // ─── PlanCard ─────────────────────────────────────────────────────────────────
 
-function PlanCard({ plan }: { plan: Plan }) {
+function PlanCard({ plan, onCheckout, checkoutLoading }: { plan: Plan; onCheckout: (plan: 'pro' | 'business') => void; checkoutLoading: string | null }) {
   const { icon: Icon } = plan;
 
   return (
@@ -173,6 +176,23 @@ function PlanCard({ plan }: { plan: Plan }) {
         >
           {plan.cta}
         </a>
+      ) : plan.name === 'Pro' || plan.name === 'Business' ? (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onCheckout(plan.name.toLowerCase() as 'pro' | 'business');
+          }}
+          disabled={checkoutLoading !== null}
+          className={`w-full py-2.5 rounded-xl text-sm font-semibold text-center transition-all ${
+            plan.highlight
+              ? 'btn-primary shadow-lg shadow-neon-purple/20'
+              : 'border border-white/10 text-gray-300 hover:text-white hover:bg-white/5'
+          } ${checkoutLoading !== null ? 'opacity-70 cursor-not-allowed' : ''}`}
+        >
+          {checkoutLoading === plan.name.toLowerCase() ? 'Redirecting…' : plan.cta}
+        </button>
       ) : (
         <Link
           to="/auth"
@@ -192,6 +212,48 @@ function PlanCard({ plan }: { plan: Plan }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PricingPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  const handleCheckout = async (plan: 'pro' | 'business') => {
+    console.log('Starting checkout', plan);
+
+    if (!user) {
+      setCheckoutError('Please sign in before starting checkout.');
+      setCheckoutLoading(null);
+      return;
+    }
+
+    setCheckoutLoading(plan);
+    setCheckoutError(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+        body: { plan, purchase_type: 'api' },
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
+
+      console.log('Checkout response', data);
+
+      if (error) throw error;
+
+      const url = (data as { url?: string } | null)?.url;
+      if (!url) {
+        setCheckoutError('Stripe checkout is unavailable right now. Please try again shortly.');
+        setCheckoutLoading(null);
+        return;
+      }
+
+      window.location.href = url;
+    } catch (err) {
+      console.error('Stripe checkout error:', err);
+      setCheckoutError('Unable to start checkout. Please try again.');
+      setCheckoutLoading(null);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
 
@@ -213,9 +275,13 @@ export default function PricingPage() {
       {/* Plan grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-16 items-start">
         {PLANS.map(plan => (
-          <PlanCard key={plan.name} plan={plan} />
+          <PlanCard key={plan.name} plan={plan} onCheckout={handleCheckout} checkoutLoading={checkoutLoading} />
         ))}
       </div>
+
+      {checkoutError && (
+        <p className="text-center text-sm text-rose-400 mb-6">{checkoutError}</p>
+      )}
 
       {/* Trust strip */}
       <div className="glass border border-white/5 rounded-2xl px-6 py-5 flex flex-col sm:flex-row items-center justify-center gap-6 text-center">

@@ -13,6 +13,19 @@ const PLAN_BY_AMOUNT: Record<number, string> = {
   9900: "business",
 };
 
+const PLAN_REQUEST_LIMITS: Record<string, number> = {
+  free: 100,
+  pro: 50000,
+  business: 250000,
+};
+
+function generateApiKey(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `ag_live_${hex}`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -47,17 +60,31 @@ Deno.serve(async (req: Request) => {
         if (!userId) break;
 
         const plan = session.metadata?.plan || "pro";
+        const purchaseType = session.metadata?.purchase_type;
+        if (purchaseType === "advertising") {
+          console.log(`Advertising checkout completed for user ${userId}, plan: ${plan}`);
+          break;
+        }
         const subscriptionId = session.subscription as string;
         const customerId = session.customer as string;
 
         const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+        const normalizedPlan = plan in PLAN_REQUEST_LIMITS ? plan : "free";
+        const { data: existingSub } = await supabase
+          .from("api_subscriptions")
+          .select("key_value")
+          .eq("user_id", userId)
+          .maybeSingle();
 
         await supabase.from("api_subscriptions").upsert({
           user_id: userId,
           stripe_customer_id: customerId,
           stripe_subscription_id: subscriptionId,
-          plan,
+          plan: normalizedPlan,
           status: "active",
+          key_value: existingSub?.key_value || generateApiKey(),
+          requests_used: 0,
+          requests_limit: PLAN_REQUEST_LIMITS[normalizedPlan] ?? 100,
           current_period_start: new Date(stripeSub.current_period_start * 1000).toISOString(),
           current_period_end: new Date(stripeSub.current_period_end * 1000).toISOString(),
           updated_at: new Date().toISOString(),
@@ -72,6 +99,11 @@ Deno.serve(async (req: Request) => {
         const userId = sub.metadata?.user_id;
         if (!userId) break;
 
+        if (sub.metadata?.purchase_type === "advertising") {
+          console.log(`Advertising subscription updated for user ${userId}`);
+          break;
+        }
+
         const amount = sub.items.data[0]?.price?.unit_amount ?? 0;
         const plan = PLAN_BY_AMOUNT[amount] || "free";
 
@@ -79,6 +111,7 @@ Deno.serve(async (req: Request) => {
           .update({
             plan,
             status: sub.status,
+            requests_limit: PLAN_REQUEST_LIMITS[plan] ?? 100,
             current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
             current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
             updated_at: new Date().toISOString(),
@@ -93,6 +126,11 @@ Deno.serve(async (req: Request) => {
         const sub = event.data.object as Stripe.Subscription;
         const userId = sub.metadata?.user_id;
         if (!userId) break;
+
+        if (sub.metadata?.purchase_type === "advertising") {
+          console.log(`Advertising subscription deleted for user ${userId}`);
+          break;
+        }
 
         await supabase.from("api_subscriptions")
           .update({

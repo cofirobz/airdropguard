@@ -1,5 +1,8 @@
 import { BadgeDollarSign, Globe, Users, TrendingUp, Mail, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const PACKAGES = [
   {
@@ -35,10 +38,42 @@ export default function AdvertisePage() {
   const [submitted, setSubmitted] = useState(false);
   const [email, setEmail] = useState('');
   const [project, setProject] = useState('');
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [checkoutLoading, setCheckoutLoading] = useState<'featured_listing' | 'banner_ad' | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitted(true);
+  };
+
+  const handleCheckout = async (plan: 'featured_listing' | 'banner_ad') => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+
+    setCheckoutLoading(plan);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+        body: {
+          plan,
+          purchase_type: 'advertising',
+        },
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
+      if (error) throw error;
+
+      const url = (data as { url?: string } | null)?.url;
+      if (!url) throw new Error('No checkout URL returned');
+
+      window.location.assign(url);
+    } catch (err) {
+      console.error('Stripe checkout error:', err);
+      setCheckoutLoading(null);
+    }
   };
 
   return (
@@ -86,7 +121,7 @@ export default function AdvertisePage() {
               <span className="text-gray-500 text-sm mb-0.5">{pkg.period}</span>
             </div>
             <p className="text-gray-400 text-sm mb-4 leading-relaxed">{pkg.desc}</p>
-            <ul className="space-y-2">
+            <ul className="space-y-2 mb-4">
               {pkg.features.map(f => (
                 <li key={f} className="flex items-start gap-2 text-xs text-gray-300">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
@@ -94,6 +129,25 @@ export default function AdvertisePage() {
                 </li>
               ))}
             </ul>
+            {pkg.name === 'Featured Listing' ? (
+              <button
+                type="button"
+                onClick={() => handleCheckout('featured_listing')}
+                disabled={authLoading || checkoutLoading !== null}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold text-center transition-all btn-primary shadow-lg shadow-neon-purple/20 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {checkoutLoading === 'featured_listing' ? 'Redirecting…' : 'Buy featured listing'}
+              </button>
+            ) : pkg.name === 'Banner Ad' ? (
+              <button
+                type="button"
+                onClick={() => handleCheckout('banner_ad')}
+                disabled={authLoading || checkoutLoading !== null}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold text-center transition-all border border-white/10 text-gray-300 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {checkoutLoading === 'banner_ad' ? 'Redirecting…' : 'Buy banner ad'}
+              </button>
+            ) : null}
           </div>
         ))}
       </div>
