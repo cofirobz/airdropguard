@@ -9,10 +9,12 @@ import {
   Rocket, ListChecks, Target, TrendingUp, Clock, AlertTriangle,
   Zap, Calendar, Star, Shield, Award, Flame, Wallet, Bell,
   BarChart3, Trophy, Sparkles, Crown, Palette, Lock, Unlock, ShieldCheck,
+  Search, UserCircle2, Bot,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { AirdropWithTasks } from '../lib/types';
+import { getBookmarks } from '../lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -662,6 +664,7 @@ export default function CustomerDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'airdrops' | 'tasks' | 'api'>('overview');
   const [reputation, setReputation] = useState<UserReputation | null>(null);
   const [unlocks, setUnlocks] = useState<UserUnlock[]>([]);
+  const [dashboardSearch, setDashboardSearch] = useState('');
 
   useEffect(() => {
     if (authLoading) return;
@@ -827,253 +830,338 @@ export default function CustomerDashboard() {
   const level = reputation?.level ?? calculatedLevel(rep);
   const title = reputation?.current_title || titleForLevel(level);
   const nextUnlock = getNextUnlock(level);
+  const watchlistCount = getBookmarks().length;
+  const avgTrustScore = airdrops.length > 0
+    ? Math.round(
+      airdrops.reduce((acc, row) => acc + (row.trust_score ?? 0), 0) / airdrops.length,
+    )
+    : 0;
+  const copilotInsights = Math.max(
+    1,
+    Math.min(99, focusAirdrops.length + deadlineAirdrops.length + trendingAirdrops.length),
+  );
 
  return (
-  <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
-    {/* Header */}
-    <div className="flex items-center justify-between gap-4">
-      <div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 mb-3">
-          <Shield className="w-3.5 h-3.5 text-sky-400" />
-          <span className="text-xs font-semibold text-sky-300">Personal command centre</span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-white">AirdropGuard Command Centre</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Welcome back, <span className="text-gray-300">{user.email}</span>
-        </p>
-      </div>
+  <div className="relative min-h-screen bg-[#050711]">
+    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(56,189,248,0.16),transparent_32%),radial-gradient(circle_at_88%_12%,rgba(139,92,246,0.18),transparent_30%),radial-gradient(circle_at_55%_110%,rgba(30,64,175,0.16),transparent_40%)]" />
 
-      <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={fetchData}
-          className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
-        <button
-          onClick={async () => { await supabase.auth.signOut(); navigate('/auth'); }}
-          className="px-3 sm:px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm hover:bg-red-500/15 transition-colors"
-        >
-          Log Out
-        </button>
-      </div>
-    </div>
-
-    {/* Retention hero */}
-    <div className="relative overflow-hidden rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-500/[0.10] via-dark-800 to-neon-purple/[0.08] p-5 sm:p-6">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.16),transparent_28%)]" />
-
-      <div className="relative grid lg:grid-cols-[1.25fr_0.75fr] gap-5 items-center">
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-4 h-4 text-sky-400" />
-            <span className="text-xs font-semibold text-sky-300 uppercase tracking-wider">Today&apos;s Briefing</span>
+    <div className="relative mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="hidden lg:flex lg:flex-col lg:gap-4">
+          <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-4 shadow-[0_0_40px_rgba(59,130,246,0.08)]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">Dashboard Nav</p>
+            <div className="mt-3 space-y-2">
+              {[
+                { id: 'overview' as const, label: 'Overview', icon: BarChart3 },
+                { id: 'airdrops' as const, label: 'Airdrops', icon: Rocket },
+                { id: 'tasks' as const, label: 'Task Tracking', icon: ListChecks },
+                { id: 'api' as const, label: 'API Access', icon: Key },
+              ].map(({ id, label, icon: Icon }) => {
+                const active = activeTab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveTab(id)}
+                    className={`flex w-full items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-all ${
+                      active
+                        ? 'border-sky-400/40 bg-gradient-to-r from-sky-500/25 to-violet-500/20 text-white shadow-[0_0_24px_rgba(59,130,246,0.25)]'
+                        : 'border-white/10 bg-white/[0.02] text-gray-400 hover:border-sky-500/25 hover:text-gray-200'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-black text-white mb-2">
-            {focusAirdrops.length > 0
-              ? `${focusAirdrops[0].name} needs your attention today`
-              : overallPct === 100
-              ? 'You are fully up to date'
-              : 'Your airdrop workspace is ready'}
-          </h2>
-
-          <p className="text-sm text-gray-400 leading-relaxed max-w-2xl">
-            {focusAirdrops.length > 0
-              ? `You have ${remainingCount} task${remainingCount !== 1 ? 's' : ''} remaining across ${airdrops.length} tracked airdrop${airdrops.length !== 1 ? 's' : ''}. Prioritise the highest urgency projects first.`
-              : overallPct === 100
-              ? 'All tracked tasks are complete. Check Wallet Intelligence or review new opportunities to keep improving your profile.'
-              : 'Track tasks, deadlines, trending projects and wallet readiness from one cleaner dashboard.'}
-          </p>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-5">
-            <div className="rounded-2xl border border-white/5 bg-white/[0.04] p-3">
-              <div className="text-lg font-black text-white">{overallPct}%</div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider">Progress</div>
+          <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-4">
+            <h3 className="text-sm font-bold text-white">Quick Access</h3>
+            <div className="mt-3 space-y-2 text-xs">
+              <Link to="/wallet-checker" className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-gray-300 hover:border-sky-500/30 hover:text-white transition-colors">
+                Wallet Intelligence
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+              <Link to="/pricing" className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-gray-300 hover:border-violet-500/30 hover:text-white transition-colors">
+                API Plans
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+              <Link to="/learn" className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-gray-300 hover:border-sky-500/30 hover:text-white transition-colors">
+                Learn
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
-            <div className="rounded-2xl border border-white/5 bg-white/[0.04] p-3">
-              <div className="text-lg font-black text-amber-400">{remainingCount}</div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider">Tasks left</div>
-            </div>
-            <div className="rounded-2xl border border-white/5 bg-white/[0.04] p-3">
-              <div className="text-lg font-black text-rose-400">
-                {deadlineAirdrops.filter(a => urgencyOf(a.expiry_date) === 'critical' || urgencyOf(a.expiry_date) === 'warning').length}
+          </div>
+        </aside>
+
+        <main className="space-y-6">
+          <div className="rounded-3xl border border-white/10 bg-[#090d1d]/80 p-4 shadow-[0_0_40px_rgba(139,92,246,0.12)] sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">Welcome back</p>
+                <h1 className="mt-1 text-2xl font-black text-white sm:text-3xl">AirdropGuard Intelligence Dashboard</h1>
+                <p className="mt-1 text-sm text-gray-400">
+                  Smart monitoring for airdrops, wallet readiness, safety signals, and AI-driven research.
+                </p>
               </div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider">Urgent</div>
-            </div>
-            <div className="rounded-2xl border border-white/5 bg-white/[0.04] p-3">
-              <div className="text-lg font-black text-sky-400">{airdrops.length}</div>
-              <div className="text-[10px] text-gray-500 uppercase tracking-wider">Tracked</div>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                  <input
+                    type="text"
+                    value={dashboardSearch}
+                    onChange={(event) => setDashboardSearch(event.target.value)}
+                    placeholder="Search dashboard"
+                    className="h-11 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-10 pr-3 text-sm text-white placeholder:text-gray-500 focus:border-sky-500/40 focus:outline-none sm:w-64"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 hover:border-sky-500/30 hover:text-white transition-colors"
+                  aria-label="Notifications"
+                >
+                  <Bell className="h-4 w-4" />
+                </button>
+                <div className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-xs text-gray-300">
+                  <UserCircle2 className="h-4 w-4 text-sky-300" />
+                  <span className="max-w-[150px] truncate">{user.email}</span>
+                </div>
+                <button
+                  onClick={fetchData}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/25 hover:text-white transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={async () => { await supabase.auth.signOut(); navigate('/auth'); }}
+                  className="h-11 rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 text-sm font-semibold text-rose-300 hover:bg-rose-500/20 hover:text-white transition-colors"
+                >
+                  Log Out
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="glass-card p-4 border border-white/10">
-          <div className="flex items-start gap-3 mb-4">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-              <Wallet className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">Wallet Intelligence</h3>
-              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                Scan your wallet for health, risk exposure, token hygiene and airdrop-readiness signals.
-              </p>
-            </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+            <StatCard
+              label="Total Airdrops" value={airdrops.length}
+              icon={Rocket} iconBg="bg-sky-500/15 border border-sky-500/30" iconClass="text-sky-300"
+            />
+            <StatCard
+              label="Watchlist" value={watchlistCount}
+              icon={Star} iconBg="bg-violet-500/15 border border-violet-500/30" iconClass="text-violet-300"
+            />
+            <StatCard
+              label="Tasks Completed" value={completedCount}
+              icon={CheckSquare} iconBg="bg-emerald-500/15 border border-emerald-500/30" iconClass="text-emerald-300"
+              sub={totalTasks > 0 ? `of ${totalTasks}` : undefined}
+            />
+            <StatCard
+              label="Average Trust Score" value={`${avgTrustScore}%`}
+              icon={Shield} iconBg="bg-cyan-500/15 border border-cyan-500/30" iconClass="text-cyan-300"
+            />
+            <StatCard
+              label="Copilot Insights" value={copilotInsights}
+              icon={Sparkles} iconBg="bg-neon-purple/15 border border-neon-purple/30" iconClass="text-neon-purple"
+              sub="Live intelligence signals"
+            />
           </div>
 
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="rounded-xl bg-dark-700/40 border border-white/5 p-2">
-              <div className="text-xs font-bold text-white">Level {level}</div>
-              <div className="text-[10px] text-gray-600">{title}</div>
-            </div>
-            <div className="rounded-xl bg-dark-700/40 border border-white/5 p-2">
-              <div className="text-xs font-bold text-white">{rep.toLocaleString()}</div>
-              <div className="text-[10px] text-gray-600">REP</div>
-            </div>
-            <div className="rounded-xl bg-dark-700/40 border border-white/5 p-2">
-              <div className="text-xs font-bold text-white">{nextUnlock ? `L${nextUnlock.level}` : 'Max'}</div>
-              <div className="text-[10px] text-gray-600">{nextUnlock ? 'Next unlock' : 'Unlocked'}</div>
+          <div className="lg:hidden">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {[
+                { id: 'overview' as const, label: 'Overview', icon: BarChart3 },
+                { id: 'airdrops' as const, label: 'Airdrops', icon: Rocket },
+                { id: 'tasks' as const, label: 'Tasks', icon: ListChecks },
+                { id: 'api' as const, label: 'API', icon: Key },
+              ].map(({ id, label, icon: Icon }) => {
+                const active = activeTab === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setActiveTab(id)}
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold whitespace-nowrap ${
+                      active
+                        ? 'border-sky-400/35 bg-sky-500/20 text-sky-200'
+                        : 'border-white/10 bg-white/[0.03] text-gray-400'
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
-
-          <Link
-            to="/wallet-checker"
-            className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-500/15 border border-sky-500/30 px-4 py-3 text-sm font-bold text-sky-300 hover:text-white hover:bg-sky-500/25 transition-colors"
-          >
-            Run Wallet Intelligence
-            <ExternalLink className="w-4 h-4" />
-          </Link>
-        </div>
-      </div>
-    </div>
-
-    {/* Sticky app-style tabs */}
-    <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-dark-900/95 backdrop-blur-xl border-y border-white/5">
-      <div className="flex gap-2 overflow-x-auto no-scrollbar">
-        {[
-          { id: 'overview' as const, label: 'Overview', icon: BarChart3 },
-          { id: 'airdrops' as const, label: 'Airdrops', icon: Rocket },
-          { id: 'tasks' as const, label: 'Tasks', icon: ListChecks },
-          { id: 'api' as const, label: 'API', icon: Key },
-        ].map(({ id, label, icon: Icon }) => {
-          const active = activeTab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold whitespace-nowrap border transition-colors ${
-                active
-                  ? 'bg-sky-500/15 border-sky-500/25 text-sky-300'
-                  : 'bg-white/[0.03] border-white/5 text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
 
     {activeTab === 'overview' && (
       <div className="space-y-6">
-        <AirdropCopilot />
+        <div className="relative overflow-hidden rounded-3xl border border-violet-400/25 bg-gradient-to-r from-[#0f1b37] via-[#101531] to-[#1a1340] p-5 shadow-[0_0_60px_rgba(139,92,246,0.2)] sm:p-6">
+          <div className="pointer-events-none absolute -right-12 -top-10 h-44 w-44 rounded-full bg-violet-500/20 blur-2xl" />
+          <div className="pointer-events-none absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-sky-500/20 blur-2xl" />
+
+          <div className="relative grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200">
+                <Bot className="h-3.5 w-3.5" />
+                Copilot Intelligence
+              </div>
+              <h2 className="mt-3 text-2xl font-black text-white sm:text-3xl">Your Airdrop Research Copilot</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-300">
+                Intelligent, data-driven recommendations tailored to your risk profile, time budget, and tracked opportunities.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {[
+                  'Best picks for this week',
+                  'Low-risk options for beginners',
+                  'What can I do in 30 minutes?',
+                ].map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => document.getElementById('copilot-chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                    className="rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-gray-200 hover:border-sky-400/35 hover:bg-sky-500/15 transition-colors"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => document.getElementById('copilot-chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="mt-4 inline-flex items-center rounded-2xl bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2.5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(59,130,246,0.32)] hover:opacity-90"
+              >
+                Set Preferences
+              </button>
+            </div>
+
+            <div className="relative mx-auto flex h-44 w-full max-w-sm items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03]">
+              <div className="absolute h-28 w-28 rounded-full border border-sky-400/35 bg-sky-500/10 blur-[2px]" />
+              <div className="absolute h-20 w-20 rounded-full border border-violet-400/50" />
+              <div className="relative flex h-24 w-24 items-center justify-center rounded-[28px] border border-white/20 bg-gradient-to-br from-sky-500/25 via-transparent to-violet-500/30 shadow-[0_0_35px_rgba(56,189,248,0.35)]">
+                <Bot className="h-11 w-11 text-sky-300" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="copilot-chat" className="scroll-mt-24">
+          <AirdropCopilot />
+        </div>
+
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-300">Top Recommended Airdrops</h2>
+            <span className="text-[11px] text-gray-500">Prioritized by urgency, trust, and progress</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {priorityAirdrops.slice(0, 6).map(a => (
+              <ProgressCard key={a.id} airdrop={a} done={doneByAirdrop[a.id] ?? 0} total={a.tasks.length} />
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="glass-card p-4 border border-sky-500/20">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-4 h-4 text-sky-300" />
+              <h2 className="text-sm font-semibold text-white">Airdrop Opportunities Summary</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-xl font-black text-white">{trendingAirdrops.length}</p>
+                <p className="text-[11px] text-gray-500 uppercase tracking-wider">Trending</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-xl font-black text-amber-300">{remainingCount}</p>
+                <p className="text-[11px] text-gray-500 uppercase tracking-wider">Open Tasks</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-xl font-black text-rose-300">
+                  {deadlineAirdrops.filter(a => urgencyOf(a.expiry_date) === 'critical' || urgencyOf(a.expiry_date) === 'warning').length}
+                </p>
+                <p className="text-[11px] text-gray-500 uppercase tracking-wider">Urgent Deadlines</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <p className="text-xl font-black text-cyan-300">{overallPct}%</p>
+                <p className="text-[11px] text-gray-500 uppercase tracking-wider">Completion</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card p-4 border border-emerald-500/20">
+            <div className="flex items-center gap-2 mb-3">
+              <Wallet className="w-4 h-4 text-emerald-300" />
+              <h2 className="text-sm font-semibold text-white">Wallet Intelligence</h2>
+            </div>
+            <p className="text-xs leading-relaxed text-gray-400">
+              Scan your wallet for health, risk exposure, token hygiene, and airdrop-readiness insights. REP is earned through verified wallet intelligence signals.
+            </p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                <div className="text-xs font-bold text-white">L{level}</div>
+                <div className="text-[10px] text-gray-600">Profile</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                <div className="text-xs font-bold text-white">{rep.toLocaleString()}</div>
+                <div className="text-[10px] text-gray-600">REP</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                <div className="text-xs font-bold text-white">{nextUnlock ? `L${nextUnlock.level}` : 'Max'}</div>
+                <div className="text-[10px] text-gray-600">Next</div>
+              </div>
+            </div>
+            <Link
+              to="/wallet-checker"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 px-4 py-2.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 hover:text-white transition-colors"
+            >
+              Run Wallet Intelligence
+              <ExternalLink className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="glass-card p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Trophy className="w-4 h-4 text-amber-300" />
+              <h2 className="text-sm font-semibold text-white">Your Activity</h2>
+            </div>
+            <div className="space-y-2 text-xs">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-gray-300">
+                Completed {completedCount} task{completedCount !== 1 ? 's' : ''} and reached {overallPct}% total progress.
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-gray-300">
+                Tracking {airdrops.length} active airdrop opportunities with {deadlineAirdrops.length} upcoming deadline{deadlineAirdrops.length !== 1 ? 's' : ''}.
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-gray-300">
+                Reputation level: {level} ({title}) with {rep.toLocaleString()} REP.
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="h-4 w-4 shrink-0 text-amber-300 mt-0.5" />
+              <div>
+                <h2 className="text-sm font-bold text-white">Safety First Always</h2>
+                <p className="mt-1 text-xs leading-relaxed text-gray-300">
+                  Verify project links, avoid suspicious wallet connections, and never share seed phrases or private keys. Treat every reward claim with caution until verified.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
         <ReputationRulesNotice />
         <DashboardEngagementPanel />
         <AirdropGuardIntelligenceCentre />
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard
-            label="Tracked Airdrops" value={airdrops.length}
-            icon={Rocket} iconBg="bg-neon-purple/10 border border-neon-purple/20" iconClass="text-neon-purple"
-          />
-          <StatCard
-            label="Tasks Completed" value={completedCount}
-            icon={CheckSquare} iconBg="bg-emerald-500/10 border border-emerald-500/20" iconClass="text-emerald-400"
-            sub={totalTasks > 0 ? `of ${totalTasks} total` : undefined}
-          />
-          <StatCard
-            label="Tasks Remaining" value={remainingCount}
-            icon={ListChecks} iconBg="bg-amber-500/10 border border-amber-500/20" iconClass="text-amber-400"
-          />
-          <StatCard
-            label="Overall Progress" value={`${overallPct}%`}
-            icon={overallPct === 100 ? Target : TrendingUp}
-            iconBg={overallPct === 100 ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-sky-500/10 border border-sky-500/20'}
-            iconClass={overallPct === 100 ? 'text-emerald-400' : 'text-sky-400'}
-          />
-        </div>
-
-        {/* Daily Briefing + Achievements */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="glass-card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                <Bell className="w-4 h-4 text-amber-400" />
-              </div>
-              <h2 className="text-sm font-semibold text-white">Daily Briefing</h2>
-              <span className="text-[10px] text-gray-600 ml-auto">Refresh daily</span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="rounded-xl bg-dark-700/35 border border-white/5 px-3 py-2 flex items-start gap-2">
-                <Zap className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  {focusAirdrops.length > 0
-                    ? `Top priority: ${focusAirdrops[0].name}.`
-                    : 'No urgent focus item right now.'}
-                </p>
-              </div>
-              <div className="rounded-xl bg-dark-700/35 border border-white/5 px-3 py-2 flex items-start gap-2">
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  {deadlineAirdrops.length > 0
-                    ? `${deadlineAirdrops.length} upcoming deadline${deadlineAirdrops.length !== 1 ? 's' : ''} to watch.`
-                    : 'No upcoming deadlines found.'}
-                </p>
-              </div>
-              <div className="rounded-xl bg-dark-700/35 border border-white/5 px-3 py-2 flex items-start gap-2">
-                <Target className="w-3.5 h-3.5 text-sky-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-gray-400 leading-relaxed">
-                  You&apos;ve completed {completedCount} task{completedCount !== 1 ? 's' : ''}. {remainingCount} remain.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                <Trophy className="w-4 h-4 text-emerald-400" />
-              </div>
-              <h2 className="text-sm font-semibold text-white">Achievements</h2>
-              <span className="text-[10px] text-gray-600 ml-auto">Keep building</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {[
-                { label: 'First Login', unlocked: true, detail: 'Dashboard unlocked' },
-                { label: 'Task Tracker', unlocked: completedCount > 0, detail: 'Personal checklist progress only' },
-                { label: 'Organised Hunter', unlocked: completedCount >= 10, detail: 'Tracked 10+ checklist items' },
-                { label: 'Checklist Complete', unlocked: overallPct === 100 && totalTasks > 0, detail: 'Progress only, no REP awarded' },
-                { label: 'Deadline Watcher', unlocked: deadlineAirdrops.length > 0, detail: 'Tracking live deadlines' },
-                { label: 'Wallet Ready', unlocked: false, detail: 'Run Wallet Intelligence to earn REP' },
-              ].map(item => (
-                <div key={item.label} className={`rounded-xl border px-3 py-2.5 flex items-start gap-2 ${item.unlocked ? 'bg-emerald-500/[0.04] border-emerald-500/15' : 'bg-dark-700/25 border-white/5'}`}>
-                  {item.unlocked ? <Check className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" /> : <Award className="w-3.5 h-3.5 text-gray-700 mt-0.5 shrink-0" />}
-                  <div>
-                    <div className={`text-xs font-semibold ${item.unlocked ? 'text-white' : 'text-gray-600'}`}>{item.label}</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">{item.detail}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
 
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -1253,6 +1341,10 @@ export default function CustomerDashboard() {
 
     {activeTab === 'airdrops' && (
       <div className="space-y-6">
+        <div className="glass-card p-4 border border-white/10">
+          <h2 className="text-lg font-bold text-white">Top Recommended Airdrops</h2>
+          <p className="mt-1 text-xs text-gray-500">High-value opportunities ranked by trust, urgency, and current checklist progress.</p>
+        </div>
         {/* Trending */}
         {trendingAirdrops.length > 0 && (
           <div className="glass-card p-4">
@@ -1373,6 +1465,10 @@ export default function CustomerDashboard() {
 
     {activeTab === 'api' && (
       <div className="space-y-4">
+        <div className="glass-card p-4 border border-white/10">
+          <h2 className="text-lg font-bold text-white">API Access</h2>
+          <p className="mt-1 text-xs text-gray-500">Manage your subscription and credentials for programmatic access.</p>
+        </div>
         {subscription && (
           <div>
             <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">API Subscription</h2>
@@ -1424,6 +1520,9 @@ export default function CustomerDashboard() {
         )}
       </div>
     )}
+        </main>
+      </div>
+    </div>
   </div>
   );
 }
