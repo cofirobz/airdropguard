@@ -171,7 +171,7 @@ const sampleActions = [
 
 function SupportedChainsStrip() {
   return (
-    <div className="mt-5 rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+    <div className="mt-5 w-full max-w-full rounded-2xl border border-white/5 bg-white/[0.03] p-3">
       <div className="mb-2 flex items-center gap-2">
         <Layers3 className="h-3.5 w-3.5 text-sky-400" />
         <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
@@ -179,7 +179,7 @@ function SupportedChainsStrip() {
         </span>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap">
+      <div className="flex flex-wrap gap-2 pb-1">
         {supportedChains.map((chain) => (
           <span
             key={chain}
@@ -226,13 +226,13 @@ function TrustPillars() {
 
 function WalletGradePreview() {
   return (
-    <div className="glass-card border border-sky-500/15 p-4 sm:p-6">
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div>
+    <div className="glass-card w-full max-w-full border border-sky-500/15 p-4 sm:p-6">
+      <div className="mb-5 flex items-start justify-between gap-4 min-w-0">
+        <div className="min-w-0">
           <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 sm:text-xs">
             Wallet IQ Dashboard
           </div>
-          <h2 className="text-xl font-black text-white sm:text-2xl">
+          <h2 className="text-xl font-black text-white sm:text-2xl break-words">
             Read-only wallet intelligence
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-gray-400">
@@ -246,8 +246,8 @@ function WalletGradePreview() {
       </div>
 
       <div className="mb-5 rounded-3xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
+        <div className="flex items-center justify-between gap-4 min-w-0">
+          <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-300">
               Example Wallet Grade
             </p>
@@ -522,9 +522,9 @@ export default function WalletCheckerPage() {
         <div className="absolute inset-0 hidden sm:block bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_30%),radial-gradient(circle_at_80%_15%,rgba(168,85,247,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.10),transparent_26%)]" />
         <div className="absolute inset-0 hidden md:block bg-[linear-gradient(rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:44px_44px]" />
 
-        <div className="relative mx-auto max-w-7xl px-4 pb-9 pt-9 sm:px-6 sm:pb-14 sm:pt-16 lg:px-8 lg:pb-16 lg:pt-20">
-          <div className="grid items-center gap-7 lg:grid-cols-[0.92fr_1.08fr] lg:gap-10">
-            <div>
+        <div className="relative mx-auto w-full max-w-7xl max-w-full px-4 pb-9 pt-9 sm:px-6 sm:pb-14 sm:pt-16 lg:px-8 lg:pb-16 lg:pt-20">
+          <div className="grid grid-cols-1 items-center gap-7 lg:grid-cols-[0.92fr_1.08fr] lg:gap-10">
+            <div className="w-full max-w-full min-w-0">
               <div className="mb-4 inline-flex max-w-full items-center gap-2 rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-2">
                 <Shield className="h-3.5 w-3.5 shrink-0 text-sky-400" />
                 <span className="text-[11px] font-semibold leading-snug text-sky-300 sm:text-xs">
@@ -532,18 +532,18 @@ export default function WalletCheckerPage() {
                 </span>
               </div>
 
-              <h1 className="max-w-3xl text-3xl font-black leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
+              <h1 className="max-w-full text-3xl font-black leading-tight tracking-tight text-white sm:max-w-3xl sm:text-5xl lg:text-6xl">
                 The most advanced read-only wallet intelligence report.
               </h1>
 
-              <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-300 sm:mt-5 sm:text-lg">
+              <p className="mt-4 max-w-full text-sm leading-relaxed text-gray-300 sm:mt-5 sm:max-w-2xl sm:text-lg">
                 Turn a public wallet address into a clear report covering wallet health, visible risk, token hygiene, activity quality, wallet DNA and airdrop-readiness signals.
               </p>
 
-              <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row">
+              <div className="mt-6 flex w-full flex-col gap-3 sm:mt-8 sm:flex-row sm:items-center">
                 <a
                   href="#wallet-report"
-                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl bg-sky-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-sky-500/10 transition-colors hover:bg-sky-500/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
+                  className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-sky-500/10 transition-colors hover:bg-sky-500/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950 sm:w-auto"
                 >
                   Analyze Wallet
                   <ArrowRight className="h-4 w-4" />
@@ -551,7 +551,7 @@ export default function WalletCheckerPage() {
 
                 <a
                   href="#why-different"
-                  className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
+                  className="inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950 sm:w-auto"
                 >
                   Why It Is Different
                 </a>
@@ -561,7 +561,9 @@ export default function WalletCheckerPage() {
               <SupportedChainsStrip />
             </div>
 
-            <WalletGradePreview />
+            <div className="w-full max-w-full min-w-0 mx-auto">
+              <WalletGradePreview />
+            </div>
           </div>
         </div>
       </section>
