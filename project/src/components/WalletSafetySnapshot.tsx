@@ -1587,7 +1587,7 @@ export default function WalletSafetySnapshot() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       <div className="glass-card rounded-3xl p-4 sm:p-5 border border-sky-500/20 bg-sky-500/[0.04]">
         <div className="flex items-start gap-3 mb-3">
           <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
@@ -1604,10 +1604,12 @@ export default function WalletSafetySnapshot() {
         <p className="text-[10px] text-gray-600 mt-2.5">We only analyse publicly available blockchain data.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-[0.72fr_0.28fr] gap-2">
-          <input type="text" value={address} onChange={e => { const next = e.target.value; setAddress(next); if (next && !next.trim().startsWith('0x')) setSelectedChain('solana'); else if (selectedChain === 'solana') setSelectedChain('1'); }} placeholder="Enter wallet address" className="min-h-[48px] w-full bg-dark-700/70 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-sky-500/50 transition-colors font-mono min-w-0" disabled={loading} autoComplete="off" spellCheck={false} />
-          <div className="relative">
+      <form onSubmit={handleSubmit} className="space-y-3 overflow-x-hidden">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[0.72fr_0.28fr]">
+          <div className="w-full min-w-0 mx-auto max-w-[42rem] sm:max-w-none sm:mx-0">
+            <input type="text" value={address} onChange={e => { const next = e.target.value; setAddress(next); if (next && !next.trim().startsWith('0x')) setSelectedChain('solana'); else if (selectedChain === 'solana') setSelectedChain('1'); }} placeholder="Enter wallet address" className="min-h-[48px] w-full max-w-full bg-dark-700/70 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-sky-500/50 transition-colors font-mono min-w-0" disabled={loading} autoComplete="off" spellCheck={false} />
+          </div>
+          <div className="relative w-full min-w-0 mx-auto max-w-[42rem] sm:max-w-none sm:mx-0">
             <select value={selectedChain} onChange={e => setSelectedChain(e.target.value as SupportedChainId)} disabled={loading || (address.trim() !== '' && !address.trim().startsWith('0x'))} className="min-h-[48px] w-full appearance-none bg-dark-700/70 border border-white/10 rounded-2xl px-4 py-3 pr-9 text-sm text-white focus:outline-none focus:border-sky-500/50 transition-colors disabled:opacity-50">
               {SUPPORTED_CHAINS.map(chain => <option key={chain.id} value={chain.id} className="bg-dark-800 text-white">{chain.name}</option>)}
             </select>
@@ -1620,7 +1622,7 @@ export default function WalletSafetySnapshot() {
             <Globe2 className="w-3.5 h-3.5 text-sky-400 shrink-0 mt-0.5" />
             <p className="text-[10px] text-gray-500 leading-relaxed">Selected chain: <span className="text-gray-300 font-semibold">{selectedChainMeta.name}</span> · {selectedChainMeta.focus}</p>
           </div>
-          <button type="submit" disabled={loading || !address.trim()} className="w-full sm:w-auto min-h-[48px] px-5 py-3 rounded-2xl bg-sky-500 border border-sky-400/30 text-white hover:bg-sky-500/90 transition-colors text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 shadow-lg shadow-sky-500/10">
+          <button type="submit" disabled={loading || !address.trim()} className="w-full max-w-[42rem] mx-auto sm:max-w-none sm:mx-0 sm:w-auto min-h-[48px] px-5 py-3 rounded-2xl bg-sky-500 border border-sky-400/30 text-white hover:bg-sky-500/90 transition-colors text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 shadow-lg shadow-sky-500/10">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             <span>{loading ? 'Scanning' : `Analyze ${selectedChainMeta.short}`}</span>
           </button>

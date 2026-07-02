@@ -1,0 +1,31 @@
+﻿a3c6a87f-3173-46f6-8eb3-568b03c96f7e|Abstract|abstract-mqjw9140
+a9a373d4-81ed-4bbb-b3a6-17103cec7c72|Anoma|anoma-mqh2sxuw
+120f0aee-2c64-4666-87be-d7e0d642083c|Backpack|backpack-mqn0yh05
+f2de9da6-0c45-43ee-88c1-dde3ee158a7c|Berachain|berachain-mqi68evs
+ec65eb22-c6f8-47c6-81bd-e2589cb50f52|Boundless|boundless-mqxcmpwq
+6022e4b3-ae8f-4c72-8272-0ebf7ad54bec|Bybit EU|bybit-eu-rewards-aio
+0a59face-aaa0-4a94-84b0-fc3291f30180|Camp Network|camp-network-mqtzlpfn
+a9369fdb-9ea1-4815-9ba7-7b34ab61ebf4|Ceitnot|ceitnot-protocol-testnet-aio
+4c99a7cc-f320-4b44-bcd7-a58c0962be32|ChimpX|chimpx-ai-aio
+0e2cd7c4-4e14-402f-8bba-25002a9ca48b|Clasho|clasho-get-paid-to-post-aio
+d82d0ef0-3d9a-40a0-ae35-40b2f4eae6e0|Cycles|cycles-money-aio
+87570ba5-9da8-469c-9549-cd7fdaafd0a5|Divvy|divvy-bet-world-cup-2026-aio
+f0b4ebf5-3cc9-44da-bf3e-50f92f796ee8|Dustswap|dustswap-aio
+2ead1777-0116-4a67-bb86-30aff08c4ff8|Eclipse|eclipse-mqh1zhai
+06018549-c58a-4272-909c-9abdf3fc9aeb|Espresso|espresso-mr3ee2js
+2a13ddf8-e5e7-477f-9d2f-1eb3ae84bbcd|Farcaster|farcaster-mqlgh3wd
+a4232a6b-c652-45e4-81af-7d15878732bf|Humanity Protocol|humanity-protocol-mqh4emiv
+fe292067-35fe-4033-bec4-0e28eeec70ff|Hypernova|hypernova-onchain-prop-firm-aio
+4f3c3c58-b588-4f1a-a0df-4290aff4abb1|Initia|initia-mqjwidac
+cf6fa7fd-39e1-480e-b10e-799c1eb2ae6d|JTX|jtx-mqn2by0q
+200ff363-ef62-4a8d-86db-52eb75d692e3|MegaETH|megaeth-mqjvml4x
+da34dce4-0fb3-4ec9-adbe-5239fbbb5b9f|MetaMask|metamask-mqu0i7dr
+daadf0fd-4d19-453c-ba2a-632d591d2e7a|Monetrix|monetrix-hyperliquid-yield-protocol-aio
+394c6ce9-8c3b-4700-949d-b9e1e2d248b6|Nillion|nillion-mqjvzlcj
+b050dffa-cdb3-4394-8188-12b01e4ee973|OpenLedger|openledger-mqwz0i1y
+f882d430-539e-4b54-a736-a962c6483a83|OpenSea|opensea-mqldvcru
+b51a6d67-3736-4047-a535-482f8d18017d|Polymarket|polymarket-mqtzd7vo
+7b6e510e-5add-437c-b56a-1bafb4145dbb|Succinct|succinct-mqh26hx4
+4bc33cac-4bf4-46e9-9175-2acaebacf32b|Tangent Finance|tangent-finance-aio
+396413ce-6c46-4988-b8e2-3ed219a46125|Tomoland|tomoland-ugc-game-aio
+f0d62957-8f66-4716-9cb8-aa7efed30ca4|Union|union-mqu0c0r8

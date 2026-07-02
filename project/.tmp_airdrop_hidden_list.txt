@@ -1,0 +1,35 @@
+﻿20d616f8-c6ea-44ce-9869-90be17c64814|Akka Finance|akka-finance-aio|published=True|review_status=pending|is_demo=False|listing_state=verified
+ed99b2df-c13d-4285-9212-fc09e8b644ef|Aptos|aptos-network|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+1be16234-8a77-4663-ae16-f003f58680c0|Babylon|babylon|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+42b6be13-8fe8-42d6-bc60-8163c5082ca8|Base|base-chain|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+4b735423-426f-4098-a2d4-27751795fc53|Berachain|berachain|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+ca289445-2afa-4a1a-a428-af075dc81677|Blast|blast|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+8186ae78-e74e-4a2a-8ca1-e5adca13d356|Celestia|celestia|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+ad599571-1f84-40ac-8244-3c60b2ae0ab8|Dymension|dymension|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+6f602b45-f9d7-4fa8-a662-b4866c7ac63c|EigenLayer|eigenlayer|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+02ea6dfe-c162-4ce2-b55d-317966b0f55f|Ethena|ethena|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+41e80c3c-6817-4b19-9ff8-b356b17683cf|Fuel Network|fuel-network|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+090a621b-ea48-432f-bdda-f3dab36630f4|Grass|grass|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+cd6b8e66-661b-444b-9725-b4d0ceebaf97|Hyperliquid|hyperliquid|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+574efff2-f817-48ef-b430-1aff24ff5f06|Initia|initia|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+b9bca5bd-c9c4-458c-85ab-ab19320e8ff1|io.net|io-net|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+03e2a59b-0c66-414a-bf80-e0d5bac33254|Jupiter|jupiter-dex|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+fac38af8-07f6-43de-b870-327ee7f50c5f|Kaito|kaito|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+1426b052-c00c-43eb-a654-34abbc517fed|LayerZero|layerzero|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+c5f6fd48-8c37-4362-b21a-46d9297d17c7|Linea|linea|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+4b40c4c5-88d2-4096-abcd-6d326df806a7|Monad|monad|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+3d7f8912-c10e-428f-adb7-001f69388d23|Movement Network|movement|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+d586eb3f-de69-42c5-9480-dcdce17a326d|Onchain.cc|onchain-cc-mqcqw875|published=True|review_status=replaced_demo|is_demo=True|listing_state=verified
+3b6ce8f0-1f3b-4abf-a846-280ea02a50b4|Pendle|pendle|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+f58ae97b-58b5-4ffc-a1ef-e004591b02f7|Plume Network|plume-network|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+c1183691-9d1a-4e4d-a111-000dbfd9995c|Pyth Network|pyth-network|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+407fb4e7-1ac5-447a-a93a-cc718fbeaf36|Scroll|scroll|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+14e2e800-07aa-47d9-9be0-d75cb88e4b74|Sophon|sophon|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+1f753ee5-fc8a-472d-a4ab-28cf42ba1398|Starknet|starknet|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+7b9e99f3-e02f-4dcd-98c3-c6f967d18f9c|Story Protocol|story-protocol|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+d466b847-47c6-4495-b948-9d30c06d4d5a|Sui Network|sui-network|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+c251e277-6e5b-414a-b0b3-0e62d0b89bae|Symbiotic|symbiotic|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+f6e0c5b8-3008-4a79-8685-1345d6b95b45|Taiko|taiko|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+d78ffc62-c6e5-41e9-9b2e-0d3bbf7d4fe4|Wormhole|wormhole|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+51fe557c-4009-4266-91cd-80a60f684809|Zircuit|zircuit|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified
+7147857a-ccac-46fa-be19-de38befc2b22|zkSync Era|zksync-era|published=True|review_status=replaced_demo|is_demo=True|listing_state=Verified

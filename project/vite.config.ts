@@ -2,28 +2,90 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import fs from 'node:fs';
 import path from 'node:path';
+import { SITEMAP_BASE_URL, STATIC_SITEMAP_ROUTES } from './scripts/sitemap.config.mjs';
 
-const STATIC_PAGES = [
-  { loc: 'https://airdropguard.com/', changefreq: 'daily', priority: '1.0' },
-  { loc: 'https://airdropguard.com/learn', changefreq: 'weekly', priority: '0.7' },
-  { loc: 'https://airdropguard.com/scam-alerts', changefreq: 'weekly', priority: '0.8' },
-  { loc: 'https://airdropguard.com/submit', changefreq: 'monthly', priority: '0.6' },
-  { loc: 'https://airdropguard.com/api-docs', changefreq: 'monthly', priority: '0.6' },
-  { loc: 'https://airdropguard.com/pricing', changefreq: 'monthly', priority: '0.6' },
-  { loc: 'https://airdropguard.com/advertise', changefreq: 'monthly', priority: '0.5' },
-  { loc: 'https://airdropguard.com/articles', changefreq: 'weekly', priority: '0.7' },
-  { loc: 'https://airdropguard.com/whitepaper', changefreq: 'monthly', priority: '0.6' },
-  { loc: 'https://airdropguard.com/wallet-checker', changefreq: 'weekly', priority: '0.8' },
+type AirdropRecord = Record<string, unknown> & {
+  slug?: string;
+  updated_at?: string;
+};
+
+const NEGATIVE_STATE_VALUES = new Set([
+  'rejected',
+  'blacklisted',
+  'hidden',
+  'archived',
+  'pending',
+  'under_review',
+  'draft',
+  'replaced_demo',
+]);
+
+const NEGATIVE_STATE_FIELDS = ['review_status', 'listing_state', 'status', 'visibility'];
+const NEGATIVE_BOOL_FIELDS = [
+  'is_hidden',
+  'hidden',
+  'is_archived',
+  'archived',
+  'is_blacklisted',
+  'blacklisted',
+  'is_rejected',
+  'rejected',
 ];
+
+function toLowerString(value: unknown): string {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function isTrue(value: unknown): boolean {
+  return value === true || value === 1 || value === '1' || value === 'true';
+}
+
+function isNotDemo(value: unknown): boolean {
+  return value !== true;
+}
+
+function isRealLiveAirdrop(row: AirdropRecord): boolean {
+  if (!row.slug || typeof row.slug !== 'string') return false;
+
+  if ('is_demo' in row && !isNotDemo(row.is_demo)) return false;
+
+  for (const field of NEGATIVE_STATE_FIELDS) {
+    if (!(field in row)) continue;
+    const value = toLowerString(row[field]);
+    if (value && NEGATIVE_STATE_VALUES.has(value)) return false;
+  }
+
+  for (const field of NEGATIVE_BOOL_FIELDS) {
+    if (!(field in row)) continue;
+    if (isTrue(row[field])) return false;
+  }
+
+  return true;
+}
+
+function normalizeAirdrops(rows: AirdropRecord[]): Array<{ slug: string; updated_at: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ slug: string; updated_at: string }> = [];
+
+  for (const row of rows) {
+    if (!isRealLiveAirdrop(row)) continue;
+    const slug = String(row.slug).trim();
+    if (!slug || seen.has(slug)) continue;
+    seen.add(slug);
+    out.push({ slug, updated_at: typeof row.updated_at === 'string' ? row.updated_at : '' });
+  }
+
+  return out;
+}
 
 function buildSitemapXml(airdropSlugs: Array<{ slug: string; updated_at: string }>): string {
   const today = new Date().toISOString().split('T')[0];
 
   const entries = [
-    ...STATIC_PAGES.map(
+    ...STATIC_SITEMAP_ROUTES.map(
       (p) =>
         `<url>
-<loc>${p.loc}</loc>
+<loc>${SITEMAP_BASE_URL}${p.path}</loc>
 <changefreq>${p.changefreq}</changefreq>
 <priority>${p.priority}</priority>
 </url>`
@@ -31,7 +93,7 @@ function buildSitemapXml(airdropSlugs: Array<{ slug: string; updated_at: string 
     ...airdropSlugs.map((a) => {
       const lastmod = a.updated_at ? a.updated_at.split('T')[0] : today;
       return `<url>
-<loc>https://airdropguard.com/airdrop/${a.slug}</loc>
+<loc>${SITEMAP_BASE_URL}/airdrop/${a.slug}</loc>
 <lastmod>${lastmod}</lastmod>
 <changefreq>weekly</changefreq>
 <priority>0.8</priority>
@@ -72,7 +134,7 @@ function sitemapGeneratorPlugin() {
       if (supabaseUrl && anonKey) {
         try {
           const res = await fetch(
-            `${supabaseUrl}/rest/v1/airdrops?select=slug,updated_at&published=eq.true&review_status=eq.approved&is_demo=eq.false&order=updated_at.desc`,
+            `${supabaseUrl}/rest/v1/airdrops?select=*&order=updated_at.desc.nullslast`,
             {
               headers: {
                 apikey: anonKey,
@@ -82,7 +144,8 @@ function sitemapGeneratorPlugin() {
           );
 
           if (res.ok) {
-            airdrops = await res.json();
+            const rows = (await res.json()) as AirdropRecord[];
+            airdrops = normalizeAirdrops(rows);
           } else {
             console.warn(`[sitemap] Supabase returned ${res.status} — static pages only.`);
           }

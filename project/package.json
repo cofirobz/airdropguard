@@ -8,9 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "sitemap:save": "node scripts/guard-sitemap.cjs backup",
-    "sitemap:restore": "node scripts/guard-sitemap.cjs restore",
-    "sitemap:verify": "node scripts/guard-sitemap.cjs verify"
+    "sitemap:generate": "vite build"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
