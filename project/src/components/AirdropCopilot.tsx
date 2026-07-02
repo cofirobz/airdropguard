@@ -194,10 +194,10 @@ export default function AirdropCopilot({ onClose, summary, className }: AirdropC
   };
 
   return (
-    <div className={`relative flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-sky-400/20 bg-[linear-gradient(160deg,rgba(7,11,24,0.95)_10%,rgba(8,14,34,0.96)_45%,rgba(12,9,35,0.96)_100%)] shadow-[0_0_40px_rgba(56,189,248,0.2),0_0_90px_rgba(99,102,241,0.16)] ${className ?? ''}`}>
+    <div className={`relative flex h-full min-h-0 w-full max-w-full flex-col overflow-x-hidden overflow-y-hidden rounded-[28px] border border-sky-400/20 bg-[linear-gradient(160deg,rgba(7,11,24,0.95)_10%,rgba(8,14,34,0.96)_45%,rgba(12,9,35,0.96)_100%)] shadow-[0_0_40px_rgba(56,189,248,0.2),0_0_90px_rgba(99,102,241,0.16)] ${className ?? ''}`}>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(56,189,248,0.17),transparent_34%),radial-gradient(circle_at_90%_16%,rgba(139,92,246,0.18),transparent_32%)]" />
 
-      <div className="relative border-b border-white/10 px-4 py-4 sm:px-5">
+      <div className="relative sticky top-0 z-20 shrink-0 border-b border-white/10 bg-[#081024]/95 px-4 py-3 backdrop-blur-xl sm:px-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/25 bg-sky-500/10 px-2.5 py-1">
@@ -241,13 +241,15 @@ export default function AirdropCopilot({ onClose, summary, className }: AirdropC
             )}
           </div>
         </div>
+      </div>
 
-        <div className="mt-4 rounded-2xl border border-sky-400/25 bg-gradient-to-br from-sky-500/15 via-indigo-500/10 to-violet-500/20 p-3.5">
-          <p className="text-lg font-bold text-white">{greeting}, {userName} <span aria-hidden>👋</span></p>
-          <p className="mt-1 text-sm text-gray-200">I've analysed your current airdrop opportunities.</p>
-          <div className="mt-3 rounded-xl border border-white/10 bg-[#0c1228]/70 p-3">
+      <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-3 sm:px-5">
+        <div className="rounded-2xl border border-sky-400/25 bg-gradient-to-br from-sky-500/15 via-indigo-500/10 to-violet-500/20 p-3">
+          <p className="text-base font-bold text-white">{greeting}, {userName} <span aria-hidden>👋</span></p>
+          <p className="mt-0.5 text-xs text-gray-200">I've analysed your current airdrop opportunities.</p>
+          <div className="mt-2 rounded-xl border border-white/10 bg-[#0c1228]/70 p-2.5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-300">Today's Summary</p>
-            <div className="mt-2 space-y-1.5 text-xs text-gray-200">
+            <div className="mt-1.5 space-y-1 text-[11px] text-gray-200">
               <p>• {verifiedCount} new verified projects</p>
               <p>• {expiresToday} project{expiresToday !== 1 ? 's' : ''} expires today</p>
               <p>• {momentumText}</p>
@@ -256,87 +258,85 @@ export default function AirdropCopilot({ onClose, summary, className }: AirdropC
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-2 py-2 text-center">
+        <div className="mt-2.5 grid grid-cols-3 gap-2">
+          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1.5 text-center">
             <p className="text-[10px] uppercase tracking-[0.12em] text-emerald-300">AI Confidence</p>
-            <p className="mt-0.5 text-sm font-black text-white">{confidence}%</p>
+            <p className="text-xs font-black text-white">{confidence}%</p>
           </div>
-          <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-2 py-2 text-center">
+          <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2 py-1.5 text-center">
             <p className="text-[10px] uppercase tracking-[0.12em] text-sky-300">Data Sources</p>
-            <p className="mt-0.5 text-sm font-black text-white">{dataSources}+</p>
+            <p className="text-xs font-black text-white">{dataSources}+</p>
           </div>
-          <div className="rounded-xl border border-violet-500/20 bg-violet-500/10 px-2 py-2 text-center">
+          <div className="rounded-lg border border-violet-500/20 bg-violet-500/10 px-2 py-1.5 text-center">
             <p className="text-[10px] uppercase tracking-[0.12em] text-violet-300">Last Updated</p>
-            <p className="mt-0.5 text-sm font-black text-white">{lastUpdated}</p>
+            <p className="text-xs font-black text-white">{lastUpdated}</p>
           </div>
         </div>
-      </div>
 
-      {showPreferences && (
-        <div className="relative border-b border-white/10 bg-[#0b1228]/75 px-4 py-3 sm:px-5">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-xs text-gray-400">
-              <span className="block font-semibold uppercase tracking-wider text-gray-300">Experience</span>
-              <select
-                value={preferences.experience_level ?? ''}
-                onChange={event => void handlePreferencesChange({ experience_level: (event.target.value || null) as UserPreferences['experience_level'] })}
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-[#111a34] px-3 py-2 text-sm text-white focus:border-sky-500/50 focus:outline-none"
-                disabled={prefLoading || prefSaving}
-              >
-                <option value="">Not set</option>
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-xs text-gray-400">
-              <span className="block font-semibold uppercase tracking-wider text-gray-300">Daily Time</span>
-              <select
-                value={preferences.daily_time_available ?? ''}
-                onChange={event => void handlePreferencesChange({ daily_time_available: (event.target.value || null) as UserPreferences['daily_time_available'] })}
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-[#111a34] px-3 py-2 text-sm text-white focus:border-sky-500/50 focus:outline-none"
-                disabled={prefLoading || prefSaving}
-              >
-                <option value="">Not set</option>
-                <option value="15">15 minutes</option>
-                <option value="30">30 minutes</option>
-                <option value="60+">60+ minutes</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-xs text-gray-400">
-              <span className="block font-semibold uppercase tracking-wider text-gray-300">Risk Tolerance</span>
-              <select
-                value={preferences.risk_tolerance ?? ''}
-                onChange={event => void handlePreferencesChange({ risk_tolerance: (event.target.value || null) as UserPreferences['risk_tolerance'] })}
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-[#111a34] px-3 py-2 text-sm text-white focus:border-sky-500/50 focus:outline-none"
-                disabled={prefLoading || prefSaving}
-              >
-                <option value="">Not set</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-xs text-gray-400">
-              <span className="block font-semibold uppercase tracking-wider text-gray-300">Preferred Chains</span>
-              <select
-                multiple
-                value={preferences.preferred_chains ?? []}
-                onChange={event => void handlePreferencesChange({ preferred_chains: Array.from(event.target.selectedOptions).map(option => option.value) })}
-                className="min-h-[108px] w-full rounded-xl border border-white/10 bg-[#111a34] px-3 py-2 text-sm text-white focus:border-sky-500/50 focus:outline-none"
-                disabled={prefLoading || prefSaving}
-              >
-                {CHAIN_OPTIONS.map(chain => (
-                  <option key={chain} value={chain}>{chain}</option>
-                ))}
-              </select>
-            </label>
+        {showPreferences && (
+          <div className="mt-2.5 rounded-xl border border-white/10 bg-[#0b1228]/75 p-3">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <label className="space-y-1 text-xs text-gray-400">
+                <span className="block font-semibold uppercase tracking-wider text-gray-300">Experience</span>
+                <select
+                  value={preferences.experience_level ?? ''}
+                  onChange={event => void handlePreferencesChange({ experience_level: (event.target.value || null) as UserPreferences['experience_level'] })}
+                  className="min-h-[44px] w-full rounded-xl border border-white/10 bg-[#111a34] px-3 py-2 text-sm text-white focus:border-sky-500/50 focus:outline-none"
+                  disabled={prefLoading || prefSaving}
+                >
+                  <option value="">Not set</option>
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-xs text-gray-400">
+                <span className="block font-semibold uppercase tracking-wider text-gray-300">Daily Time</span>
+                <select
+                  value={preferences.daily_time_available ?? ''}
+                  onChange={event => void handlePreferencesChange({ daily_time_available: (event.target.value || null) as UserPreferences['daily_time_available'] })}
+                  className="min-h-[44px] w-full rounded-xl border border-white/10 bg-[#111a34] px-3 py-2 text-sm text-white focus:border-sky-500/50 focus:outline-none"
+                  disabled={prefLoading || prefSaving}
+                >
+                  <option value="">Not set</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60+">60+ minutes</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-xs text-gray-400">
+                <span className="block font-semibold uppercase tracking-wider text-gray-300">Risk Tolerance</span>
+                <select
+                  value={preferences.risk_tolerance ?? ''}
+                  onChange={event => void handlePreferencesChange({ risk_tolerance: (event.target.value || null) as UserPreferences['risk_tolerance'] })}
+                  className="min-h-[44px] w-full rounded-xl border border-white/10 bg-[#111a34] px-3 py-2 text-sm text-white focus:border-sky-500/50 focus:outline-none"
+                  disabled={prefLoading || prefSaving}
+                >
+                  <option value="">Not set</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-xs text-gray-400">
+                <span className="block font-semibold uppercase tracking-wider text-gray-300">Preferred Chains</span>
+                <select
+                  multiple
+                  value={preferences.preferred_chains ?? []}
+                  onChange={event => void handlePreferencesChange({ preferred_chains: Array.from(event.target.selectedOptions).map(option => option.value) })}
+                  className="min-h-[108px] w-full rounded-xl border border-white/10 bg-[#111a34] px-3 py-2 text-sm text-white focus:border-sky-500/50 focus:outline-none"
+                  disabled={prefLoading || prefSaving}
+                >
+                  {CHAIN_OPTIONS.map(chain => (
+                    <option key={chain} value={chain}>{chain}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-500">Preferences improve ranking quality by time, risk tolerance, and chain fit.</p>
           </div>
-          <p className="mt-2 text-[11px] text-gray-500">Preferences improve ranking quality by time, risk tolerance, and chain fit.</p>
-        </div>
-      )}
+        )}
 
-      <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-5">
         <div className="space-y-2.5">
           {QUICK_PROMPTS.map(item => {
             const Icon = item.icon;
@@ -346,7 +346,7 @@ export default function AirdropCopilot({ onClose, summary, className }: AirdropC
                 type="button"
                 onClick={() => void sendPrompt(item.prompt)}
                 disabled={loading}
-                className="flex min-h-[48px] w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left text-sm text-gray-200 transition-all hover:border-sky-400/30 hover:bg-sky-500/[0.08] hover:shadow-[0_0_24px_rgba(56,189,248,0.18)] disabled:opacity-60"
+                className="mt-2 flex min-h-[54px] w-full touch-manipulation items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left text-sm text-gray-200 transition-all hover:border-sky-400/30 hover:bg-sky-500/[0.08] hover:shadow-[0_0_24px_rgba(56,189,248,0.18)] disabled:opacity-60"
               >
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-sky-400/25 bg-sky-500/10">
                   <Icon className="h-4 w-4 text-sky-300" />
@@ -358,7 +358,7 @@ export default function AirdropCopilot({ onClose, summary, className }: AirdropC
           })}
         </div>
 
-        <div className="mt-4 space-y-3 pb-28 sm:pb-32">
+        <div className="mt-4 space-y-3 pb-56 sm:pb-60">
           {messages.map(message => (
             <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[90%] rounded-2xl border px-3 py-2.5 text-sm leading-relaxed sm:max-w-[85%] ${message.role === 'user'
@@ -397,8 +397,8 @@ export default function AirdropCopilot({ onClose, summary, className }: AirdropC
         </div>
       </div>
 
-      <div className="relative mt-auto border-t border-white/10 bg-[#070d1f]/95 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl sm:px-5">
-        <div className="mb-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.08] px-3 py-2 text-[11px] leading-relaxed text-amber-100">
+      <div className="relative sticky bottom-0 z-20 mt-auto shrink-0 border-t border-white/10 bg-[#070d1f]/97 px-4 pb-[max(env(safe-area-inset-bottom),0.85rem)] pt-2.5 backdrop-blur-xl sm:px-5">
+        <div className="mb-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.08] px-3 py-1.5 text-[10px] leading-relaxed text-amber-100">
           <div className="mb-1 inline-flex items-center gap-1.5 font-semibold text-amber-300">
             <ShieldAlert className="h-3.5 w-3.5" />
             Safety reminder

@@ -1599,7 +1599,7 @@ export default function CustomerDashboard() {
               className={`absolute inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity duration-300 ${aiDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
               onClick={() => setAiDrawerOpen(false)}
             />
-            <aside className={`absolute bottom-0 right-0 h-[92dvh] w-full overflow-hidden rounded-t-[30px] border border-white/10 bg-[#060a18]/95 p-2 shadow-[0_0_70px_rgba(56,189,248,0.2)] transition-transform duration-300 lg:bottom-3 lg:top-3 lg:h-auto lg:w-[420px] lg:rounded-l-[32px] lg:rounded-tr-none lg:rounded-br-none lg:border-l lg:border-t lg:border-b lg:border-r-0 lg:p-3 ${aiDrawerOpen ? 'translate-y-0 lg:translate-x-0' : 'translate-y-full lg:translate-y-0 lg:translate-x-full'}`}>
+            <aside className={`absolute inset-0 h-[100dvh] w-full max-w-full overflow-hidden rounded-none border border-white/10 bg-[#060a18]/95 p-2 shadow-[0_0_70px_rgba(56,189,248,0.2)] transition-transform duration-300 lg:inset-auto lg:bottom-3 lg:right-0 lg:top-3 lg:h-auto lg:w-[min(430px,100vw)] lg:max-w-[430px] lg:rounded-l-[32px] lg:rounded-tr-none lg:rounded-br-none lg:border-l lg:border-t lg:border-b lg:border-r-0 lg:p-3 ${aiDrawerOpen ? 'translate-y-0 lg:translate-x-0' : 'translate-y-full lg:translate-y-0 lg:translate-x-full'}`}>
               <AirdropCopilot
                 onClose={() => setAiDrawerOpen(false)}
                 summary={{
