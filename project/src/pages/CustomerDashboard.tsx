@@ -1,5 +1,6 @@
 import DashboardEngagementPanel from "../components/DashboardEngagementPanel";
 import AirdropGuardIntelligenceCentre from "../components/AirdropGuardIntelligenceCentre";
+import AirdropCopilot from "../components/AirdropCopilot";
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -978,6 +979,7 @@ export default function CustomerDashboard() {
 
     {activeTab === 'overview' && (
       <div className="space-y-6">
+        <AirdropCopilot />
         <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
         <ReputationRulesNotice />
         <DashboardEngagementPanel />

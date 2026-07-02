@@ -152,3 +152,11 @@ export interface AirdropTask {
 export interface AirdropWithTasks extends Airdrop {
   tasks: AirdropTask[];
 }
+
+export interface UserPreferences {
+  user_id: string;
+  experience_level: 'beginner' | 'intermediate' | 'advanced' | null;
+  daily_time_available: '15' | '30' | '60+' | null;
+  preferred_chains: string[] | null;
+  risk_tolerance: 'low' | 'medium' | 'high' | null;
+}
