@@ -7,9 +7,9 @@ import {
   Loader2, Key, Copy, Check, RefreshCw,
   ExternalLink, ChevronDown, ChevronUp, CheckSquare, Square,
   Rocket, ListChecks, Target, TrendingUp, Clock, AlertTriangle,
-  Zap, Calendar, Star, Shield, Award, Flame, Wallet, Bell,
+  Zap, Calendar, Star, Shield, Award, Flame, Wallet, Bell, ShieldAlert,
   BarChart3, Trophy, Sparkles, Crown, Palette, Lock, Unlock, ShieldCheck,
-  Search, UserCircle2, Bot,
+  Search, UserCircle2, Bot, ChevronRight,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
