@@ -9,7 +9,8 @@ import {
   Rocket, ListChecks, Target, TrendingUp, Clock, AlertTriangle,
   Zap, Calendar, Star, Shield, Award, Flame, Wallet, Bell, ShieldAlert,
   BarChart3, Trophy, Sparkles, Crown, Palette, Lock, Unlock, ShieldCheck,
-  Search, UserCircle2, Bot, ChevronRight,
+  Search, UserCircle2, Bot, ChevronRight, Menu, X, LayoutDashboard,
+  Home, Activity, CreditCard, LogOut, Settings,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -665,6 +666,7 @@ export default function CustomerDashboard() {
   const [reputation, setReputation] = useState<UserReputation | null>(null);
   const [unlocks, setUnlocks] = useState<UserUnlock[]>([]);
   const [dashboardSearch, setDashboardSearch] = useState('');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -841,69 +843,219 @@ export default function CustomerDashboard() {
     Math.min(99, focusAirdrops.length + deadlineAirdrops.length + trendingAirdrops.length),
   );
 
+  const watchlistIds = getBookmarks();
+  const watchlistAirdrops = airdrops
+    .filter(item => watchlistIds.includes(item.id))
+    .slice(0, 5);
+
+  const underReviewCount = airdrops.filter(item => item.listing_state === 'under_review').length;
+  const highPotentialCount = airdrops.filter(item => (item.opportunity_score ?? 0) >= 75).length;
+  const mediumPotentialCount = airdrops.filter(item => {
+    const score = item.opportunity_score ?? 0;
+    return score >= 45 && score < 75;
+  }).length;
+  const lowPotentialCount = airdrops.filter(item => (item.opportunity_score ?? 0) < 45).length;
+  const opportunityTotal = Math.max(
+    1,
+    highPotentialCount + mediumPotentialCount + lowPotentialCount + underReviewCount,
+  );
+  const highPotentialPct = Math.round((highPotentialCount / opportunityTotal) * 100);
+  const mediumPotentialPct = Math.round((mediumPotentialCount / opportunityTotal) * 100);
+  const lowPotentialPct = Math.round((lowPotentialCount / opportunityTotal) * 100);
+  const underReviewPct = Math.max(0, 100 - highPotentialPct - mediumPotentialPct - lowPotentialPct);
+  const opportunityDonutStyle = {
+    background: `conic-gradient(
+      #22d3ee 0% ${highPotentialPct}%,
+      #6366f1 ${highPotentialPct}% ${highPotentialPct + mediumPotentialPct}%,
+      #f59e0b ${highPotentialPct + mediumPotentialPct}% ${highPotentialPct + mediumPotentialPct + lowPotentialPct}%,
+      #a855f7 ${highPotentialPct + mediumPotentialPct + lowPotentialPct}% 100%
+    )`,
+  };
+
+  const marketPulse = {
+    momentum: Math.round((trendingAirdrops.length / Math.max(1, airdrops.length)) * 100),
+    riskSignals: deadlineAirdrops.filter(item => urgencyOf(item.expiry_date) === 'critical').length,
+    reviewed: underReviewCount,
+  };
+
+  const streakDays = Math.max(0, reputation?.weekly_streak ?? 0);
+  const greeting = (() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  })();
+  const firstName = user.email?.split('@')[0] || 'Explorer';
+
+  const activityTimeline = [
+    {
+      id: 'tasks',
+      title: `${completedCount} checklist tasks completed`,
+      detail: `${remainingCount} tasks still open in your workflow`,
+    },
+    {
+      id: 'watchlist',
+      title: `${watchlistCount} projects in your watchlist`,
+      detail: `${watchlistAirdrops.length} are surfaced in dashboard widgets`,
+    },
+    {
+      id: 'safety',
+      title: `${marketPulse.riskSignals} urgent risk signals`,
+      detail: `Critical deadline and quality indicators to review now`,
+    },
+    {
+      id: 'reputation',
+      title: `Level ${level} reputation profile`,
+      detail: `${rep.toLocaleString()} REP tracked from verified platform activity`,
+    },
+  ];
+
  return (
-  <div className="relative min-h-screen bg-[#050711]">
+  <div className="relative min-h-screen overflow-x-clip bg-[#050711]">
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(56,189,248,0.16),transparent_32%),radial-gradient(circle_at_88%_12%,rgba(139,92,246,0.18),transparent_30%),radial-gradient(circle_at_55%_110%,rgba(30,64,175,0.16),transparent_40%)]" />
 
-    <div className="relative mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-      <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="hidden lg:flex lg:flex-col lg:gap-4">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-4 shadow-[0_0_40px_rgba(59,130,246,0.08)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">Dashboard Nav</p>
-            <div className="mt-3 space-y-2">
-              {[
-                { id: 'overview' as const, label: 'Overview', icon: BarChart3 },
-                { id: 'airdrops' as const, label: 'Airdrops', icon: Rocket },
-                { id: 'tasks' as const, label: 'Task Tracking', icon: ListChecks },
-                { id: 'api' as const, label: 'API Access', icon: Key },
-              ].map(({ id, label, icon: Icon }) => {
-                const active = activeTab === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setActiveTab(id)}
-                    className={`flex w-full items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition-all ${
-                      active
-                        ? 'border-sky-400/40 bg-gradient-to-r from-sky-500/25 to-violet-500/20 text-white shadow-[0_0_24px_rgba(59,130,246,0.25)]'
-                        : 'border-white/10 bg-white/[0.02] text-gray-400 hover:border-sky-500/25 hover:text-gray-200'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
+    <aside className="fixed left-0 top-20 hidden h-[calc(100vh-5rem)] w-[260px] flex-col border-r border-white/10 bg-[#070b18]/95 px-3 py-4 shadow-[0_0_60px_rgba(31,41,55,0.35)] backdrop-blur-xl lg:flex">
+      <Link to="/dashboard" className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="text-base font-black gradient-text">AirdropGuard</div>
+        <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">Check Before You Connect</div>
+      </Link>
+
+      <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
+        {[
+          { kind: 'tab' as const, label: 'Dashboard', icon: LayoutDashboard, tab: 'overview' as const },
+          { kind: 'route' as const, label: 'Browse Airdrops', icon: Home, to: '/' },
+          { kind: 'route' as const, label: 'Trending', icon: Flame, to: '/?filter=trending' },
+          { kind: 'route' as const, label: 'Wallet Check', icon: Wallet, to: '/wallet-checker' },
+          { kind: 'tab' as const, label: 'Watchlist', icon: Star, tab: 'overview' as const },
+          { kind: 'tab' as const, label: 'Task Tracking', icon: ListChecks, tab: 'tasks' as const },
+          { kind: 'route' as const, label: 'Alerts', icon: AlertTriangle, to: '/scam-alerts' },
+          { kind: 'tab' as const, label: 'Community Results', icon: Activity, tab: 'overview' as const },
+          { kind: 'tab' as const, label: 'API Access', icon: Key, tab: 'api' as const },
+          { kind: 'route' as const, label: 'Wallet Intelligence', icon: Shield, to: '/wallet-checker' },
+          { kind: 'tab' as const, label: 'AI Analyzer', icon: Sparkles, tab: 'overview' as const },
+          { kind: 'tab' as const, label: 'Profile', icon: UserCircle2, tab: 'overview' as const },
+          { kind: 'tab' as const, label: 'Settings', icon: Settings, tab: 'overview' as const },
+          { kind: 'route' as const, label: 'Billing / API Plans', icon: CreditCard, to: '/pricing' },
+        ].map((item) => {
+          const Icon = item.icon;
+          if (item.kind === 'route') {
+            return (
+              <Link
+                key={item.label}
+                to={item.to}
+                className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-xs font-semibold text-gray-300 transition-colors hover:border-sky-500/35 hover:text-white"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            );
+          }
+
+          const active = activeTab === item.tab;
+          return (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => setActiveTab(item.tab)}
+              className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
+                active
+                  ? 'border-sky-400/35 bg-gradient-to-r from-sky-500/20 to-violet-500/20 text-white'
+                  : 'border-white/10 bg-white/[0.02] text-gray-300 hover:border-sky-500/35 hover:text-white'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2">
+                <Icon className="h-3.5 w-3.5" />
+                {item.label}
+              </span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="mt-3 rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/20 to-sky-500/10 p-3">
+        <p className="text-xs font-bold text-white">Upgrade to Pro</p>
+        <p className="mt-1 text-[11px] text-gray-300">Unlock deeper AI signals, premium scoring, and advanced wallet intelligence.</p>
+        <Link to="/pricing" className="mt-2 inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-violet-500 to-sky-500 px-3 py-2 text-xs font-bold text-white">See Plans</Link>
+      </div>
+
+      <button
+        type="button"
+        onClick={async () => { await supabase.auth.signOut(); navigate('/auth'); }}
+        className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-500/20"
+      >
+        <LogOut className="h-3.5 w-3.5" />
+        Logout
+      </button>
+    </aside>
+
+    <div className="relative px-4 pb-24 pt-4 sm:px-6 lg:ml-[260px] lg:px-8 lg:pb-8">
+      <main className="mx-auto max-w-[1180px] space-y-6">
+          <div className="flex items-center justify-between lg:hidden">
+            <div>
+              <div className="text-sm font-black gradient-text">AirdropGuard</div>
+              <div className="text-[10px] uppercase tracking-[0.12em] text-gray-500">Dashboard</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300"
+              aria-label="Open dashboard menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
+
+          {mobileNavOpen && (
+            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm lg:hidden">
+              <div className="absolute right-0 top-0 h-full w-[84%] max-w-sm overflow-y-auto border-l border-white/10 bg-[#070b18] p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="text-sm font-black text-white">Dashboard Menu</div>
+                  <button type="button" onClick={() => setMobileNavOpen(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-gray-300">
+                    <X className="h-4 w-4" />
                   </button>
-                );
-              })}
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Overview', action: () => setActiveTab('overview'), icon: LayoutDashboard },
+                    { label: 'Airdrops', action: () => setActiveTab('airdrops'), icon: Rocket },
+                    { label: 'Tasks', action: () => setActiveTab('tasks'), icon: ListChecks },
+                    { label: 'API', action: () => setActiveTab('api'), icon: Key },
+                  ].map(item => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.label}
+                        type="button"
+                        onClick={() => { item.action(); setMobileNavOpen(false); }}
+                        className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3 text-sm font-semibold text-gray-200"
+                      >
+                        <Icon className="h-4 w-4" />
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                  <Link to="/wallet-checker" onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3 text-sm font-semibold text-gray-200">
+                    <Wallet className="h-4 w-4" /> Wallet Check
+                  </Link>
+                  <Link to="/pricing" onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3 text-sm font-semibold text-gray-200">
+                    <CreditCard className="h-4 w-4" /> Billing / API Plans
+                  </Link>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-4">
-            <h3 className="text-sm font-bold text-white">Quick Access</h3>
-            <div className="mt-3 space-y-2 text-xs">
-              <Link to="/wallet-checker" className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-gray-300 hover:border-sky-500/30 hover:text-white transition-colors">
-                Wallet Intelligence
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-              <Link to="/pricing" className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-gray-300 hover:border-violet-500/30 hover:text-white transition-colors">
-                API Plans
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-              <Link to="/learn" className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-gray-300 hover:border-sky-500/30 hover:text-white transition-colors">
-                Learn
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-          </div>
-        </aside>
-
-        <main className="space-y-6">
           <div className="rounded-3xl border border-white/10 bg-[#090d1d]/80 p-4 shadow-[0_0_40px_rgba(139,92,246,0.12)] sm:p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">Welcome back</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">{greeting}, {firstName} 👋</p>
                 <h1 className="mt-1 text-2xl font-black text-white sm:text-3xl">AirdropGuard Intelligence Dashboard</h1>
                 <p className="mt-1 text-sm text-gray-400">
-                  Smart monitoring for airdrops, wallet readiness, safety signals, and AI-driven research.
+                  Here&apos;s what&apos;s happening with your airdrop opportunities today.
                 </p>
               </div>
 
@@ -920,6 +1072,13 @@ export default function CustomerDashboard() {
                 </div>
                 <button
                   type="button"
+                  className="hidden h-11 items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-300 sm:inline-flex"
+                >
+                  <Activity className="h-3.5 w-3.5" />
+                  Market Pulse Live
+                </button>
+                <button
+                  type="button"
                   className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 hover:border-sky-500/30 hover:text-white transition-colors"
                   aria-label="Notifications"
                 >
@@ -931,14 +1090,15 @@ export default function CustomerDashboard() {
                 </div>
                 <button
                   onClick={fetchData}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/25 hover:text-white transition-colors"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-gray-300 hover:border-white/25 hover:text-white transition-colors"
                   title="Refresh"
                 >
                   <RefreshCw className="h-4 w-4" />
+                  <span className="hidden sm:inline">Refresh Data</span>
                 </button>
                 <button
                   onClick={async () => { await supabase.auth.signOut(); navigate('/auth'); }}
-                  className="h-11 rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 text-sm font-semibold text-rose-300 hover:bg-rose-500/20 hover:text-white transition-colors"
+                  className="hidden h-11 rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 text-sm font-semibold text-rose-300 hover:bg-rose-500/20 hover:text-white transition-colors lg:inline-flex"
                 >
                   Log Out
                 </button>
@@ -972,7 +1132,7 @@ export default function CustomerDashboard() {
           </div>
 
           <div className="lg:hidden">
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="grid grid-cols-4 gap-2">
               {[
                 { id: 'overview' as const, label: 'Overview', icon: BarChart3 },
                 { id: 'airdrops' as const, label: 'Airdrops', icon: Rocket },
@@ -985,7 +1145,7 @@ export default function CustomerDashboard() {
                     key={id}
                     type="button"
                     onClick={() => setActiveTab(id)}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold whitespace-nowrap ${
+                    className={`inline-flex items-center justify-center gap-1 rounded-xl border px-2 py-2.5 text-[11px] font-semibold ${
                       active
                         ? 'border-sky-400/35 bg-sky-500/20 text-sky-200'
                         : 'border-white/10 bg-white/[0.03] text-gray-400'
@@ -996,167 +1156,253 @@ export default function CustomerDashboard() {
                   </button>
                 );
               })}
+
+              <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-[#070b18]/95 px-3 py-2 backdrop-blur-xl lg:hidden">
+                <div className="mx-auto grid max-w-md grid-cols-4 gap-2">
+                  {[
+                    { id: 'overview' as const, label: 'Home', icon: Home },
+                    { id: 'airdrops' as const, label: 'Airdrops', icon: Rocket },
+                    { id: 'tasks' as const, label: 'Tasks', icon: ListChecks },
+                    { id: 'api' as const, label: 'API', icon: Key },
+                  ].map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setActiveTab(id)}
+                      className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold ${activeTab === id ? 'text-sky-300' : 'text-gray-500'}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
     {activeTab === 'overview' && (
-      <div className="space-y-6">
-        <div className="relative overflow-hidden rounded-3xl border border-violet-400/25 bg-gradient-to-r from-[#0f1b37] via-[#101531] to-[#1a1340] p-5 shadow-[0_0_60px_rgba(139,92,246,0.2)] sm:p-6">
-          <div className="pointer-events-none absolute -right-12 -top-10 h-44 w-44 rounded-full bg-violet-500/20 blur-2xl" />
-          <div className="pointer-events-none absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-sky-500/20 blur-2xl" />
-
-          <div className="relative grid gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200">
-                <Bot className="h-3.5 w-3.5" />
-                Copilot Intelligence
+            <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+              <div id="copilot-chat" className="space-y-4">
+                <div className="relative overflow-hidden rounded-3xl border border-violet-400/25 bg-gradient-to-r from-[#0f1b37] via-[#101531] to-[#1a1340] p-5 shadow-[0_0_60px_rgba(139,92,246,0.2)] sm:p-6">
+                  <div className="pointer-events-none absolute -right-12 -top-10 h-44 w-44 rounded-full bg-violet-500/20 blur-2xl" />
+                  <div className="pointer-events-none absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-sky-500/20 blur-2xl" />
+                  <div className="relative mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200">
+                        <Bot className="h-3.5 w-3.5" />
+                        Copilot Intelligence
+                      </div>
+                      <h2 className="mt-2 text-2xl font-black text-white">Your Airdrop Research Copilot</h2>
+                    </div>
+                    <div className="hidden h-20 w-20 items-center justify-center rounded-3xl border border-white/15 bg-white/[0.03] sm:flex">
+                      <Bot className="h-10 w-10 text-sky-300" />
+                    </div>
+                  </div>
+                  <AirdropCopilot />
+                </div>
               </div>
-              <h2 className="mt-3 text-2xl font-black text-white sm:text-3xl">Your Airdrop Research Copilot</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-300">
-                Intelligent, data-driven recommendations tailored to your risk profile, time budget, and tracked opportunities.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {[
-                  'Best picks for this week',
-                  'Low-risk options for beginners',
-                  'What can I do in 30 minutes?',
-                ].map((prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    onClick={() => document.getElementById('copilot-chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                    className="rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-gray-200 hover:border-sky-400/35 hover:bg-sky-500/15 transition-colors"
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => document.getElementById('copilot-chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                className="mt-4 inline-flex items-center rounded-2xl bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2.5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(59,130,246,0.32)] hover:opacity-90"
-              >
-                Set Preferences
-              </button>
-            </div>
 
-            <div className="relative mx-auto flex h-44 w-full max-w-sm items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03]">
-              <div className="absolute h-28 w-28 rounded-full border border-sky-400/35 bg-sky-500/10 blur-[2px]" />
-              <div className="absolute h-20 w-20 rounded-full border border-violet-400/50" />
-              <div className="relative flex h-24 w-24 items-center justify-center rounded-[28px] border border-white/20 bg-gradient-to-br from-sky-500/25 via-transparent to-violet-500/30 shadow-[0_0_35px_rgba(56,189,248,0.35)]">
-                <Bot className="h-11 w-11 text-sky-300" />
-              </div>
-            </div>
-          </div>
-        </div>
+              <div className="space-y-4">
+                <div className="glass-card p-4 border border-violet-500/20">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Star className="h-4 w-4 text-violet-300" />
+                    <h3 className="text-sm font-semibold text-white">Your Watchlist</h3>
+                  </div>
+                  {watchlistAirdrops.length === 0 ? (
+                    <p className="text-xs text-gray-500">No bookmarked airdrops yet. Use the bookmark icon on any airdrop to build your watchlist.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {watchlistAirdrops.map(item => (
+                        <Link key={item.id} to={`/airdrop/${item.slug}`} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-gray-200 hover:border-sky-500/30">
+                          <span className="truncate pr-2">{item.name}</span>
+                          <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-200">
+                            {item.trust_score ?? 0}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-        <div id="copilot-chat" className="scroll-mt-24">
-          <AirdropCopilot />
-        </div>
+                <div className="glass-card p-4 border border-emerald-500/20">
+                  <div className="mb-3 flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-emerald-300" />
+                    <h3 className="text-sm font-semibold text-white">Market Pulse</h3>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                      <div className="text-sm font-black text-emerald-300">{marketPulse.momentum}%</div>
+                      <div className="text-[10px] text-gray-500">Momentum</div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                      <div className="text-sm font-black text-amber-300">{marketPulse.reviewed}</div>
+                      <div className="text-[10px] text-gray-500">Under Review</div>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                      <div className="text-sm font-black text-rose-300">{marketPulse.riskSignals}</div>
+                      <div className="text-[10px] text-gray-500">Risk Alerts</div>
+                    </div>
+                  </div>
+                </div>
 
-        <div>
-          <div className="mb-3 flex items-center justify-between">
+                <div className="glass-card p-4 border border-amber-500/20">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Flame className="h-4 w-4 text-amber-300" />
+                    <h3 className="text-sm font-semibold text-white">Your Streak</h3>
+                  </div>
+                  <p className="text-3xl font-black text-amber-300">{streakDays} day{streakDays === 1 ? '' : 's'}</p>
+                  <p className="mt-1 text-xs text-gray-500">Stay active daily to maintain momentum and profile progression.</p>
+                </div>
             <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-300">Top Recommended Airdrops</h2>
-            <span className="text-[11px] text-gray-500">Prioritized by urgency, trust, and progress</span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {priorityAirdrops.slice(0, 6).map(a => (
-              <ProgressCard key={a.id} airdrop={a} done={doneByAirdrop[a.id] ?? 0} total={a.tasks.length} />
-            ))}
-          </div>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="glass-card p-4 border border-sky-500/20">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="w-4 h-4 text-sky-300" />
-              <h2 className="text-sm font-semibold text-white">Airdrop Opportunities Summary</h2>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <p className="text-xl font-black text-white">{trendingAirdrops.length}</p>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider">Trending</p>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="glass-card p-4 border border-sky-500/20">
+                <div className="mb-3 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-sky-300" />
+                  <h2 className="text-sm font-semibold text-white">Airdrop Opportunities</h2>
+                </div>
+                <div className="grid grid-cols-[110px_1fr] items-center gap-4">
+                  <div className="relative h-28 w-28 rounded-full p-2" style={opportunityDonutStyle}>
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0a1022] border border-white/10">
+                      <span className="text-xs font-bold text-white">{airdrops.length}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    {[
+                      { label: 'High Potential', value: highPotentialCount, tone: 'bg-cyan-400' },
+                      { label: 'Medium Potential', value: mediumPotentialCount, tone: 'bg-indigo-400' },
+                      { label: 'Low Potential', value: lowPotentialCount, tone: 'bg-amber-400' },
+                      { label: 'Under Review', value: underReviewCount, tone: 'bg-violet-400' },
+                    ].map(row => (
+                      <div key={row.label} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                        <span className="inline-flex items-center gap-2 text-gray-300">
+                          <span className={`h-2.5 w-2.5 rounded-full ${row.tone}`} />
+                          {row.label}
+                        </span>
+                        <span className="font-bold text-white">{row.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <p className="text-xl font-black text-amber-300">{remainingCount}</p>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider">Open Tasks</p>
+
+              <div className="glass-card p-4 border border-violet-500/20">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-white">Top Recommended Airdrops</h2>
+                  <span className="text-[11px] text-gray-500">Trust-ranked</span>
+                </div>
+                <div className="space-y-2">
+                  {priorityAirdrops.slice(0, 6).map(item => (
+                    <Link key={item.id} to={`/airdrop/${item.slug}`} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs hover:border-sky-500/30">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-white">{item.name}</p>
+                        <p className="text-[10px] text-gray-500">{item.tasks.length} tasks</p>
+                      </div>
+                      <span className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                        Trust {(item.trust_score ?? 0)}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <p className="text-xl font-black text-rose-300">
-                  {deadlineAirdrops.filter(a => urgencyOf(a.expiry_date) === 'critical' || urgencyOf(a.expiry_date) === 'warning').length}
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="glass-card p-4 border border-white/10">
+                <div className="flex items-center gap-2 mb-3">
+                  <Trophy className="w-4 h-4 text-amber-300" />
+                  <h2 className="text-sm font-semibold text-white">Your Activity</h2>
+                </div>
+                <div className="space-y-3">
+                  {activityTimeline.map((entry, idx) => (
+                    <div key={entry.id} className="relative pl-5">
+                      <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-sky-400" />
+                      {idx < activityTimeline.length - 1 && <span className="absolute left-[4px] top-4 h-[calc(100%-8px)] w-px bg-white/10" />}
+                      <p className="text-xs font-semibold text-white">{entry.title}</p>
+                      <p className="text-[11px] text-gray-500">{entry.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+                <div className="flex items-start gap-2">
+                  <ShieldAlert className="h-4 w-4 shrink-0 text-amber-300 mt-0.5" />
+                  <div>
+                    <h2 className="text-sm font-bold text-white">Safety First Always</h2>
+                    <p className="mt-1 text-xs leading-relaxed text-gray-300">
+                      Verify project links, avoid suspicious wallet connections, and never share seed phrases or private keys. Treat every reward claim with caution until verified.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="glass-card p-4 border border-emerald-500/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <Wallet className="w-4 h-4 text-emerald-300" />
+                  <h2 className="text-sm font-semibold text-white">Wallet Intelligence</h2>
+                </div>
+                <p className="text-xs leading-relaxed text-gray-400">
+                  Scan your wallet for health, risk exposure, token hygiene, and airdrop-readiness insights. REP is earned through verified wallet intelligence signals.
                 </p>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider">Urgent Deadlines</p>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                    <div className="text-xs font-bold text-white">L{level}</div>
+                    <div className="text-[10px] text-gray-600">Profile</div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                    <div className="text-xs font-bold text-white">{rep.toLocaleString()}</div>
+                    <div className="text-[10px] text-gray-600">REP</div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                    <div className="text-xs font-bold text-white">{nextUnlock ? `L${nextUnlock.level}` : 'Max'}</div>
+                    <div className="text-[10px] text-gray-600">Next</div>
+                  </div>
+                </div>
+                <Link
+                  to="/wallet-checker"
+                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 px-4 py-2.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 hover:text-white transition-colors"
+                >
+                  Run Wallet Intelligence
+                  <ExternalLink className="w-4 h-4" />
+                </Link>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                <p className="text-xl font-black text-cyan-300">{overallPct}%</p>
-                <p className="text-[11px] text-gray-500 uppercase tracking-wider">Completion</p>
-              </div>
-            </div>
-          </div>
 
-          <div className="glass-card p-4 border border-emerald-500/20">
-            <div className="flex items-center gap-2 mb-3">
-              <Wallet className="w-4 h-4 text-emerald-300" />
-              <h2 className="text-sm font-semibold text-white">Wallet Intelligence</h2>
+              <div className="glass-card p-4 border border-sky-500/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="w-4 h-4 text-sky-300" />
+                  <h2 className="text-sm font-semibold text-white">Airdrop Opportunities Summary</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <p className="text-xl font-black text-white">{trendingAirdrops.length}</p>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider">Trending</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <p className="text-xl font-black text-amber-300">{remainingCount}</p>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider">Open Tasks</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <p className="text-xl font-black text-rose-300">
+                      {deadlineAirdrops.filter(a => urgencyOf(a.expiry_date) === 'critical' || urgencyOf(a.expiry_date) === 'warning').length}
+                    </p>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider">Urgent Deadlines</p>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                    <p className="text-xl font-black text-cyan-300">{overallPct}%</p>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider">Completion</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p className="text-xs leading-relaxed text-gray-400">
-              Scan your wallet for health, risk exposure, token hygiene, and airdrop-readiness insights. REP is earned through verified wallet intelligence signals.
-            </p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                <div className="text-xs font-bold text-white">L{level}</div>
-                <div className="text-[10px] text-gray-600">Profile</div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                <div className="text-xs font-bold text-white">{rep.toLocaleString()}</div>
-                <div className="text-[10px] text-gray-600">REP</div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                <div className="text-xs font-bold text-white">{nextUnlock ? `L${nextUnlock.level}` : 'Max'}</div>
-                <div className="text-[10px] text-gray-600">Next</div>
-              </div>
-            </div>
-            <Link
-              to="/wallet-checker"
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 px-4 py-2.5 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 hover:text-white transition-colors"
-            >
-              Run Wallet Intelligence
-              <ExternalLink className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="glass-card p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Trophy className="w-4 h-4 text-amber-300" />
-              <h2 className="text-sm font-semibold text-white">Your Activity</h2>
-            </div>
-            <div className="space-y-2 text-xs">
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-gray-300">
-                Completed {completedCount} task{completedCount !== 1 ? 's' : ''} and reached {overallPct}% total progress.
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-gray-300">
-                Tracking {airdrops.length} active airdrop opportunities with {deadlineAirdrops.length} upcoming deadline{deadlineAirdrops.length !== 1 ? 's' : ''}.
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-gray-300">
-                Reputation level: {level} ({title}) with {rep.toLocaleString()} REP.
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
-            <div className="flex items-start gap-2">
-              <ShieldAlert className="h-4 w-4 shrink-0 text-amber-300 mt-0.5" />
-              <div>
-                <h2 className="text-sm font-bold text-white">Safety First Always</h2>
-                <p className="mt-1 text-xs leading-relaxed text-gray-300">
-                  Verify project links, avoid suspicious wallet connections, and never share seed phrases or private keys. Treat every reward claim with caution until verified.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+            <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
+            <ReputationRulesNotice />
+            <DashboardEngagementPanel />
+            <AirdropGuardIntelligenceCentre />
 
         <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
         <ReputationRulesNotice />
@@ -1521,7 +1767,6 @@ export default function CustomerDashboard() {
       </div>
     )}
         </main>
-      </div>
     </div>
   </div>
   );
