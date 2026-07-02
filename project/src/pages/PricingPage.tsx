@@ -171,7 +171,9 @@ function PlanCard({ plan, onCheckout, checkoutLoading }: { plan: Plan; onCheckou
       {/* CTA */}
       {plan.enterprise ? (
         <a
-          href="mailto:cofirobz@googlemail.com"
+          href="https://mail.google.com/mail/?view=cm&fs=1&to=cofirobz@googlemail.com"
+target="_blank"
+rel="noopener noreferrer"
           className="w-full inline-flex items-center justify-center py-2.5 rounded-xl text-sm font-semibold text-center border border-white/10 text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
         >
           {plan.cta}
