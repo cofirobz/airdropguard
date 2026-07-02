@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type React from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
@@ -15,9 +15,8 @@ import FeaturedSpotlight from '../components/FeaturedSpotlight';
 import FilterBar, { type Filters } from '../components/FilterBar';
 import TrustStrip from '../components/TrustStrip';
 import SEO from '../components/SEO';
-
-const TrustScoreSection = lazy(() => import('../components/TrustScoreSection'));
-const NewsletterSection = lazy(() => import('../components/NewsletterSection'));
+import TrustScoreSection from '../components/TrustScoreSection';
+import NewsletterSection from '../components/NewsletterSection';
 
 function useDeferredRender(delay = 650) {
   const [ready, setReady] = useState(false);
@@ -879,9 +878,7 @@ export default function HomePage() {
           <IntelligencePillars />
           <HowItWorks />
 
-          <Suspense fallback={null}>
-            <TrustScoreSection />
-          </Suspense>
+          <TrustScoreSection />
 
           <ComparisonSection />
           <IntelligenceWorkflow />
@@ -909,9 +906,7 @@ export default function HomePage() {
           <RoadmapPreview />
           <FinalCta />
 
-          <Suspense fallback={null}>
-            <NewsletterSection />
-          </Suspense>
+          <NewsletterSection />
         </>
       )}
     </>
