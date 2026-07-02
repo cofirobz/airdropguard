@@ -890,6 +890,18 @@ export default function CustomerDashboard() {
     return 'Good evening';
   })();
   const firstName = user.email?.split('@')[0] || 'Explorer';
+  const expiresTodayCount = safeAirdrops.filter(item => {
+    if (!item.expiry_date) return false;
+    const left = msUntil(item.expiry_date);
+    return left > 0 && left <= 86_400_000;
+  }).length;
+  const verifiedProjectsCount = safeAirdrops.filter(item => {
+    return (item.trust_score ?? 0) >= 75 && item.listing_state !== 'under_review';
+  }).length;
+  const estimatedRewardsText = highPotentialCount > 0
+    ? `Estimated potential from ${highPotentialCount} high-opportunity project${highPotentialCount !== 1 ? 's' : ''}`
+    : 'Estimated potential varies';
+  const copilotConfidencePct = Math.max(84, Math.min(99, 80 + Math.round(avgTrustScore / 4)));
 
   const openProfileOverview = () => {
     setActiveTab('overview');
@@ -1163,10 +1175,11 @@ export default function CustomerDashboard() {
               <button
                 type="button"
                 onClick={() => setAiDrawerOpen(true)}
-                className="-mt-5 inline-flex h-14 w-14 items-center justify-center self-center rounded-full border border-sky-400/50 bg-gradient-to-r from-sky-500 to-neon-purple text-white shadow-[0_8px_28px_rgba(56,189,248,0.35)]"
+                className="-mt-7 inline-flex h-[72px] w-[72px] flex-col items-center justify-center self-center rounded-full border border-sky-300/55 bg-gradient-to-br from-sky-500 to-violet-500 text-white shadow-[0_0_0_6px_rgba(56,189,248,0.16),0_14px_34px_rgba(56,189,248,0.34)] transition-all duration-200 hover:scale-105"
                 aria-label="Open AI Copilot"
               >
-                <Bot className="h-5 w-5" />
+                <Sparkles className="h-5 w-5" />
+                <span className="mt-0.5 text-[10px] font-black uppercase tracking-[0.1em]">AI</span>
               </button>
               <button
                 type="button"
@@ -1212,16 +1225,16 @@ export default function CustomerDashboard() {
           <div className="glass-card border border-violet-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-400/35">
             <div className="mb-2 flex items-center gap-2">
               <Bot className="h-4 w-4 text-violet-300" />
-              <h2 className="text-sm font-semibold text-white">Copilot Access</h2>
+              <h2 className="text-sm font-semibold text-white">Copilot Insights</h2>
             </div>
-            <p className="text-xs text-gray-400">Open AI Copilot for quick recommendations, safer picks, and personalized next actions.</p>
+            <p className="text-xs text-gray-400">Live AI guidance for your next move, risk balance, and high-signal opportunities.</p>
             <button
               type="button"
               onClick={() => setAiDrawerOpen(true)}
               className="mt-3 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-neon-purple px-4 py-2.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
             >
               <Sparkles className="h-4 w-4" />
-              Ask AI Copilot
+              Open Copilot
             </button>
           </div>
         </div>
@@ -1574,33 +1587,34 @@ export default function CustomerDashboard() {
           <button
             type="button"
             onClick={() => setAiDrawerOpen(true)}
-            className="fixed bottom-8 right-8 z-40 hidden items-center gap-2 rounded-2xl border border-sky-400/40 bg-gradient-to-r from-sky-500 to-neon-purple px-4 py-3 text-sm font-bold text-white shadow-[0_12px_32px_rgba(56,189,248,0.35)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(56,189,248,0.45)] lg:inline-flex"
+            className="group fixed bottom-8 right-8 z-[75] hidden h-[88px] w-[88px] flex-col items-center justify-center rounded-full border border-sky-300/60 bg-gradient-to-br from-sky-500 via-cyan-500 to-violet-500 text-white shadow-[0_0_0_7px_rgba(56,189,248,0.16),0_18px_40px_rgba(56,189,248,0.34)] transition-all duration-300 hover:-translate-y-1 hover:scale-[1.04] lg:inline-flex"
           >
-            <Bot className="h-4 w-4" />
-            Ask AI
+            <span className="pointer-events-none absolute inset-0 rounded-full border border-sky-300/60 animate-ping opacity-30" />
+            <Sparkles className="relative h-5 w-5" />
+            <span className="relative mt-1 text-xs font-black uppercase tracking-[0.12em]">Ask AI</span>
           </button>
 
-          <div className={`fixed inset-0 z-[70] ${aiDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+          <div className={`fixed inset-0 z-[80] ${aiDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
             <div
-              className={`absolute inset-0 bg-black/65 transition-opacity duration-300 ${aiDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
+              className={`absolute inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity duration-300 ${aiDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
               onClick={() => setAiDrawerOpen(false)}
             />
-            <aside className={`absolute right-0 top-0 h-full w-full max-w-2xl overflow-y-auto border-l border-white/10 bg-[#070b18] p-4 shadow-[0_0_80px_rgba(0,0,0,0.5)] transition-transform duration-300 sm:p-5 ${aiDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300">AirdropGuard AI</p>
-                  <h2 className="text-lg font-black text-white">Copilot Panel</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAiDrawerOpen(false)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-gray-300 hover:text-white"
-                  aria-label="Close AI drawer"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <AirdropCopilot />
+            <aside className={`absolute bottom-0 right-0 h-[92dvh] w-full overflow-hidden rounded-t-[30px] border border-white/10 bg-[#060a18]/95 p-2 shadow-[0_0_70px_rgba(56,189,248,0.2)] transition-transform duration-300 lg:bottom-3 lg:top-3 lg:h-auto lg:w-[420px] lg:rounded-l-[32px] lg:rounded-tr-none lg:rounded-br-none lg:border-l lg:border-t lg:border-b lg:border-r-0 lg:p-3 ${aiDrawerOpen ? 'translate-y-0 lg:translate-x-0' : 'translate-y-full lg:translate-y-0 lg:translate-x-full'}`}>
+              <AirdropCopilot
+                onClose={() => setAiDrawerOpen(false)}
+                summary={{
+                  userName: firstName,
+                  totalAirdrops: safeAirdrops.length,
+                  verifiedCount: verifiedProjectsCount,
+                  expiresToday: expiresTodayCount,
+                  momentumLabel: marketPulse.momentum >= 20 ? 'Market momentum is increasing' : 'Market momentum is mixed today',
+                  estimatedRewards: estimatedRewardsText,
+                  confidence: copilotConfidencePct,
+                  dataSources: safeAirdrops.length + Math.max(1, watchlistCount),
+                  lastUpdated: '1 min ago',
+                }}
+                className="h-full"
+              />
             </aside>
           </div>
         </main>
