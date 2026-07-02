@@ -47,11 +47,42 @@ type CompactAirdrop = {
   tasks: string[];
 };
 
+type CopilotIntent = "general" | "today" | "safety" | "compare";
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function errorResponse(error: unknown) {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const message = safeString(rawMessage);
+
+  console.error("airdrop-copilot failed", {
+    message,
+    stack: error instanceof Error ? error.stack : undefined,
+  });
+
+  if (message === "OPENAI_API_KEY is not set") {
+    return json({
+      error: "AirdropGuard Copilot is not configured correctly right now. Please try again later.",
+      details: message,
+    }, 503);
+  }
+
+  if (message.startsWith("OpenAI error:")) {
+    return json({
+      error: "The AI provider request failed. Please try again shortly.",
+      details: message,
+    }, 502);
+  }
+
+  return json({
+    error: message || "AirdropGuard Copilot could not complete this request.",
+    details: message,
+  }, 500);
 }
 
 function safeString(value: unknown): string {
@@ -82,6 +113,134 @@ function sortForCopilot(airdrop: Record<string, unknown>): number {
   const statusBonus = airdrop.status === "Active" ? 8 : airdrop.status === "Ending Soon" ? 5 : 0;
   const listingBonus = airdrop.listing_state === "verified" ? 8 : airdrop.listing_state === "under_review" ? 3 : 0;
   return trust + opportunity + statusBonus + listingBonus - riskPenalty;
+}
+
+function listingPriority(listingState: string | null): number {
+  if (listingState === "verified") return 3;
+  if (listingState === "under_review") return 2;
+  return 1;
+}
+
+function detectIntent(message: string, relevantSlugs: Set<string>): CopilotIntent {
+  const lower = message.toLowerCase();
+  if (/\b(compare|comparison|versus|vs\.?|better than)\b/.test(lower) || relevantSlugs.size >= 2) return "compare";
+  if (/\b(today|right now|today's|todays|best opportunities|top opportunities|focus on today|ending soon)\b/.test(lower)) return "today";
+  if (/\b(safe|safety|risky|risk|scam|legit|trustworthy|security)\b/.test(lower)) return "safety";
+  return "general";
+}
+
+function compactValue(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "Unknown";
+  if (typeof value === "number") return String(value);
+  const text = safeString(value);
+  return text || "Unknown";
+}
+
+function buildReasonList(airdrop: CompactAirdrop): string[] {
+  const reasons: string[] = [];
+  if (airdrop.listing_state === "verified") reasons.push("Verified by AirdropGuard");
+  else if (airdrop.listing_state === "under_review") reasons.push("Under AirdropGuard review");
+
+  if (typeof airdrop.trust_score === "number") reasons.push(`Trust Score ${airdrop.trust_score}`);
+  if (typeof airdrop.opportunity_score === "number") reasons.push(`AI Confidence ${airdrop.opportunity_score}`);
+  if (airdrop.risk_level) reasons.push(`Risk Level ${airdrop.risk_level}`);
+  if (airdrop.estimated_reward) reasons.push(`Estimated Reward ${airdrop.estimated_reward}`);
+  if (airdrop.time_required) reasons.push(`Time Required ${airdrop.time_required}`);
+
+  return reasons.slice(0, 5);
+}
+
+function rankAirdrops(rows: CompactAirdrop[]): CompactAirdrop[] {
+  return [...rows].sort((a, b) => {
+    const listingDelta = listingPriority(b.listing_state) - listingPriority(a.listing_state);
+    if (listingDelta !== 0) return listingDelta;
+
+    const trustDelta = (b.trust_score ?? -1) - (a.trust_score ?? -1);
+    if (trustDelta !== 0) return trustDelta;
+
+    const confidenceDelta = (b.opportunity_score ?? -1) - (a.opportunity_score ?? -1);
+    if (confidenceDelta !== 0) return confidenceDelta;
+
+    const riskWeight = (risk: string | null) => risk === "Low" ? 2 : risk === "Medium" ? 1 : 0;
+    return riskWeight(b.risk_level) - riskWeight(a.risk_level);
+  });
+}
+
+function buildTopOpportunities(rows: CompactAirdrop[]): string {
+  const ranked = rankAirdrops(rows).slice(0, 5);
+  if (ranked.length === 0) return "None";
+
+  return ranked.map((row, index) => {
+    const reasons = buildReasonList(row).join(", ");
+    return `${index + 1}. ${row.name} | Listing: ${compactValue(row.listing_state)} | Trust Score: ${compactValue(row.trust_score)} | AI Confidence: ${compactValue(row.opportunity_score)} | Risk Level: ${compactValue(row.risk_level)} | Estimated Reward: ${compactValue(row.estimated_reward)} | Time Required: ${compactValue(row.time_required)} | Why it ranks: ${reasons || "Limited structured signals available"}`;
+  }).join("\n");
+}
+
+function buildComparisonSet(rows: CompactAirdrop[], relevantSlugs: Set<string>): CompactAirdrop[] {
+  const directMatches = rows.filter(row => relevantSlugs.has(row.slug));
+  if (directMatches.length >= 2) return directMatches.slice(0, 4);
+  return rankAirdrops(rows).slice(0, 3);
+}
+
+function buildComparisonBrief(rows: CompactAirdrop[], relevantSlugs: Set<string>): string {
+  const compared = buildComparisonSet(rows, relevantSlugs);
+  if (compared.length === 0) return "None";
+
+  return compared.map(row => [
+    row.name,
+    `Listing=${compactValue(row.listing_state)}`,
+    `Trust Score=${compactValue(row.trust_score)}`,
+    `AI Confidence=${compactValue(row.opportunity_score)}`,
+    `Risk Level=${compactValue(row.risk_level)}`,
+    `Estimated Reward=${compactValue(row.estimated_reward)}`,
+    `Time Required=${compactValue(row.time_required)}`,
+    `Status=${compactValue(row.status)}`,
+  ].join(" | ")).join("\n");
+}
+
+function buildRiskFactorsBrief(): string {
+  return [
+    "AirdropGuard risk review uses the following available signals when present:",
+    "- Listing State: verified is strongest, under_review is secondary, unknown listings need more caution.",
+    "- Trust Score: higher scores support stronger confidence; missing scores must be called out as unknown.",
+    "- AI Confidence / Opportunity Score: stronger signal for prioritization, not a guarantee of reward.",
+    "- Risk Level: Low, Medium, High must be explained directly.",
+    "- Estimated Reward and Time Required: used for effort-versus-upside judgment only when present.",
+    "- Status and expiry timing: active or ending soon can affect urgency.",
+    "- Missing docs, GitHub, funding, investor, or team data should be treated as unknown, never inferred.",
+  ].join("\n");
+}
+
+function buildInstructionBlock(intent: CopilotIntent): string {
+  const base = [
+    "You are AirdropGuard Copilot, a premium crypto intelligence assistant focused on airdrop research.",
+    "Use AirdropGuard data first for every answer. Do not answer like a generic chatbot.",
+    "Prefer verified opportunities first, then under_review, then anything else only if necessary.",
+    "Never fabricate rewards, funding, investors, GitHub activity, docs quality, or team strength.",
+    "If data is missing, say Unknown explicitly instead of guessing.",
+    "Keep responses concise but informative.",
+    "Explain why recommendations are made, referencing available signals.",
+    "Recommend concrete next actions.",
+    "Reference Trust Score, AI Confidence, Risk Level, Estimated Reward, and Time Required whenever those fields are available.",
+    "Use markdown formatting with short headings, bullet lists, and tables where helpful.",
+    "Highlight the primary recommendation using bold markdown.",
+    "If comparing projects, include a markdown table.",
+    "End the response with this exact sentence: Would you like me to compare another project or recommend your next task?",
+  ];
+
+  if (intent === "today") {
+    base.push("The user is asking about today's opportunities. Rank the top opportunities from current AirdropGuard data before any other commentary.");
+  }
+
+  if (intent === "safety") {
+    base.push("The user is asking about safety. Explain the risk factors AirdropGuard AI is using before giving recommendations.");
+  }
+
+  if (intent === "compare") {
+    base.push("The user is asking for a comparison. Start with a markdown comparison table using only available AirdropGuard fields.");
+  }
+
+  return base.join("\n");
 }
 
 function compactAirdrop(row: Record<string, unknown>): CompactAirdrop {
@@ -197,16 +356,15 @@ Deno.serve(async (req: Request) => {
 
     const compactRows = selected.map(compactAirdrop);
     const preferences = (preferencesRes.data ?? null) as UserPreferences | null;
+    const intent = detectIntent(message, relevantSlugs);
+    const topOpportunitiesBrief = buildTopOpportunities(compactRows);
+    const comparisonBrief = buildComparisonBrief(compactRows, relevantSlugs);
+    const riskFactorsBrief = buildRiskFactorsBrief();
 
     const prompt = [
-      "You are AirdropGuard AI Copilot, a practical airdrop research assistant.",
-      "Use ONLY the supplied AirdropGuard data. If something is missing or unsupported, say so clearly.",
-      "Do not promise rewards. Do not give financial advice. Never ask for seed phrases or private keys. Never tell users to connect wallets to suspicious or unknown sites.",
-      "Prefer verified and under_review listings over unknown-quality projects. Mention risk clearly. If a project is speculative or data is missing, say that.",
-      "For recommendation questions, use this structure when it fits: 1. Best picks 2. Why these 3. Risks to watch 4. Time required 5. What to do next.",
-      "For comparison questions, use a clear side-by-side comparison based only on available fields.",
-      "Always end with this exact safety wording:",
-      "AirdropGuard provides educational analysis only, not financial advice. Never share your seed phrase or connect your wallet to unknown sites.",
+      buildInstructionBlock(intent),
+      "",
+      `DETECTED INTENT: ${intent}`,
       "",
       `USER QUESTION: ${message}`,
       "",
@@ -216,6 +374,15 @@ Deno.serve(async (req: Request) => {
         preferred_chains: preferences?.preferred_chains ?? [],
         risk_tolerance: preferences?.risk_tolerance ?? null,
       })}`,
+      "",
+      "TOP OPPORTUNITIES FROM CURRENT AIRDROPGUARD DATA:",
+      topOpportunitiesBrief,
+      "",
+      "COMPARISON CANDIDATES:",
+      comparisonBrief,
+      "",
+      "RISK FACTORS USED BY AIRDROPGUARD AI:",
+      riskFactorsBrief,
       "",
       `AIRDROPGUARD DATA (${compactRows.length} rows):`,
       JSON.stringify(compactRows),
@@ -229,6 +396,6 @@ Deno.serve(async (req: Request) => {
       airdrop_count: compactRows.length,
     });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    return errorResponse(error);
   }
 });

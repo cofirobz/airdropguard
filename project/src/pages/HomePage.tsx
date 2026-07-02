@@ -1,57 +1,38 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type React from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
-  TrendingUp, Clock, Flame, Grid3X3, Loader2, AlertCircle,
-  ShieldCheck, AlertTriangle, CheckSquare, Search, Gift,
-  MessageSquare, Send, Shield, Brain, Users, Code2,
-  BarChart3, ArrowRight, Eye, LockKeyhole, Radio, Star,
-  Activity, FileSearch, Wallet, Gauge, Target, Fingerprint,
+  Activity,
+  AlertCircle,
+  ArrowRight,
+  BarChart3,
+  Bot,
+  Brain,
+  CheckCircle2,
+  CheckSquare,
+  Clock,
+  Flame,
+  Grid3X3,
+  Layers3,
+  Loader2,
+  Search,
+  Shield,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Target,
+  Users,
+  Wallet,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Airdrop } from '../lib/types';
 import AirdropCard from '../components/AirdropCard';
+import CommunityResults from '../components/CommunityResults';
 import FeaturedSpotlight from '../components/FeaturedSpotlight';
 import FilterBar, { type Filters } from '../components/FilterBar';
-import TrustStrip from '../components/TrustStrip';
-import SEO from '../components/SEO';
-import TrustScoreSection from '../components/TrustScoreSection';
 import NewsletterSection from '../components/NewsletterSection';
-
-function useDeferredRender(delay = 650) {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let timeoutId: number | undefined;
-    let cancelled = false;
-
-    const start = () => {
-      if (!cancelled) setReady(true);
-    };
-
-    const win = window as Window & {
-      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-
-    if (win.requestIdleCallback) {
-      const idleId = win.requestIdleCallback(start, { timeout: delay + 800 });
-      return () => {
-        cancelled = true;
-        win.cancelIdleCallback?.(idleId);
-      };
-    }
-
-    timeoutId = window.setTimeout(start, delay);
-
-    return () => {
-      cancelled = true;
-      if (timeoutId) window.clearTimeout(timeoutId);
-    };
-  }, [delay]);
-
-  return ready;
-}
+import SEO from '../components/SEO';
+import TrustStrip from '../components/TrustStrip';
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
@@ -66,556 +47,720 @@ const INITIAL_VISIBLE_AIRDROPS = 6;
 const LOAD_MORE_AIRDROPS = 6;
 
 type Tab = 'all' | 'trending' | 'ending' | 'featured';
+type ShowcaseTab = 'dashboard' | 'wallet' | 'copilot';
 
-type StatItem = {
+type CounterItem = {
   label: string;
-  value: string | number;
+  value: number;
+  suffix?: string;
   sub: string;
 };
-
-type HeroMessage = {
-  badge: string;
-  headline: string;
-  subtext: string;
-  snapshotTitle: string;
-};
-
-const DAILY_HERO_MESSAGES: HeroMessage[] = [
-  {
-    badge: 'Crypto airdrop discovery • AI scored • human reviewed',
-    headline: 'Find verified crypto airdrops before you connect.',
-    subtext: 'Browse live crypto airdrops with trust scores, opportunity ratings, task guidance, scam warnings and wallet safety checks built into every listing.',
-    snapshotTitle: 'Airdrop discovery made safer',
-  },
-  {
-    badge: 'Verified airdrops • trust scores • safer farming',
-    headline: 'Discover airdrops worth your time.',
-    subtext: 'AirdropGuard helps you compare live opportunities by reward potential, risk level, blockchain, difficulty and human-reviewed trust signals.',
-    snapshotTitle: 'From airdrop list to trusted shortlist',
-  },
-  {
-    badge: 'Check Before You Connect • AirdropGuard intelligence',
-    headline: 'Crypto airdrops, reviewed before you act.',
-    subtext: 'Find promising airdrops, avoid obvious scams, review AI-assisted research and focus on campaigns with clearer evidence and safer task flows.',
-    snapshotTitle: 'Research every airdrop first',
-  },
-  {
-    badge: 'Airdrop rewards • project trust • wallet safety',
-    headline: 'Your safer starting point for crypto airdrops.',
-    subtext: 'Track verified listings, review project reputation, understand airdrop confidence and use read-only wallet tools before spending time or gas.',
-    snapshotTitle: 'Find, review, then decide',
-  },
-  {
-    badge: 'AI analysis • human review • verified opportunities',
-    headline: 'The discovery layer for trusted crypto airdrops.',
-    subtext: 'AirdropGuard brings airdrop listings, trust analysis, wallet safety and scam awareness together so users can research faster and safer.',
-    snapshotTitle: 'AirdropGuard intelligence',
-  },
-];
-
-function getDailyHeroMessage(): HeroMessage {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), 0, 0);
-  const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
-  return DAILY_HERO_MESSAGES[dayOfYear % DAILY_HERO_MESSAGES.length];
-}
 
 function isFeaturedPlacement(airdrop: Airdrop): boolean {
   const anyAirdrop = airdrop as Airdrop & { is_sponsored?: boolean };
   return Boolean(airdrop.is_featured || anyAirdrop.is_sponsored);
 }
 
+function useCountUp(target: number, duration = 1100) {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    let frameId = 0;
+    const start = performance.now();
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(target * eased));
+      if (progress < 1) frameId = window.requestAnimationFrame(tick);
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [target, duration]);
+
+  return value;
+}
+
+function CounterCard({ item }: { item: CounterItem }) {
+  const value = useCountUp(item.value);
+
+  return (
+    <div className="glass-card rounded-3xl border border-white/10 p-6">
+      <div className="text-4xl font-black tracking-tight text-white sm:text-5xl">
+        {value.toLocaleString()}
+        {item.suffix ?? ''}
+      </div>
+      <div className="mt-2 text-sm font-semibold text-white">{item.label}</div>
+      <div className="mt-2 text-xs leading-relaxed text-gray-500">{item.sub}</div>
+    </div>
+  );
+}
+
+function HeroSection({
+  loading,
+  stats,
+  featured,
+  topVerified,
+}: {
+  loading: boolean;
+  stats: { analysed: number; verified: number; aiAnalyses: number };
+  featured: Airdrop | null;
+  topVerified: Airdrop[];
+}) {
+  const previewRows = topVerified.slice(0, 3);
+
+  return (
+    <section className="relative overflow-hidden border-b border-white/5 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(139,92,246,0.16),transparent_24%),linear-gradient(180deg,#050b18_0%,#081225_55%,#060d1b_100%)]">
+      <div className="pointer-events-none absolute inset-0 opacity-80">
+        {[0, 1, 2, 3, 4, 5].map(index => (
+          <span
+            key={index}
+            className="absolute h-1.5 w-1.5 rounded-full bg-sky-300/40 animate-pulse"
+            style={{
+              top: `${14 + index * 12}%`,
+              left: `${10 + ((index * 13) % 70)}%`,
+              animationDuration: `${2.8 + index * 0.35}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 pb-16 pt-12 sm:px-6 sm:pb-20 sm:pt-16 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:px-8 lg:pb-24 lg:pt-20">
+        <div className="relative z-10">
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/25 bg-sky-500/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200 sm:text-xs">
+            <Sparkles className="h-3.5 w-3.5 text-sky-300" />
+            Premium AI-powered Web3 intelligence
+          </div>
+
+          <h1 className="mt-6 max-w-4xl text-4xl font-black leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
+            The AI-Powered Platform for Smarter Crypto Airdrops
+          </h1>
+
+          <p className="mt-5 max-w-2xl text-base leading-relaxed text-gray-300 sm:text-lg">
+            Discover verified opportunities, analyse risks with AI, check your wallet safely and focus on the projects that deserve your time.
+          </p>
+
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <Link
+              to="/auth"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-sky-500 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-sky-400"
+            >
+              Get Started Free
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <a
+              href="#airdrops"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]"
+            >
+              Explore Airdrops
+            </a>
+          </div>
+
+          <div className="mt-7 flex flex-wrap gap-2.5 text-xs font-semibold text-gray-300">
+            {['Dashboard', 'Airdrops', 'Wallet Intelligence', 'Copilot', 'Pricing'].map(item => (
+              <span key={item} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
+                {item}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur">
+              <div className="text-2xl font-black text-white">{stats.analysed}</div>
+              <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-gray-500">Projects analysed</div>
+            </div>
+            <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.06] px-4 py-3 backdrop-blur">
+              <div className="text-2xl font-black text-white">{stats.verified}</div>
+              <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-emerald-300">Verified listings</div>
+            </div>
+            <div className="rounded-2xl border border-violet-500/15 bg-violet-500/[0.06] px-4 py-3 backdrop-blur">
+              <div className="text-2xl font-black text-white">{stats.aiAnalyses}</div>
+              <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-violet-300">AI analyses</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10">
+          <div className="absolute -inset-6 rounded-[36px] bg-sky-500/10 blur-3xl" />
+          <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(160deg,rgba(7,11,24,0.96)_8%,rgba(8,14,34,0.96)_50%,rgba(12,9,35,0.96)_100%)] p-5 shadow-[0_0_40px_rgba(56,189,248,0.15),0_0_90px_rgba(99,102,241,0.1)] backdrop-blur-xl sm:p-6">
+            <div className="mb-5 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300">Live platform preview</div>
+                <h2 className="mt-1 text-xl font-black text-white">AirdropGuard Command Centre</h2>
+              </div>
+              <div className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-300">
+                Live intelligence
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Verified</div>
+                <div className="mt-2 text-2xl font-black text-white">{stats.verified}</div>
+                <div className="mt-1 text-xs text-gray-400">Projects reviewed by AirdropGuard</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Wallet safety</div>
+                <div className="mt-2 text-2xl font-black text-white">Read-only</div>
+                <div className="mt-1 text-xs text-gray-400">No signatures, no seed phrase</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Copilot</div>
+                <div className="mt-2 text-2xl font-black text-white">AI+</div>
+                <div className="mt-1 text-xs text-gray-400">Research guidance in seconds</div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-3xl border border-white/10 bg-[#0d152b]/80 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Priority opportunities</div>
+                  <div className="mt-1 text-sm font-bold text-white">What deserves attention right now</div>
+                </div>
+                {featured && <div className="text-xs text-sky-300">Featured: {featured.name}</div>}
+              </div>
+
+              <div className="space-y-3">
+                {loading && (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-sm text-gray-400">
+                    Loading dashboard preview...
+                  </div>
+                )}
+
+                {!loading && previewRows.map((airdrop, index) => (
+                  <div key={airdrop.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sky-400/25 bg-sky-500/10 text-sm font-black text-sky-200">
+                      0{index + 1}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-white">{airdrop.name}</div>
+                      <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-gray-400">
+                        <span>Trust {airdrop.trust_score ?? 'Unknown'}</span>
+                        <span>Risk {airdrop.risk_level}</span>
+                        <span>{airdrop.estimated_reward || 'Reward TBA'}</span>
+                      </div>
+                    </div>
+                    <div className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-300">
+                      {airdrop.listing_state === 'verified' || airdrop.human_verified ? 'Verified' : 'Review'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-violet-500/20 bg-violet-500/[0.07] p-4">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-violet-300">Copilot recommendation</div>
+                <p className="mt-2 text-sm leading-relaxed text-gray-200">
+                  Focus on <span className="font-semibold text-white">verified listings with strong trust signals</span>, then use Wallet Intelligence before connecting to anything new.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HowItWorksSection() {
+  const steps = [
+    {
+      icon: Search,
+      title: 'Discover',
+      desc: 'Browse verified and under-review crypto airdrops.',
+    },
+    {
+      icon: Brain,
+      title: 'Analyse',
+      desc: 'AI + human intelligence evaluates risk, trust and opportunity.',
+    },
+    {
+      icon: CheckSquare,
+      title: 'Farm Smarter',
+      desc: 'Complete the best opportunities with confidence.',
+    },
+  ];
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+      <div className="mx-auto max-w-3xl text-center">
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">How it works</div>
+        <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">A clearer path from discovery to action</h2>
+        <p className="mt-4 text-sm leading-relaxed text-gray-400 sm:text-base">
+          First-time visitors should know exactly what to do: discover credible opportunities, understand the risk, then focus effort where it matters.
+        </p>
+      </div>
+
+      <div className="mt-10 grid gap-5 lg:grid-cols-3">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          return (
+            <div key={step.title} className="relative rounded-[28px] border border-white/10 bg-white/[0.03] p-7 backdrop-blur">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-sky-400/25 bg-sky-500/10 text-sky-300">
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Step 0{index + 1}</div>
+              <h3 className="mt-2 text-xl font-black text-white">{step.title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-gray-400">{step.desc}</p>
+              {index < steps.length - 1 && (
+                <div className="mt-6 hidden text-sky-300 lg:block">↓</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function WhyAirdropGuardSection() {
+  const items = [
+    {
+      icon: Shield,
+      title: 'AI Security Analysis',
+      desc: 'Detect potential risks before connecting.',
+      tone: 'border-rose-500/20 bg-rose-500/[0.06] text-rose-300',
+    },
+    {
+      icon: Wallet,
+      title: 'Wallet Intelligence',
+      desc: 'Read-only wallet analysis.',
+      tone: 'border-sky-500/20 bg-sky-500/[0.06] text-sky-300',
+    },
+    {
+      icon: Bot,
+      title: 'AirdropGuard Copilot',
+      desc: 'Ask AI what deserves your time.',
+      tone: 'border-violet-500/20 bg-violet-500/[0.06] text-violet-300',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Human Verification',
+      desc: 'Every verified project is reviewed.',
+      tone: 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-300',
+    },
+  ];
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Why AirdropGuard</div>
+          <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">A premium research layer for crypto airdrops</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-relaxed text-gray-400 sm:text-base">
+          AirdropGuard is built to help users decide, not just scroll. It combines structured AI analysis, human review and safer wallet workflows into one platform.
+        </p>
+      </div>
+
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        {items.map(item => {
+          const Icon = item.icon;
+          return (
+            <div key={item.title} className="glass-card rounded-[28px] border border-white/10 p-6">
+              <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl border ${item.tone}`}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <h3 className="mt-6 text-lg font-black text-white">{item.title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-gray-400">{item.desc}</p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function DashboardPreview({ airdrops, verifiedCount }: { airdrops: Airdrop[]; verifiedCount: number }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[0.92fr_1.08fr]">
+      <div className="rounded-[28px] border border-white/10 bg-[#0c1428]/90 p-5">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">Dashboard snapshot</div>
+        <h3 className="mt-2 text-2xl font-black text-white">Priority intelligence</h3>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Verified listings</div>
+            <div className="mt-2 text-3xl font-black text-white">{verifiedCount}</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Live watchlist</div>
+            <div className="mt-2 text-3xl font-black text-white">{Math.min(airdrops.length, 12)}</div>
+          </div>
+        </div>
+        <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-4 text-sm text-gray-200">
+          <span className="font-semibold text-white">Best use:</span> Start your day by checking verified opportunities, deadlines and trust changes before opening a new project.
+        </div>
+      </div>
+
+      <div className="rounded-[28px] border border-white/10 bg-[#0b1224]/92 p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Top opportunities</div>
+            <div className="mt-1 text-lg font-bold text-white">Today&apos;s shortlist</div>
+          </div>
+          <div className="rounded-full border border-sky-400/25 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold text-sky-200">
+            AI ranked
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {airdrops.slice(0, 4).map((airdrop, index) => (
+            <div key={airdrop.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-xs font-black text-white">
+                {index + 1}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-white">{airdrop.name}</div>
+                <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-gray-400">
+                  <span>Trust {airdrop.trust_score ?? 'Unknown'}</span>
+                  <span>Risk {airdrop.risk_level}</span>
+                  <span>{airdrop.time_required || 'Time unknown'}</span>
+                </div>
+              </div>
+              <div className="text-[11px] text-emerald-300">{airdrop.estimated_reward || 'Reward TBA'}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WalletPreview() {
+  const checks = [
+    'Wallet Health grade and score',
+    'Risk exposure and token hygiene',
+    'Airdrop readiness signals',
+    'No connection or signatures required',
+  ];
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[0.88fr_1.12fr]">
+      <div className="rounded-[28px] border border-sky-500/20 bg-[linear-gradient(160deg,rgba(14,165,233,0.08),rgba(7,11,24,0.96))] p-5">
+        <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200">
+          <Wallet className="h-3.5 w-3.5" />
+          Read-only wallet intelligence
+        </div>
+        <h3 className="mt-4 text-2xl font-black text-white">Check your wallet safely</h3>
+        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+          Review public activity, risk signals and readiness before you use a wallet for new campaigns.
+        </p>
+        <div className="mt-5 space-y-2">
+          {checks.map(item => (
+            <div key={item} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-gray-200">
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              {item}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-[28px] border border-white/10 bg-[#0b1224]/92 p-5">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Wallet Intelligence preview</div>
+            <div className="mt-1 text-lg font-bold text-white">Sample wallet report</div>
+          </div>
+          <div className="text-right">
+            <div className="text-3xl font-black text-emerald-400">A</div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Example grade</div>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {[
+            ['Wallet Health', '82/100'],
+            ['Risk Exposure', 'Low'],
+            ['Airdrop Readiness', 'Strong'],
+            ['Wallet Profile', 'Research-ready'],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">{label}</div>
+              <div className="mt-2 text-base font-bold text-white">{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CopilotPreview() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      <div className="rounded-[28px] border border-violet-500/20 bg-[linear-gradient(160deg,rgba(139,92,246,0.1),rgba(7,11,24,0.96))] p-5">
+        <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-200">
+          <Bot className="h-3.5 w-3.5" />
+          AirdropGuard Copilot
+        </div>
+        <h3 className="mt-4 text-2xl font-black text-white">A crypto research assistant, not a generic chatbot</h3>
+        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+          Copilot uses AirdropGuard data first, highlights verified opportunities and explains why a project deserves your attention.
+        </p>
+      </div>
+
+      <div className="rounded-[28px] border border-white/10 bg-[#0b1224]/92 p-5">
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <div className="max-w-[80%] rounded-2xl bg-sky-500 px-4 py-3 text-sm text-white">
+              What should I focus on today?
+            </div>
+          </div>
+          <div className="flex justify-start">
+            <div className="max-w-[85%] rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-gray-200">
+              <div className="font-semibold text-white">Top verified opportunity</div>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-300">
+                <li>Prioritises strong Trust Score and lower visible risk.</li>
+                <li>Uses estimated reward and time required where available.</li>
+                <li>Recommends concrete next steps instead of generic advice.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LivePlatformSection({ airdrops, verifiedCount }: { airdrops: Airdrop[]; verifiedCount: number }) {
+  const [activeTab, setActiveTab] = useState<ShowcaseTab>('dashboard');
+
+  const tabs: { key: ShowcaseTab; label: string; icon: React.ReactNode }[] = [
+    { key: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-4 w-4" /> },
+    { key: 'wallet', label: 'Wallet Intelligence', icon: <Wallet className="h-4 w-4" /> },
+    { key: 'copilot', label: 'Copilot', icon: <Bot className="h-4 w-4" /> },
+  ];
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Live platform</div>
+          <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">See the platform before you sign in</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-relaxed text-gray-400 sm:text-base">
+          AirdropGuard brings your dashboard, wallet safety workflow and Copilot guidance together in one focused research experience.
+        </p>
+      </div>
+
+      <div className="rounded-[32px] border border-white/10 bg-[linear-gradient(160deg,rgba(7,11,24,0.95)_10%,rgba(8,14,34,0.96)_45%,rgba(12,9,35,0.96)_100%)] p-5 shadow-[0_0_36px_rgba(56,189,248,0.12)] sm:p-6">
+        <div className="mb-6 flex flex-wrap gap-2">
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`inline-flex min-h-[42px] items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition-colors ${activeTab === tab.key
+                ? 'border border-sky-400/30 bg-sky-500/12 text-white'
+                : 'border border-white/10 bg-white/[0.03] text-gray-400 hover:bg-white/[0.06] hover:text-white'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'dashboard' && <DashboardPreview airdrops={airdrops} verifiedCount={verifiedCount} />}
+        {activeTab === 'wallet' && <WalletPreview />}
+        {activeTab === 'copilot' && <CopilotPreview />}
+      </div>
+    </section>
+  );
+}
+
+function TrustSection({ counters }: { counters: CounterItem[] }) {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+      <div className="mx-auto max-w-3xl text-center">
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Trust</div>
+        <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">Built around evidence, safety and repeatable research</h2>
+      </div>
+      <div className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
+        {counters.map(item => <CounterCard key={item.label} item={item} />)}
+      </div>
+    </section>
+  );
+}
+
+function AudienceSection() {
+  const personas = [
+    ['Beginners', 'Start with verified listings, guided risk signals and read-only wallet checks.'],
+    ['Advanced Farmers', 'Prioritise opportunities faster and spend time only where the edge is clearer.'],
+    ['Content Creators', 'Turn structured platform intelligence into better explainers and updates.'],
+    ['Researchers', 'Review trust, risk and opportunity context from one interface.'],
+    ['Developers', 'Understand the platform quickly before exploring pricing or API surfaces.'],
+  ];
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Who it&apos;s for</div>
+          <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">Designed for every level of crypto operator</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-relaxed text-gray-400 sm:text-base">
+          Whether you are just starting or running a deeper workflow, the platform is designed to surface what matters first.
+        </p>
+      </div>
+
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+        {personas.map(([title, desc]) => (
+          <div key={title} className="glass-card rounded-[28px] border border-white/10 p-6">
+            <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sky-300">
+              <Users className="h-5 w-5" />
+            </div>
+            <h3 className="mt-5 text-lg font-black text-white">{title}</h3>
+            <p className="mt-3 text-sm leading-relaxed text-gray-400">{desc}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SocialProofSection({ featured, latestVerified }: { featured: Airdrop | null; latestVerified: Airdrop[] }) {
+  const recentRewards = latestVerified.filter(item => item.estimated_reward).slice(0, 3);
+  const activityFeed = latestVerified.slice(0, 4).map(item => ({
+    title: item.name,
+    detail: item.listing_state === 'verified' || item.human_verified
+      ? 'Verified project available for review'
+      : 'Under-review project added to the platform',
+    timestamp: new Date(item.updated_at).toLocaleDateString(),
+  }));
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Social proof</div>
+          <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">Live signals from the platform</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-relaxed text-gray-400 sm:text-base">
+          Show visitors that AirdropGuard is active, curated and focused on real platform intelligence, not just static listings.
+        </p>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="glass-card rounded-[32px] border border-white/10 p-5 sm:p-6">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
+            <Star className="h-4 w-4 text-sky-300" />
+            Community Results
+          </div>
+          {featured ? (
+            <CommunityResults airdropId={featured.id} />
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-10 text-center text-sm text-gray-400">
+              Community reporting will appear here as soon as a featured listing is available.
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-5">
+          <div className="glass-card rounded-[32px] border border-white/10 p-6">
+            <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
+              <Target className="h-4 w-4 text-emerald-300" />
+              Latest successful rewards
+            </div>
+            <div className="space-y-3">
+              {recentRewards.length > 0 ? recentRewards.map(item => (
+                <div key={item.id} className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-white">{item.name}</div>
+                    <div className="text-xs text-emerald-300">{item.estimated_reward}</div>
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500">Verified reward guidance from the listing page</div>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-sm text-gray-400">
+                  Estimated reward data is still being collected.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="glass-card rounded-[32px] border border-white/10 p-6">
+            <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
+              <ShieldCheck className="h-4 w-4 text-sky-300" />
+              Latest verified projects
+            </div>
+            <div className="space-y-3">
+              {latestVerified.slice(0, 3).map(item => (
+                <Link key={item.id} to={`/airdrop/${item.slug}`} className="block rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 transition-colors hover:bg-white/[0.07]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-white">{item.name}</div>
+                    <div className="text-xs text-sky-300">Trust {item.trust_score ?? 'Unknown'}</div>
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500">{item.blockchain.slice(0, 2).join(' • ') || 'Chain unknown'}</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="glass-card rounded-[32px] border border-white/10 p-6">
+            <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
+              <Activity className="h-4 w-4 text-violet-300" />
+              Recent platform activity
+            </div>
+            <div className="space-y-3">
+              {activityFeed.map(item => (
+                <div key={`${item.title}-${item.timestamp}`} className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+                  <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-sky-400" />
+                  <div>
+                    <div className="text-sm font-semibold text-white">{item.title}</div>
+                    <div className="mt-1 text-xs text-gray-500">{item.detail}</div>
+                    <div className="mt-2 text-[11px] text-gray-600">{item.timestamp}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FinalCtaSection() {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+      <div className="relative overflow-hidden rounded-[36px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_28%),radial-gradient(circle_at_80%_10%,rgba(139,92,246,0.18),transparent_24%),linear-gradient(180deg,#091224_0%,#0a1327_100%)] px-6 py-10 text-center sm:px-10 sm:py-14">
+        <div className="mx-auto max-w-3xl">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Ready to Farm Smarter?</div>
+          <h2 className="mt-4 text-3xl font-black text-white sm:text-5xl">Join AirdropGuard today.</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-gray-300 sm:text-base">
+            Create an account, explore verified projects and let Copilot help you decide where to spend your next hour.
+          </p>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link
+              to="/auth"
+              className="inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-sky-500 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-sky-400"
+            >
+              Create Free Account
+            </Link>
+            <a
+              href="#airdrops"
+              className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]"
+            >
+              Explore Airdrops
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SponsoredTransparencyNote() {
   return (
-    <div className="mt-3 mb-6 rounded-2xl border border-amber-500/15 bg-amber-500/[0.04] px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-      <div className="inline-flex items-center gap-2 text-amber-300 text-xs font-semibold uppercase tracking-wider">
-        <Star className="w-3.5 h-3.5 fill-current" />
+    <div className="mb-6 mt-3 flex flex-col gap-2 rounded-2xl border border-amber-500/15 bg-amber-500/[0.04] px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
+      <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-300">
+        <Star className="h-3.5 w-3.5 fill-current" />
         Featured placement
       </div>
-      <p className="text-xs text-gray-500 leading-relaxed">
+      <p className="text-xs leading-relaxed text-gray-500">
         Featured listings may be paid placements, but they must still pass review. Paid placement never overrides risk warnings, trust signals, or human verification.
       </p>
     </div>
-  );
-}
-
-function HeroProofStrip() {
-  const items = [
-    'Live airdrop listings with trust signals',
-    'AI-scored and human-reviewed research',
-    'Task, risk and reward details in one place',
-    'No seed phrases, private keys or forced connections',
-  ];
-
-  return (
-    <div className="mt-7 grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-2xl">
-      {items.map(item => (
-        <div key={item} className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-          <span className="text-xs text-gray-400">{item}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function HeroV2() {
-  const hero = getDailyHeroMessage();
-
-  const snapshotItems = [
-    { label: 'Verified Listings', value: 'Reviewed for project quality, risk and evidence.', icon: ShieldCheck, tone: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
-    { label: 'Airdrop Confidence', value: 'Token, snapshot and reward evidence separated from project trust.', icon: Gift, tone: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
-    { label: 'Scam Warnings', value: 'Impersonation, exploit and suspicious-link signals highlighted first.', icon: AlertTriangle, tone: 'text-rose-400 bg-rose-500/10 border-rose-500/20' },
-    { label: 'Action Guidance', value: 'Clear next step: research, monitor, review or avoid.', icon: CheckSquare, tone: 'text-sky-400 bg-sky-500/10 border-sky-500/20' },
-  ];
-
-  return (
-    <section className="relative overflow-hidden border-b border-white/5">
-      <div className="absolute inset-0 hidden md:block bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.12),transparent_30%),radial-gradient(circle_at_70%_20%,rgba(168,85,247,0.10),transparent_28%)]" />
-
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 pb-8 sm:pt-16 sm:pb-14 lg:pt-20 lg:pb-16">
-        <div className="grid gap-7 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:items-center">
-          <div className="text-center lg:text-left">
-            <div className="mx-auto lg:mx-0 inline-flex max-w-full items-center gap-2 rounded-full border border-neon-purple/25 bg-neon-purple/10 px-3 py-2 mb-5">
-              <ShieldCheck className="w-3.5 h-3.5 text-neon-purple shrink-0" />
-              <span className="text-[11px] sm:text-xs font-semibold text-neon-purple leading-snug">
-                {hero.badge}
-              </span>
-            </div>
-
-            <h1 className="mx-auto lg:mx-0 max-w-4xl text-[2rem] sm:text-5xl lg:text-6xl font-black text-white leading-[1.08] tracking-tight">
-              {hero.headline}
-            </h1>
-
-            <p className="mx-auto lg:mx-0 mt-4 sm:mt-5 text-sm sm:text-lg text-gray-400 leading-relaxed max-w-2xl">
-              {hero.subtext}
-            </p>
-
-            <div className="mt-6 flex flex-col sm:flex-row sm:justify-center lg:justify-start gap-3">
-              <a
-                href="#airdrops"
-                className="min-h-[48px] inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl bg-neon-purple px-6 py-3 text-sm font-bold text-white hover:bg-neon-purple/90 transition-colors"
-              >
-                Browse Airdrops
-                <ArrowRight className="w-4 h-4" />
-              </a>
-
-              <Link
-                to="/wallet-checker"
-                className="min-h-[48px] inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-6 py-3 text-sm font-bold text-sky-300 hover:bg-sky-500/20 hover:text-white transition-colors"
-              >
-                Check Wallet Safety
-              </Link>
-
-              <Link
-                to="/submit"
-                className="min-h-[48px] inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-white hover:bg-white/10 transition-colors"
-              >
-                Submit Airdrop
-              </Link>
-            </div>
-
-            <p className="mt-4 text-xs text-gray-600">
-              No seed phrases. No private keys. No forced wallet connection to access research.
-            </p>
-
-            <HeroProofStrip />
-          </div>
-
-          <div className="glass-card p-4 sm:p-6 border border-neon-purple/15">
-            <div className="flex items-start justify-between gap-4 mb-5">
-              <div>
-                <div className="text-[10px] sm:text-xs text-gray-600 uppercase tracking-wider mb-1">
-                  Airdrop Discovery Snapshot
-                </div>
-                <h2 className="text-lg sm:text-xl font-bold text-white">{hero.snapshotTitle}</h2>
-              </div>
-
-              <div className="hidden sm:flex items-center gap-0.5 text-amber-300" aria-label="5 star intelligence rating">
-                {[1, 2, 3, 4, 5].map(i => <Star key={i} className="w-4 h-4 fill-current" />)}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
-              {snapshotItems.map(({ label, value, icon: Icon, tone }) => (
-                <div key={label} className="rounded-2xl border border-white/5 bg-dark-700/35 p-3 sm:p-4 flex items-start gap-3">
-                  <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${tone}`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-white">{label}</h3>
-                    <p className="text-xs text-gray-500 leading-relaxed mt-1">{value}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function PlatformStats({ stats }: { stats: StatItem[] }) {
-  return (
-    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-4 pb-8 sm:pt-0 sm:-mt-5 sm:pb-12 relative z-10">
-      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:px-0">
-        {stats.map(stat => (
-          <div key={stat.label} className="glass-card min-w-[155px] flex-1 p-4 sm:p-5 border border-white/5">
-            <div className="text-2xl sm:text-3xl font-black text-white tabular-nums">{stat.value}</div>
-            <div className="text-xs font-semibold text-gray-400 mt-1">{stat.label}</div>
-            <div className="text-[10px] text-gray-600 mt-1 leading-relaxed">{stat.sub}</div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-const PILLARS = [
-  {
-    icon: Brain,
-    title: 'Intelligence Reports',
-    desc: 'Each project can show reputation, airdrop confidence, evidence coverage, threat level and final recommendation.',
-    color: 'text-neon-purple',
-    bg: 'bg-neon-purple/10 border-neon-purple/20',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Human Verification',
-    desc: 'Automation supports research, but analyst review remains central before listings are verified or promoted.',
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10 border-emerald-500/20',
-  },
-  {
-    icon: Eye,
-    title: 'Transparent Signals',
-    desc: 'Users can see why a project looks strong, what is missing, and what should be checked before spending time or gas.',
-    color: 'text-sky-400',
-    bg: 'bg-sky-500/10 border-sky-500/20',
-  },
-  {
-    icon: LockKeyhole,
-    title: 'Safety First',
-    desc: 'AirdropGuard does not ask for seed phrases, private keys, or forced wallet connections to view intelligence.',
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10 border-amber-500/20',
-  },
-];
-
-function IntelligencePillars() {
-  return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10 sm:pb-12">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-        <div>
-          <p className="text-xs text-neon-purple font-semibold uppercase tracking-wider mb-2">Why AirdropGuard</p>
-          <h2 className="text-2xl sm:text-3xl font-black text-white">More than an airdrop list.</h2>
-        </div>
-        <p className="text-sm text-gray-500 max-w-xl">
-          AirdropGuard is designed so visitors instantly understand what is credible, what is speculative, and what deserves attention before taking action.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {PILLARS.map(({ icon: Icon, title, desc, color, bg }) => (
-          <div key={title} className="glass-card p-6">
-            <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center mb-4 ${bg}`}>
-              <Icon className={`w-5 h-5 ${color}`} />
-            </div>
-            <h3 className="text-sm font-bold text-white mb-2">{title}</h3>
-            <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-const WORKFLOW = [
-  { icon: Send, title: 'Project Submitted', desc: 'Projects can be submitted by teams or added by AirdropGuard analysts.' },
-  { icon: FileSearch, title: 'Evidence Collected', desc: 'Official links, docs, social signals, token data, funding and risk indicators are reviewed.' },
-  { icon: Brain, title: 'Intelligence Structured', desc: 'Signals are organised into reputation, security, evidence, opportunity and airdrop confidence layers.' },
-  { icon: Users, title: 'Analyst Review', desc: 'A human reviewer checks the intelligence before final publishing and status decisions.' },
-  { icon: Radio, title: 'Ongoing Monitoring', desc: 'Listings can be updated as new reward, token, risk or community information appears.' },
-];
-
-function IntelligenceWorkflow() {
-  return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-      <div className="glass-card p-6 sm:p-8 border border-neon-purple/15">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-          <div>
-            <p className="text-xs text-neon-purple font-semibold uppercase tracking-wider mb-2">Process</p>
-            <h2 className="text-2xl sm:text-3xl font-black text-white">How intelligence becomes a listing.</h2>
-          </div>
-          <Link to="/whitepaper" className="text-sm text-neon-purple hover:text-neon-purple/80 transition-colors">
-            Read methodology →
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          {WORKFLOW.map(({ icon: Icon, title, desc }, index) => (
-            <div key={title} className="relative rounded-2xl bg-dark-700/35 border border-white/5 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                  <Icon className="w-4 h-4 text-neon-purple" />
-                </div>
-                <span className="text-[10px] text-gray-700 font-bold">0{index + 1}</span>
-              </div>
-              <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
-              <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-const STEPS = [
-  { icon: Search, num: '1', title: 'Discover', desc: 'Browse verified airdrops filtered by blockchain, risk level, reward potential and category.' },
-  { icon: BarChart3, num: '2', title: 'Review Signals', desc: 'Compare reputation, airdrop confidence, evidence coverage and risk before you spend time.' },
-  { icon: CheckSquare, num: '3', title: 'Track Tasks', desc: 'Follow saved task checklists and monitor progress across multiple opportunities.' },
-];
-
-function HowItWorks() {
-  return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-      <h2 className="text-2xl sm:text-3xl font-black text-white text-center mb-3">From discovery to decision</h2>
-      <p className="text-sm text-gray-500 text-center max-w-2xl mx-auto mb-8">
-        AirdropGuard helps users move beyond hype and make safer, better-informed decisions.
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {STEPS.map(({ icon: Icon, num, title, desc }) => (
-          <div key={title} className="glass-card p-6 text-center flex flex-col items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center">
-              <span className="text-xs font-bold gradient-text">{num}</span>
-            </div>
-            <Icon className="w-6 h-6 text-neon-purple" />
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
-            <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ComparisonSection() {
-  const rows = [
-    ['Lists campaigns', 'Evaluates project quality and airdrop confidence'],
-    ['Basic trust indicators', 'Multi-layer intelligence and final recommendations'],
-    ['Little explanation', 'Evidence coverage, missing signals and threat notes'],
-    ['Static pages', 'Designed for ongoing monitoring and updates'],
-  ];
-
-  return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-      <div className="grid lg:grid-cols-[0.8fr_1.2fr] gap-6 items-start">
-        <div>
-          <p className="text-xs text-neon-purple font-semibold uppercase tracking-wider mb-2">Difference</p>
-          <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">Built for safer airdrop research.</h2>
-          <p className="text-sm text-gray-500 leading-relaxed">
-            Most airdrop platforms focus on discovery. AirdropGuard focuses on decision support: what is credible, what is speculative, and what deserves your attention.
-          </p>
-        </div>
-        <div className="glass-card overflow-hidden border border-white/5">
-          <div className="grid grid-cols-2 bg-white/[0.03] border-b border-white/5">
-            <div className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Typical airdrop sites</div>
-            <div className="p-4 text-xs font-bold text-neon-purple uppercase tracking-wider border-l border-white/5">AirdropGuard</div>
-          </div>
-          {rows.map(([other, guard]) => (
-            <div key={other} className="grid grid-cols-2 border-b border-white/5 last:border-0">
-              <div className="p-4 text-sm text-gray-500">{other}</div>
-              <div className="p-4 text-sm text-gray-300 border-l border-white/5">{guard}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function WalletCheckerSection() {
-  const walletSignals = [
-    { label: 'Wallet Health', value: 'Grade + score', icon: Gauge, tone: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
-    { label: 'Risk Exposure', value: 'GoPlus security', icon: Shield, tone: 'text-sky-400 bg-sky-500/10 border-sky-500/20' },
-    { label: 'Airdrop Readiness', value: 'Activity signals', icon: Target, tone: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
-    { label: 'Wallet DNA', value: 'User persona', icon: Fingerprint, tone: 'text-neon-purple bg-neon-purple/10 border-neon-purple/20' },
-  ];
-
-  return (
-    <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-      <div className="relative overflow-hidden rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-500/[0.08] via-dark-800 to-neon-purple/[0.06] p-5 sm:p-8 lg:p-10">
-        <div className="absolute inset-0 hidden md:block bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.10),transparent_28%)]" />
-
-        <div className="relative grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:gap-8 lg:items-center">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1 mb-5">
-              <Wallet className="w-3.5 h-3.5 text-sky-400" />
-              <span className="text-xs font-semibold text-sky-300">Wallet Intelligence • read-only security</span>
-            </div>
-
-            <h2 className="text-2xl sm:text-4xl font-black text-white leading-tight mb-4">
-              Check your wallet before you chase the next airdrop.
-            </h2>
-
-            <p className="text-sm sm:text-base text-gray-400 leading-relaxed mb-6">
-              AirdropGuard analyses public wallet activity, visible risk signals, token hygiene and airdrop-readiness indicators without asking for a seed phrase, private key or wallet signature.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
-              {['No wallet connection', 'No signatures', 'No seed phrase', 'GoPlus security layer'].map(item => (
-                <div key={item} className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                  <span className="text-xs text-gray-400">{item}</span>
-                </div>
-              ))}
-            </div>
-
-            <Link
-              to="/wallet-checker"
-              className="inline-flex min-h-[46px] w-full sm:w-auto items-center justify-center gap-2 rounded-2xl bg-sky-500 px-6 py-3 text-sm font-bold text-white hover:bg-sky-500/90 transition-colors"
-            >
-              Run Wallet Intelligence
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <div className="glass-card p-4 sm:p-6 border border-white/10">
-            <div className="flex items-center justify-between gap-4 mb-5">
-              <div>
-                <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">Report Preview</div>
-                <h3 className="text-lg sm:text-xl font-bold text-white">Wallet Intelligence Report</h3>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-3xl font-black text-emerald-400">A</div>
-                <div className="text-[10px] text-gray-600 uppercase tracking-wider">Example grade</div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {walletSignals.map(({ label, value, icon: Icon, tone }) => (
-                <div key={label} className="rounded-2xl border border-white/5 bg-dark-700/35 p-4">
-                  <div className={`w-9 h-9 rounded-xl border flex items-center justify-center mb-3 ${tone}`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="text-sm font-bold text-white">{label}</div>
-                  <div className="text-[10px] text-gray-600 mt-1">{value}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.04] p-4">
-              <p className="text-xs text-gray-400 leading-relaxed">
-                Built as a separate full tool so the homepage stays fast, focused and easy to scan.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function DeveloperApiSection() {
-  return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="glass-card p-8 flex flex-col lg:flex-row items-start lg:items-center gap-6 border border-blue-500/15">
-        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-          <Code2 className="w-6 h-6 text-blue-400" />
-        </div>
-        <div className="flex-1">
-          <p className="text-xs text-blue-400 font-semibold uppercase tracking-wider mb-2">Developer platform</p>
-          <h3 className="text-xl font-bold text-white mb-2">Use AirdropGuard intelligence in your own product.</h3>
-          <p className="text-sm text-gray-500 leading-relaxed">
-            API access is designed for wallets, portfolio trackers, research tools, DeFi dashboards, Discord bots and Telegram bots.
-          </p>
-        </div>
-        <Link
-          to="/api-docs"
-          className="w-full sm:w-auto shrink-0 px-6 py-3 rounded-xl text-sm font-semibold bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 hover:text-white transition-colors text-center"
-        >
-          View API Docs
-        </Link>
-      </div>
-    </section>
-  );
-}
-
-function RoadmapPreview() {
-  const items = [
-    { title: 'Now', text: 'Verified listings, intelligence reports, community results and wallet safety tools.' },
-    { title: 'Next', text: 'Smarter alerts, project signal history, stronger dashboard personalisation and API improvements.' },
-    { title: 'Future', text: 'Browser extension, mobile app, enterprise intelligence and broader multi-chain coverage.' },
-  ];
-
-  return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-        <div>
-          <p className="text-xs text-neon-purple font-semibold uppercase tracking-wider mb-2">Roadmap</p>
-          <h2 className="text-2xl sm:text-3xl font-black text-white">Building the trust layer for airdrops.</h2>
-        </div>
-        <Link to="/whitepaper" className="text-sm text-neon-purple hover:text-neon-purple/80 transition-colors">
-          Read whitepaper →
-        </Link>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        {items.map(item => (
-          <div key={item.title} className="glass-card p-6 border border-white/5">
-            <div className="text-xs text-neon-purple font-semibold uppercase tracking-wider mb-2">{item.title}</div>
-            <p className="text-sm text-gray-400 leading-relaxed">{item.text}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CommunitySection() {
-  return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="glass-card p-8 flex flex-col sm:flex-row items-center gap-6 border border-indigo-500/20">
-        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
-          <MessageSquare className="w-6 h-6 text-indigo-400" />
-        </div>
-        <div className="flex-1 text-center sm:text-left">
-          <h3 className="text-base font-bold text-white mb-1">Join the AirdropGuard community</h3>
-          <p className="text-sm text-gray-500">Get alerts, safety tips and discussion from other airdrop researchers. Free to join.</p>
-        </div>
-        <a
-          href="https://discord.gg/uDP9xm6Dv"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full sm:w-auto shrink-0 px-6 py-3 rounded-xl text-sm font-semibold bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 hover:text-white transition-colors text-center"
-        >
-          Join Discord
-        </a>
-      </div>
-    </section>
-  );
-}
-
-function FinalCta() {
-  return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-      <div className="glass-card p-8 sm:p-10 text-center border border-neon-purple/15">
-        <Activity className="w-8 h-8 text-neon-purple mx-auto mb-4" />
-        <h2 className="text-2xl sm:text-3xl font-black text-white mb-3">Ready to find your next airdrop?</h2>
-        <p className="text-sm text-gray-500 max-w-2xl mx-auto mb-6">
-          Browse verified crypto airdrops, compare trust signals and check before you connect.
-        </p>
-        <div className="flex flex-col sm:flex-row justify-center gap-3">
-          <a href="#airdrops" className="px-6 py-3 rounded-2xl text-sm font-bold bg-neon-purple text-white hover:bg-neon-purple/90 transition-colors">
-            Explore Airdrops
-          </a>
-          <Link to="/submit" className="px-6 py-3 rounded-2xl text-sm font-bold border border-white/10 bg-white/5 text-white hover:bg-white/10 transition-colors">
-            Submit a Project
-          </Link>
-        </div>
-      </div>
-    </section>
   );
 }
 
@@ -626,7 +771,8 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_AIRDROPS);
-  const showDeferredSections = useDeferredRender();
+  const [communityCount, setCommunityCount] = useState(0);
+  const [walletCount, setWalletCount] = useState(0);
 
   const tab = (searchParams.get('filter') as Tab) ?? 'all';
 
@@ -638,20 +784,28 @@ export default function HomePage() {
     async function load() {
       setLoading(true);
       setError(null);
-      const { data, error: err } = await supabase
-        .from('airdrops')
-        .select('*')
-        .eq('published', true)
-        .eq('review_status', 'approved')
-        .eq('is_demo', false)
-        .neq('listing_state', 'scam_alert')
-        .order('sort_order', { ascending: true });
 
-      if (err) {
-        setError(err.message);
+      const [airdropsRes, communityRes, walletRes] = await Promise.all([
+        supabase
+          .from('airdrops')
+          .select('*')
+          .eq('published', true)
+          .eq('review_status', 'approved')
+          .eq('is_demo', false)
+          .neq('listing_state', 'scam_alert')
+          .order('sort_order', { ascending: true }),
+        supabase.from('airdrop_results').select('*', { count: 'exact', head: true }),
+        supabase.from('wallet_scan_history').select('*', { count: 'exact', head: true }),
+      ]);
+
+      if (airdropsRes.error) {
+        setError(airdropsRes.error.message);
       } else {
-        setAirdrops(data ?? []);
+        setAirdrops(airdropsRes.data ?? []);
       }
+
+      if (!communityRes.error) setCommunityCount(communityRes.count ?? 0);
+      if (!walletRes.error) setWalletCount(walletRes.count ?? 0);
       setLoading(false);
     }
 
@@ -674,7 +828,17 @@ export default function HomePage() {
           (a.trust_score === null || a.trust_score >= 60)
       ) ??
       null,
-    [airdrops]
+    [airdrops],
+  );
+
+  const verifiedProjects = useMemo(
+    () => airdrops.filter(item => item.listing_state === 'verified' || item.human_verified),
+    [airdrops],
+  );
+
+  const topVerified = useMemo(
+    () => [...verifiedProjects].sort((a, b) => (b.trust_score ?? 0) - (a.trust_score ?? 0)),
+    [verifiedProjects],
   );
 
   const filtered = useMemo(() => {
@@ -685,13 +849,14 @@ export default function HomePage() {
     else if (tab === 'featured') list = list.filter(a => isFeaturedPlacement(a));
 
     if (filters.search) {
-      const q = filters.search.toLowerCase();
+      const query = filters.search.toLowerCase();
       list = list.filter(a =>
-        a.name.toLowerCase().includes(q) ||
-        a.ticker?.toLowerCase().includes(q) ||
-        a.ai_summary?.toLowerCase().includes(q)
+        a.name.toLowerCase().includes(query) ||
+        a.ticker?.toLowerCase().includes(query) ||
+        a.ai_summary?.toLowerCase().includes(query),
       );
     }
+
     if (filters.blockchain) list = list.filter(a => a.blockchain.includes(filters.blockchain as never));
     if (filters.category) list = list.filter(a => a.category.includes(filters.category as never));
     if (filters.reward) list = list.filter(a => a.reward_potential === filters.reward);
@@ -708,27 +873,7 @@ export default function HomePage() {
 
   const hasMoreAirdrops = visibleCount < filtered.length;
 
-  const stats = useMemo<StatItem[]>(() => {
-    const active = airdrops.filter(a => a.status !== 'Expired').length;
-    const verified = airdrops.filter(a => a.human_verified || a.listing_state === 'verified').length;
-    const chains = new Set(airdrops.flatMap(a => a.blockchain ?? [])).size;
-    const lowRisk = airdrops.filter(a => a.risk_level === 'Low').length;
-
-    return [
-      { label: 'Active Airdrops', value: active, sub: 'Approved opportunities currently visible' },
-      { label: 'Verified Listings', value: verified, sub: 'Human-verified or analyst-reviewed projects' },
-      { label: 'Chains Covered', value: chains, sub: 'Networks represented in listings' },
-      { label: 'Low Risk Options', value: lowRisk, sub: 'Listings currently marked lower risk' },
-    ];
-  }, [airdrops]);
-
-  const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
-    { key: 'all', label: 'All Airdrops', icon: <Grid3X3 className="w-3.5 h-3.5" /> },
-    { key: 'trending', label: 'Trending', icon: <Flame className="w-3.5 h-3.5" /> },
-    { key: 'ending', label: 'Ending Soon', icon: <Clock className="w-3.5 h-3.5" /> },
-    { key: 'featured', label: 'Featured', icon: <TrendingUp className="w-3.5 h-3.5" /> },
-  ];
- const homepageSchema = {
+  const homepageSchema = {
     '@context': 'https://schema.org',
     '@graph': [
       {
@@ -738,7 +883,7 @@ export default function HomePage() {
         url: 'https://airdropguard.com',
         logo: 'https://airdropguard.com/airdrop_guards.png',
         description:
-          'AirdropGuard is a crypto intelligence platform providing AI-assisted analysis, human-reviewed airdrops, scam alerts, trust signals, wallet safety tools and educational resources to help users research before participating.',
+          'AirdropGuard is a crypto intelligence platform providing AI-assisted analysis, human-reviewed airdrops, wallet safety tools, trust signals and Copilot guidance.',
         sameAs: ['https://x.com/Dropguardai'],
       },
       {
@@ -750,33 +895,93 @@ export default function HomePage() {
           '@id': 'https://airdropguard.com/#organization',
         },
         description:
-          'Discover verified crypto airdrops, compare trust signals, analyse project reputation, review AI-assisted intelligence and use read-only wallet security tools. Check Before You Connect.',
+          'Discover verified crypto airdrops, analyse risk with AI, check your wallet safely and use Copilot to focus on opportunities that deserve your time.',
       },
     ],
   };
+
+  const trustCounters: CounterItem[] = useMemo(() => {
+    const aiAnalyses = airdrops.filter(item => item.ai_summary || item.ai_risk_analysis || item.ai_reward_estimate).length;
+    return [
+      {
+        label: 'Projects Analysed',
+        value: airdrops.length,
+        sub: 'Approved projects currently visible on the platform.',
+      },
+      {
+        label: 'Verified Listings',
+        value: verifiedProjects.length,
+        sub: 'Listings reviewed and surfaced with stronger confidence.',
+      },
+      {
+        label: 'Community Members',
+        value: communityCount,
+        sub: 'Community result submissions currently recorded.',
+      },
+      {
+        label: 'Wallets Analysed',
+        value: walletCount,
+        sub: 'Saved wallet intelligence reports in platform history.',
+      },
+      {
+        label: 'AI Analyses',
+        value: aiAnalyses,
+        sub: 'Listings with AI-generated intelligence coverage.',
+      },
+    ];
+  }, [airdrops, verifiedProjects.length, communityCount, walletCount]);
+
+  const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+    { key: 'all', label: 'All Airdrops', icon: <Grid3X3 className="w-3.5 h-3.5" /> },
+    { key: 'trending', label: 'Trending', icon: <Flame className="w-3.5 h-3.5" /> },
+    { key: 'ending', label: 'Ending Soon', icon: <Clock className="w-3.5 h-3.5" /> },
+    { key: 'featured', label: 'Featured', icon: <Layers3 className="w-3.5 h-3.5" /> },
+  ];
+
   return (
     <>
-         <SEO
-        title="AirdropGuard | Verified Crypto Airdrops & Wallet Safety Tools"
-        description="Find verified crypto airdrops with AI trust scores, human review, task guides, scam warnings and wallet safety tools before you connect."
+      <SEO
+        title="AirdropGuard | The AI-Powered Platform for Smarter Crypto Airdrops"
+        description="Discover verified opportunities, analyse risk with AI, check your wallet safely and use Copilot to focus on the crypto airdrops that deserve your time."
         canonical="https://airdropguard.com/"
         schema={homepageSchema}
       />
-      <HeroV2 />
-      <PlatformStats stats={stats} />
+
+      <HeroSection
+        loading={loading}
+        stats={{
+          analysed: airdrops.length,
+          verified: verifiedProjects.length,
+          aiAnalyses: airdrops.filter(item => item.ai_summary || item.ai_risk_analysis || item.ai_reward_estimate).length,
+        }}
+        featured={featured}
+        topVerified={topVerified}
+      />
+
       <TrustStrip />
-      <section id="airdrops" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+      <HowItWorksSection />
+      <WhyAirdropGuardSection />
+      <LivePlatformSection airdrops={topVerified.slice(0, 6)} verifiedCount={verifiedProjects.length} />
+      <TrustSection counters={trustCounters} />
+      <AudienceSection />
+
+      <section id="airdrops" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs text-neon-purple font-semibold uppercase tracking-wider mb-2">Live airdrop discovery</p>
-            <h2 className="text-2xl sm:text-3xl font-black text-white">Latest verified crypto airdrops</h2>
-            <p className="text-sm text-gray-500 mt-2 max-w-2xl">
-              Browse active opportunities first, then filter by chain, category, reward, risk and difficulty before opening each full research report.
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Explore Airdrops</div>
+            <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">Find the opportunities that deserve your time</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400 sm:text-base">
+              Browse live opportunities, filter by chain and risk, then open the full research page for trust signals, rewards, tasks and supporting evidence.
             </p>
           </div>
-          <Link to="/submit" className="text-sm text-neon-purple hover:text-neon-purple/80 transition-colors">
-            Submit project →
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/dashboard" className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-sky-400/25 bg-sky-500/10 px-5 py-3 text-sm font-semibold text-sky-200 transition-colors hover:bg-sky-500/20">
+              Open Dashboard
+            </Link>
+            <Link to="/pricing" className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/[0.08]">
+              View Pricing
+            </Link>
+          </div>
         </div>
 
         {featured && tab === 'all' && !filters.search ? (
@@ -786,31 +991,24 @@ export default function HomePage() {
           </div>
         ) : null}
 
-        <div className="-mx-4 flex items-center gap-1 mb-6 border-b border-white/5 pb-1 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
-          {tabs.map(t => (
+        <div className="-mx-4 mb-6 flex items-center gap-1 overflow-x-auto border-b border-white/5 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+          {tabs.map(item => (
             <button
-              key={t.key}
+              key={item.key}
               onClick={() => {
-                if (t.key === 'all') {
-                  setSearchParams({});
-                } else {
-                  setSearchParams({ filter: t.key });
-                }
+                if (item.key === 'all') setSearchParams({});
+                else setSearchParams({ filter: item.key });
               }}
-              className={`flex min-h-[42px] shrink-0 items-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-medium transition-colors ${
-                tab === t.key
-                  ? 'text-white bg-white/5 border-b-2 border-neon-purple'
-                  : 'text-gray-500 hover:text-gray-300'
+              className={`flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === item.key
+                ? 'border-b-2 border-sky-400 bg-white/5 text-white'
+                : 'text-gray-500 hover:text-gray-300'
               }`}
             >
-              {t.icon}
-              {t.label}
-              {t.key === 'trending' && (
-                <span className="ml-0.5 w-1.5 h-1.5 rounded-full bg-neon-purple animate-pulse" />
-              )}
+              {item.icon}
+              {item.label}
             </button>
           ))}
-          <div className="ml-auto hidden sm:block text-xs text-gray-600">
+          <div className="ml-auto hidden text-xs text-gray-600 sm:block">
             {!loading && <span>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>}
           </div>
         </div>
@@ -820,36 +1018,33 @@ export default function HomePage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24 gap-3 text-gray-500">
-            <Loader2 className="w-5 h-5 animate-spin" />
+          <div className="flex items-center justify-center gap-3 py-24 text-gray-500">
+            <Loader2 className="h-5 w-5 animate-spin" />
             <span className="text-sm">Loading airdrops...</span>
           </div>
         ) : error ? (
-          <div className="flex items-center justify-center py-24 gap-3 text-rose-400">
-            <AlertCircle className="w-5 h-5" />
+          <div className="flex items-center justify-center gap-3 py-24 text-rose-400">
+            <AlertCircle className="h-5 w-5" />
             <span className="text-sm">{error}</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-24">
-            <p className="text-gray-500 text-sm">No airdrops match your filters.</p>
+          <div className="py-24 text-center">
+            <p className="text-sm text-gray-500">No airdrops match your filters.</p>
             <button
               onClick={() => {
                 setFilters(DEFAULT_FILTERS);
                 setSearchParams({});
               }}
-              className="mt-3 text-sm text-neon-purple hover:text-neon-purple/80 transition-colors"
+              className="mt-3 text-sm text-sky-300 transition-colors hover:text-sky-200"
             >
               Clear filters
             </button>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-              {visibleAirdrops.map((airdrop) => (
-                <AirdropCard
-                  key={airdrop.id}
-                  airdrop={airdrop}
-                />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+              {visibleAirdrops.map(airdrop => (
+                <AirdropCard key={airdrop.id} airdrop={airdrop} />
               ))}
             </div>
 
@@ -857,7 +1052,7 @@ export default function HomePage() {
               <div className="mt-8 flex justify-center">
                 <button
                   type="button"
-                  onClick={() => setVisibleCount((count) => count + LOAD_MORE_AIRDROPS)}
+                  onClick={() => setVisibleCount(count => count + LOAD_MORE_AIRDROPS)}
                   className="min-h-[46px] rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-bold text-gray-200 transition-colors hover:bg-white/[0.08] hover:text-white"
                 >
                   Load More Airdrops
@@ -871,44 +1066,9 @@ export default function HomePage() {
         )}
       </section>
 
-
-      {showDeferredSections && (
-        <>
-          <WalletCheckerSection />
-          <IntelligencePillars />
-          <HowItWorks />
-
-          <TrustScoreSection />
-
-          <ComparisonSection />
-          <IntelligenceWorkflow />
-          <DeveloperApiSection />
-
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="glass-card p-5 sm:p-8 flex flex-col sm:flex-row items-center gap-5 sm:gap-6 border border-sky-500/15">
-              <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
-                <Send className="w-6 h-6 text-sky-400" />
-              </div>
-              <div className="flex-1 text-center sm:text-left">
-                <h3 className="text-base font-bold text-white mb-1">Running an airdrop?</h3>
-                <p className="text-sm text-gray-500">Submit your project for review. Approved listings can appear with trust, risk and opportunity intelligence.</p>
-              </div>
-              <Link
-                to="/submit"
-                className="w-full sm:w-auto shrink-0 px-6 py-3 rounded-xl text-sm font-semibold bg-sky-500/15 border border-sky-500/30 text-sky-300 hover:bg-sky-500/25 hover:text-white transition-colors text-center"
-              >
-                Submit Your Project
-              </Link>
-            </div>
-          </section>
-
-          <CommunitySection />
-          <RoadmapPreview />
-          <FinalCta />
-
-          <NewsletterSection />
-        </>
-      )}
+      <SocialProofSection featured={featured ?? topVerified[0] ?? null} latestVerified={topVerified} />
+      <FinalCtaSection />
+      <NewsletterSection />
     </>
   );
 }

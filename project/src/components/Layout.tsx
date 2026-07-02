@@ -4,6 +4,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   Menu,
   X,
+  Bot,
   Shield,
   BadgeDollarSign,
   Key,
@@ -46,10 +47,10 @@ function isActivePath(currentPath: string, currentSearch: string, to: string) {
 }
 
 const primaryNavItems = [
-  { to: "/", label: "Browse", icon: Home },
-  { to: "/?filter=trending", label: "Trending", icon: Flame },
-  { to: "/wallet-checker", label: "Wallet Check", icon: Wallet },
-  { to: "/learn", label: "Learn", icon: BookOpen },
+  { to: "/", label: "Airdrops", icon: Home },
+  { to: "/wallet-checker", label: "Wallet Intelligence", icon: Wallet },
+  { to: "/dashboard", label: "Copilot", icon: Bot },
+  { to: "/pricing", label: "Pricing", icon: Key },
 ];
 
 const researchNavItems = [
