@@ -46,6 +46,7 @@ const corsHeaders = {
  */
 
 const CACHE_TTL_DAYS = 1;
+const ENRICHMENT_CACHE_TTL_HOURS = 24;
 const MAX_SEARCH_RESULTS_PER_QUERY = 5;
 const MAX_WEB_PAGES_TO_FETCH = 8;
 const MAX_PAGE_BYTES = 120_000;
@@ -97,6 +98,9 @@ interface SearchResult {
 interface WebPageData {
   found: boolean;
   url: string;
+  finalUrl?: string;
+  statusCode?: number;
+  canonicalUrl?: string;
   title?: string;
   text?: string;
   links?: string[];
@@ -138,10 +142,14 @@ interface GitHubData {
   openIssues?: number;
   watchers?: number;
   lastPushDaysAgo?: number;
+  lastCommitDate?: string;
+  contributors?: number;
+  visibility?: "public" | "private";
   recentCommits30d?: number;
   language?: string;
   archived?: boolean;
   disabled?: boolean;
+  createdAt?: string;
   repoUrl?: string;
   note?: string;
 }
@@ -186,14 +194,22 @@ interface DefiLlamaData {
 
 interface WebEnrichmentData {
   found: boolean;
+  website_accessible?: boolean;
+  website_status_code?: number;
+  website_canonical_url?: string;
+  website_redirect_url?: string;
   github_link?: string;
   docs_url?: string;
+  whitepaper_url?: string;
   blog_url?: string;
+  medium_url?: string;
+  linkedin_url?: string;
   audit_url?: string;
   x_url?: string;
   discord_url?: string;
   telegram_url?: string;
   has_team_info?: boolean;
+  team_visibility?: "Public Team" | "Anonymous" | "Partially Public";
   token_mentioned?: boolean;
   mainnet_mentioned?: boolean;
   testnet_mentioned?: boolean;
@@ -203,6 +219,68 @@ interface WebEnrichmentData {
   partner_mentions?: number;
   risk_terms?: string[];
   note?: string;
+}
+
+interface EnrichmentField<T = unknown> {
+  value: T;
+  confidence: ConfidenceLevel;
+  source_url: string | null;
+}
+
+interface EnrichmentProfile {
+  version: number;
+  generated_at: string;
+  cache_key: string;
+  fields: {
+    official_website: {
+      accessibility: EnrichmentField<string>;
+      canonical_url: EnrichmentField<string>;
+      redirect_url: EnrichmentField<string>;
+    };
+    documentation: {
+      docs: EnrichmentField<string>;
+      whitepaper: EnrichmentField<string>;
+    };
+    github: {
+      repository_url: EnrichmentField<string>;
+      last_commit_date: EnrichmentField<string>;
+      commit_activity: EnrichmentField<string>;
+      contributors: EnrichmentField<string>;
+      visibility: EnrichmentField<string>;
+    };
+    team: {
+      visibility: EnrichmentField<string>;
+    };
+    funding_investors: {
+      investors: EnrichmentField<string>;
+    };
+    socials: {
+      x: EnrichmentField<string>;
+      discord: EnrichmentField<string>;
+      telegram: EnrichmentField<string>;
+      medium: EnrichmentField<string>;
+      linkedin: EnrichmentField<string>;
+    };
+    token: {
+      token_name: EnrichmentField<string>;
+      symbol: EnrichmentField<string>;
+      contract_address: EnrichmentField<string>;
+      blockchain: EnrichmentField<string>;
+      contract_verified: EnrichmentField<string>;
+    };
+    project_metadata: {
+      category: EnrichmentField<string>;
+      main_blockchain: EnrichmentField<string>;
+      launch_status: EnrichmentField<string>;
+      network_stage: EnrichmentField<string>;
+      approximate_project_age: EnrichmentField<string>;
+    };
+  };
+  failures: string[];
+  snapshots: {
+    web: WebEnrichmentData;
+    github: GitHubData;
+  };
 }
 
 interface IntelligenceScore {
@@ -855,6 +933,50 @@ function hostname(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; }
 }
 
+function toIsoDate(value: string | undefined): string {
+  if (!value) return "Unknown";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Unknown";
+  return parsed.toISOString().slice(0, 10);
+}
+
+function field<T>(value: T, confidence: ConfidenceLevel, source_url: string | null): EnrichmentField<T> {
+  return { value, confidence, source_url };
+}
+
+function parseCanonicalUrl(rawHtml: string, baseUrl: string): string | undefined {
+  const match = rawHtml.match(/<link[^>]+rel=["'][^"']*canonical[^"']*["'][^>]*href=["']([^"']+)["']/i)
+    ?? rawHtml.match(/<link[^>]+href=["']([^"']+)["'][^>]*rel=["'][^"']*canonical[^"']*["']/i);
+  if (!match?.[1]) return undefined;
+  try {
+    return new URL(match[1], baseUrl).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function buildEnrichmentCacheKey(airdrop: Record<string, unknown>): string {
+  const name = safeString(airdrop.name || airdrop.project_name).toLowerCase();
+  const website = normaliseUrl(safeString(airdrop.website_url)).toLowerCase();
+  const github = safeString(airdrop.github_url).toLowerCase();
+  const contract = safeString(airdrop.contract_address).toLowerCase();
+  const chains = Array.isArray(airdrop.blockchain) ? (airdrop.blockchain as string[]).join("|").toLowerCase() : "";
+  return [name, website, github, contract, chains].join("::");
+}
+
+function parseEnrichmentProfile(raw: unknown): EnrichmentProfile | null {
+  if (!raw || typeof raw !== "object") return null;
+  const maybe = raw as Partial<EnrichmentProfile>;
+  if (!maybe.generated_at || !maybe.cache_key || !maybe.fields || !maybe.snapshots) return null;
+  return maybe as EnrichmentProfile;
+}
+
+function isEnrichmentFresh(profile: EnrichmentProfile): boolean {
+  const generatedAt = new Date(profile.generated_at).getTime();
+  if (Number.isNaN(generatedAt)) return false;
+  return (Date.now() - generatedAt) / 3_600_000 < ENRICHMENT_CACHE_TTL_HOURS;
+}
+
 function fmt(n: number | undefined, prefix = "$", digits = 2): string {
   if (n == null || Number.isNaN(n)) return "";
   if (n >= 1_000_000_000) return `${prefix}${(n / 1_000_000_000).toFixed(digits)}B`;
@@ -1228,7 +1350,15 @@ async function fetchTextPage(url: string): Promise<WebPageData> {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       redirect: "follow",
     });
-    if (!res.ok) return { found: false, url: finalUrl, note: `HTTP ${res.status}` };
+    if (!res.ok) {
+      return {
+        found: false,
+        url: finalUrl,
+        finalUrl: res.url || finalUrl,
+        statusCode: res.status,
+        note: `HTTP ${res.status}`,
+      };
+    }
 
     const reader = res.body?.getReader();
     if (!reader) return { found: false, url: finalUrl, note: "no body" };
@@ -1267,7 +1397,17 @@ async function fetchTextPage(url: string): Promise<WebPageData> {
       .trim()
       .slice(0, 30_000);
 
-    return { found: true, url: finalUrl, title, text, links };
+    const resolvedUrl = res.url || finalUrl;
+    return {
+      found: true,
+      url: finalUrl,
+      finalUrl: resolvedUrl,
+      statusCode: res.status,
+      canonicalUrl: parseCanonicalUrl(raw, resolvedUrl),
+      title,
+      text,
+      links,
+    };
   } catch (e) {
     return { found: false, url: finalUrl, note: String(e) };
   }
@@ -1276,7 +1416,15 @@ async function fetchTextPage(url: string): Promise<WebPageData> {
 async function fetchWebEnrichment(websiteUrl: string): Promise<WebEnrichmentData> {
   if (!websiteUrl) return { found: false };
   const page = await fetchTextPage(websiteUrl);
-  if (!page.found || !page.text) return { found: false, note: page.note };
+  if (!page.found || !page.text) {
+    return {
+      found: false,
+      website_accessible: false,
+      website_status_code: page.statusCode,
+      website_redirect_url: page.finalUrl,
+      note: page.note,
+    };
+  }
 
   const htmlText = page.text.toLowerCase();
   const links = page.links ?? [];
@@ -1290,7 +1438,13 @@ async function fetchWebEnrichment(websiteUrl: string): Promise<WebEnrichmentData
     u => u.includes("readthedocs.io"),
     u => /\/docs?(\/|$)/.test(new URL(u).pathname),
   ]);
+  const whitepaper_url = findLink([
+    u => /whitepaper|litepaper|paper/i.test(u),
+    u => /\/(whitepaper|litepaper)(\/|$)/i.test(new URL(u).pathname),
+  ]);
   const blog_url = findLink([u => u.includes("medium.com"), u => u.includes("mirror.xyz"), u => /\/blog(\/|$)/.test(new URL(u).pathname)]);
+  const medium_url = findLink([u => u.includes("medium.com"), u => u.includes("mirror.xyz")]);
+  const linkedin_url = findLink([u => u.includes("linkedin.com/company") || u.includes("linkedin.com/in/")]);
   const audit_url = findLink([u => u.includes("audit"), u => u.includes("certik"), u => u.includes("hacken"), u => u.includes("trailofbits"), u => u.includes("openzeppelin")]);
   const x_url = findLink([u => u.includes("x.com/") || u.includes("twitter.com/")]);
   const discord_url = findLink([u => u.includes("discord.gg") || u.includes("discord.com/invite")]);
@@ -1306,17 +1460,32 @@ async function fetchWebEnrichment(websiteUrl: string): Promise<WebEnrichmentData
   const ecosystems = ["ethereum", "base", "arbitrum", "optimism", "solana", "sui", "avalanche", "polygon", "bnb chain", "cosmos", "starknet", "linea", "scroll", "bitcoin"]
     .filter(e => htmlText.includes(e));
   const risk_terms = includesAny(htmlText, HIGH_RISK_TERMS);
+  const anonymousTeam = /\banonymous team|pseudonymous|anon team|undoxxed\b/.test(htmlText);
+  const publicTeam = /\b(founder|co-founder|ceo|cto|team|our team|leadership|linkedin)\b/.test(htmlText);
+
+  let team_visibility: "Public Team" | "Anonymous" | "Partially Public" | undefined;
+  if (anonymousTeam) team_visibility = "Anonymous";
+  else if (publicTeam && /\b(linkedin|team page|about us|leadership)\b/.test(htmlText)) team_visibility = "Public Team";
+  else if (publicTeam) team_visibility = "Partially Public";
 
   return {
     found: true,
+    website_accessible: true,
+    website_status_code: page.statusCode,
+    website_canonical_url: page.canonicalUrl ?? page.finalUrl ?? page.url,
+    website_redirect_url: page.finalUrl && page.finalUrl !== page.url ? page.finalUrl : undefined,
     github_link,
     docs_url,
+    whitepaper_url,
     blog_url,
+    medium_url,
+    linkedin_url,
     audit_url,
     x_url,
     discord_url,
     telegram_url,
     has_team_info: /\b(team|co-founder|founder|ceo|cto|chief executive|chief technology|founded by)\b/.test(htmlText),
+    team_visibility,
     token_mentioned: /\b(token|tge|token generation event|pre-tge|airdrop)\b/.test(htmlText),
     mainnet_mentioned: /\bmainnet\b/.test(htmlText),
     testnet_mentioned: /\btestnet\b/.test(htmlText),
@@ -1427,14 +1596,19 @@ async function fetchGitHub(githubUrl: string): Promise<GitHubData> {
     const ghToken = Deno.env.get("GITHUB_TOKEN");
     if (ghToken) headers.Authorization = `Bearer ${ghToken}`;
 
-    const [repoRes, commitRes] = await Promise.all([
+    const [repoRes, commitRes, contributorsRes] = await Promise.all([
       fetch(`https://api.github.com/repos/${owner}/${cleanRepo}`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
       fetch(`https://api.github.com/repos/${owner}/${cleanRepo}/commits?since=${new Date(Date.now() - 30 * 86400000).toISOString()}&per_page=100`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
+      fetch(`https://api.github.com/repos/${owner}/${cleanRepo}/contributors?per_page=100&anon=true`, { headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }),
     ]);
     if (!repoRes.ok) return { found: false, note: `GitHub ${repoRes.status}` };
     const repoData = await repoRes.json();
     const commits = commitRes.ok ? await commitRes.json() : [];
+    const contributors = contributorsRes.ok ? await contributorsRes.json() : [];
     const daysSincePush = Math.floor((Date.now() - new Date(repoData.pushed_at).getTime()) / 86400000);
+    const lastCommitDate = Array.isArray(commits) && commits[0]?.commit?.author?.date
+      ? commits[0].commit.author.date
+      : repoData.pushed_at;
     return {
       found: true,
       stars: repoData.stargazers_count,
@@ -1442,15 +1616,125 @@ async function fetchGitHub(githubUrl: string): Promise<GitHubData> {
       openIssues: repoData.open_issues_count,
       watchers: repoData.watchers_count,
       lastPushDaysAgo: daysSincePush,
+      lastCommitDate,
+      contributors: Array.isArray(contributors) ? contributors.length : undefined,
+      visibility: repoData.private ? "private" : "public",
       recentCommits30d: Array.isArray(commits) ? commits.length : 0,
       language: repoData.language,
       archived: repoData.archived,
       disabled: repoData.disabled,
+      createdAt: repoData.created_at,
       repoUrl: repoData.html_url,
     };
   } catch (e) {
     return { found: false, note: String(e) };
   }
+}
+
+function approximateProjectAge(github: GitHubData): string {
+  if (!github.createdAt) return "Unknown";
+  const created = new Date(github.createdAt).getTime();
+  if (Number.isNaN(created)) return "Unknown";
+  const ageDays = Math.max(1, Math.floor((Date.now() - created) / 86_400_000));
+  if (ageDays >= 365) return `~${Math.floor(ageDays / 365)} year(s)`;
+  if (ageDays >= 30) return `~${Math.floor(ageDays / 30)} month(s)`;
+  return `~${ageDays} day(s)`;
+}
+
+function buildEnrichmentProfile(args: {
+  airdrop: Record<string, unknown>;
+  web: WebEnrichmentData;
+  github: GitHubData;
+  goplus: GoPlusData;
+  cacheKey: string;
+}): EnrichmentProfile {
+  const { airdrop, web, github, goplus, cacheKey } = args;
+
+  const websiteSource = safeString(airdrop.website_url) || web.website_canonical_url || null;
+  const githubSource = github.repoUrl ?? web.github_link ?? null;
+
+  const docsValue = (web.docs_url ?? safeString(airdrop.docs_url)) || "Unknown";
+  const whitepaperValue = web.whitepaper_url ?? "Unknown";
+  const githubUrlValue = (github.repoUrl ?? web.github_link ?? safeString(airdrop.github_url)) || "Not Detected";
+  const investorsValue = web.known_investors?.length
+    ? web.known_investors.join(", ")
+    : safeString(airdrop.investors) || "Unknown";
+  const teamVisibility = web.team_visibility
+    ?? (safeString(airdrop.team_info) ? "Partially Public" : "Anonymous");
+
+  const blockchain = Array.isArray(airdrop.blockchain)
+    ? (airdrop.blockchain as string[]).join(", ")
+    : safeString(airdrop.blockchain);
+
+  const launchStatus = safeString(airdrop.status) || "Unknown";
+  const networkStage = web.mainnet_mentioned ? "Mainnet" : web.testnet_mentioned ? "Testnet" : "Unknown";
+
+  const tokenName = safeString(airdrop.name) || "Unknown";
+  const tokenSymbol = safeString(airdrop.ticker) || "Unknown";
+  const tokenContract = safeString(airdrop.contract_address) || "Unknown";
+  const contractVerified = tokenContract && tokenContract !== "Unknown"
+    ? (goplus.found && goplus.is_open_source === "1" ? "Yes" : goplus.found ? "No" : "Unknown")
+    : "Unknown";
+
+  const category = Array.isArray(airdrop.category)
+    ? (airdrop.category as string[]).join(", ") || "Unknown"
+    : safeString(airdrop.category) || "Unknown";
+
+  return {
+    version: 1,
+    generated_at: new Date().toISOString(),
+    cache_key: cacheKey,
+    fields: {
+      official_website: {
+        accessibility: field(web.website_accessible === false ? "Inaccessible" : "Accessible", web.website_accessible === false ? "Medium" : "High", websiteSource),
+        canonical_url: field((web.website_canonical_url ?? safeString(airdrop.website_url)) || "Unknown", web.website_canonical_url ? "High" : safeString(airdrop.website_url) ? "Medium" : "Low", web.website_canonical_url ?? websiteSource),
+        redirect_url: field(web.website_redirect_url ?? "None", web.website_redirect_url ? "High" : "Low", web.website_redirect_url ?? websiteSource),
+      },
+      documentation: {
+        docs: field(docsValue, docsValue !== "Unknown" ? (web.docs_url ? "High" : "Medium") : "Low", web.docs_url ?? websiteSource),
+        whitepaper: field(whitepaperValue, whitepaperValue !== "Unknown" ? "Medium" : "Low", web.whitepaper_url ?? websiteSource),
+      },
+      github: {
+        repository_url: field(githubUrlValue, githubUrlValue !== "Not Detected" ? "High" : "Low", githubSource),
+        last_commit_date: field(github.lastCommitDate ? toIsoDate(github.lastCommitDate) : "Not Detected", github.lastCommitDate ? "High" : "Low", githubSource),
+        commit_activity: field(typeof github.recentCommits30d === "number" ? `${github.recentCommits30d} commits (30d)` : "Not Detected", typeof github.recentCommits30d === "number" ? "High" : "Low", githubSource),
+        contributors: field(typeof github.contributors === "number" ? String(github.contributors) : "Not Detected", typeof github.contributors === "number" ? "High" : "Low", githubSource),
+        visibility: field(github.visibility ?? (githubUrlValue === "Not Detected" ? "Not Detected" : "Unknown"), github.visibility ? "High" : githubUrlValue === "Not Detected" ? "Low" : "Medium", githubSource),
+      },
+      team: {
+        visibility: field(teamVisibility, teamVisibility === "Public Team" ? "High" : teamVisibility === "Partially Public" ? "Medium" : "Low", websiteSource),
+      },
+      funding_investors: {
+        investors: field(investorsValue, investorsValue !== "Unknown" ? (web.known_investors?.length ? "High" : "Medium") : "Low", websiteSource),
+      },
+      socials: {
+        x: field((web.x_url ?? safeString(airdrop.twitter_url)) || "Unknown", (web.x_url || safeString(airdrop.twitter_url)) ? "High" : "Low", web.x_url ?? websiteSource),
+        discord: field((web.discord_url ?? safeString(airdrop.discord_url)) || "Unknown", (web.discord_url || safeString(airdrop.discord_url)) ? "High" : "Low", web.discord_url ?? websiteSource),
+        telegram: field((web.telegram_url ?? safeString(airdrop.telegram_url)) || "Unknown", (web.telegram_url || safeString(airdrop.telegram_url)) ? "High" : "Low", web.telegram_url ?? websiteSource),
+        medium: field(web.medium_url ?? "Unknown", web.medium_url ? "High" : "Low", web.medium_url ?? websiteSource),
+        linkedin: field(web.linkedin_url ?? "Unknown", web.linkedin_url ? "High" : "Low", web.linkedin_url ?? websiteSource),
+      },
+      token: {
+        token_name: field(tokenName, tokenName !== "Unknown" ? "Medium" : "Low", safeString(airdrop.website_url) || null),
+        symbol: field(tokenSymbol, tokenSymbol !== "Unknown" ? "Medium" : "Low", safeString(airdrop.website_url) || null),
+        contract_address: field(tokenContract, tokenContract !== "Unknown" ? "High" : "Low", safeString(airdrop.website_url) || null),
+        blockchain: field(blockchain || "Unknown", blockchain ? "High" : "Low", safeString(airdrop.website_url) || null),
+        contract_verified: field(contractVerified, contractVerified === "Unknown" ? "Low" : goplus.found ? "High" : "Medium", safeString(airdrop.website_url) || null),
+      },
+      project_metadata: {
+        category: field(category, category !== "Unknown" ? "High" : "Low", safeString(airdrop.website_url) || null),
+        main_blockchain: field(blockchain || "Unknown", blockchain ? "High" : "Low", safeString(airdrop.website_url) || null),
+        launch_status: field(launchStatus, launchStatus !== "Unknown" ? "Medium" : "Low", safeString(airdrop.website_url) || null),
+        network_stage: field(networkStage, networkStage !== "Unknown" ? "High" : "Low", websiteSource),
+        approximate_project_age: field(approximateProjectAge(github), github.createdAt ? "Medium" : "Low", githubSource),
+      },
+    },
+    failures: [],
+    snapshots: {
+      web,
+      github,
+    },
+  };
 }
 
 function looksLikeUnsetToken(value: string): boolean {
@@ -2350,10 +2634,11 @@ function buildNarrativePrompt(args: {
   cg: CoinGeckoData;
   llama: DefiLlamaData;
   web: WebEnrichmentData;
+  enrichment: EnrichmentProfile;
   score: IntelligenceScore;
   evidence: SourceEvidence[];
 }): string {
-  const { project, taskCount, dex, goplus, github, cg, llama, web, score, evidence } = args;
+  const { project, taskCount, dex, goplus, github, cg, llama, web, enrichment, score, evidence } = args;
   const evidenceLines = evidence.slice(0, 18).map(e => `- [${e.tier}] ${e.title} — ${e.url}${e.snippet ? ` — ${e.snippet.slice(0, 180)}` : ""}`);
   const dataLines: string[] = [
     `PROJECT: ${project.name ?? project.project_name} (${project.ticker || project.token_symbol || "pre-token"})`,
@@ -2375,6 +2660,9 @@ function buildNarrativePrompt(args: {
   if (github.found) dataLines.push(`GitHub: ${github.stars} stars, ${github.recentCommits30d} commits/30d, pushed ${github.lastPushDaysAgo}d ago, archived=${github.archived}`);
   if (goplus.found) dataLines.push(`GoPlus: honeypot=${goplus.is_honeypot}, open_source=${goplus.is_open_source}, buy_tax=${goplus.buy_tax}, sell_tax=${goplus.sell_tax}, holders=${goplus.holder_count}`);
   if (web.found) dataLines.push(`Website: docs=${web.docs_url ?? "not found"}, github=${web.github_link ?? "not found"}, investors=${web.known_investors?.join(", ") ?? "not found"}`);
+  dataLines.push(
+    `Enrichment v${enrichment.version}: website=${enrichment.fields.official_website.canonical_url.value}, docs=${enrichment.fields.documentation.docs.value}, github=${enrichment.fields.github.repository_url.value}, team=${enrichment.fields.team.visibility.value}, investors=${enrichment.fields.funding_investors.investors.value}`,
+  );
 
   return [
     "You are AirdropGuard's senior crypto threat intelligence analyst.",
@@ -2458,6 +2746,8 @@ function deriveAutofillUpdates(
 ): Record<string, unknown> {
   const updates: Record<string, unknown> = {};
 
+  const canonicalWebsite = web.website_canonical_url ?? web.website_redirect_url;
+
   const docs = web.docs_url ?? firstTrustedEvidenceUrl(evidence, [
     (url, text) => url.includes("/docs") || url.includes("docs.") || url.includes("gitbook") || text.includes("documentation"),
   ]);
@@ -2468,6 +2758,7 @@ function deriveAutofillUpdates(
   const audit = web.audit_url ?? firstTrustedEvidenceUrl(evidence, [(url, text) => /audit|certik|hacken|trailofbits|openzeppelin|slowmist/i.test(`${url} ${text}`)]);
   const funding = extractFundingSummary(evidence, web);
 
+  if (canonicalWebsite && !safeString(airdrop.website_url)) updates.website_url = canonicalWebsite;
   if (docs && !safeString(airdrop.docs_url)) updates.docs_url = docs;
   if (github && !safeString(airdrop.github_url)) updates.github_url = github;
   if (xUrl && !safeString(airdrop.twitter_url)) updates.twitter_url = xUrl;
@@ -2569,16 +2860,26 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
     if (ageDays < CACHE_TTL_DAYS) return jsonResponse({ success: true, cached: true, age_days: Math.floor(ageDays) });
   }
 
+  const enrichmentCacheKey = buildEnrichmentCacheKey(airdrop as Record<string, unknown>);
+  const cachedEnrichment = parseEnrichmentProfile(airdrop.enrichment_profile);
+  const canUseCachedEnrichment =
+    cachedEnrichment &&
+    cachedEnrichment.cache_key === enrichmentCacheKey &&
+    isEnrichmentFresh(cachedEnrichment);
+
   const projectHost = hostname(safeString(airdrop.website_url));
   const queries = buildSearchQueries(airdrop as Record<string, unknown>);
+
+  const cachedWeb = canUseCachedEnrichment ? cachedEnrichment.snapshots.web : null;
+  const cachedGithub = canUseCachedEnrichment ? cachedEnrichment.snapshots.github : null;
 
   const [dexData, goplusData, githubDataInit, cgData, llamaData, webData, searchResults] = await Promise.all([
     fetchDexScreener(safeString(airdrop.name), safeString(airdrop.ticker)),
     fetchGoPlus(safeString(airdrop.contract_address), Array.isArray(airdrop.blockchain) ? airdrop.blockchain : []),
-    fetchGitHub(safeString(airdrop.github_url)),
+    cachedGithub ? Promise.resolve(cachedGithub) : fetchGitHub(safeString(airdrop.github_url)),
     fetchCoinGecko(safeString(airdrop.name), safeString(airdrop.ticker), safeString(airdrop.website_url), safeString(airdrop.contract_address)),
     fetchDefiLlama(safeString(airdrop.name)),
-    fetchWebEnrichment(safeString(airdrop.website_url)),
+    cachedWeb ? Promise.resolve(cachedWeb) : fetchWebEnrichment(safeString(airdrop.website_url)),
     runSearchQueries(queries),
   ]);
 
@@ -2645,6 +2946,13 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
     cg: cgData,
     llama: llamaData,
     web: webData,
+    enrichment: buildEnrichmentProfile({
+      airdrop: airdrop as Record<string, unknown>,
+      web: webData,
+      github: githubData,
+      goplus: goplusData,
+      cacheKey: enrichmentCacheKey,
+    }),
     score,
     evidence,
   }));
@@ -2658,6 +2966,18 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
   };
 
   const now = new Date().toISOString();
+  const enrichmentProfile = buildEnrichmentProfile({
+    airdrop: airdrop as Record<string, unknown>,
+    web: webData,
+    github: githubData,
+    goplus: goplusData,
+    cacheKey: enrichmentCacheKey,
+  });
+
+  if (!webData.found) enrichmentProfile.failures.push("Official website fetch failed or unavailable");
+  if (!githubData.found) enrichmentProfile.failures.push("GitHub repository not detected");
+  if (!searchResults.length) enrichmentProfile.failures.push("Search results unavailable");
+
   const updatePayload: Record<string, unknown> = {
     ai_summary: narrative.ai_summary,
     ai_risk_analysis: narrative.ai_risk_analysis,
@@ -2679,6 +2999,7 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
     missing_information: score.missing_information,
     sources_checked: score.sources_checked,
     sub_scores: score.breakdown,
+    enrichment_profile: enrichmentProfile,
     last_analyzed_at: now,
     updated_at: now,
   };
@@ -2699,6 +3020,7 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
   return jsonResponse({
     success: true,
     cached: false,
+    enrichment_cached: canUseCachedEnrichment,
     ai_recommendation: score.ai_recommendation,
     trust_score: score.trust_score,
     opportunity_score: score.opportunity_score,

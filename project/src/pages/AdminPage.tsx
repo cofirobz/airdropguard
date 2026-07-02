@@ -644,7 +644,21 @@ export default function AdminPage() {
         if (error) throw error;
 
         const taskCount = newAirdrop ? await saveTasksForAirdrop(newAirdrop.id, form.tasks_text) : 0;
-        showToast(`${form.name} added successfully${taskCount ? ` with ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''}`);
+
+        if (newAirdrop) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const analyzeRes = await supabase.functions.invoke('analyze-airdrop', {
+              body: { airdrop_id: newAirdrop.id, force: true },
+              headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+            });
+            if (analyzeRes.error) throw analyzeRes.error;
+          } catch (analysisErr) {
+            showToast(`${form.name} added, but automatic AI enrichment failed: ${analysisErr instanceof Error ? analysisErr.message : 'Unknown error'}`, 'error');
+          }
+        }
+
+        showToast(`${form.name} added successfully${taskCount ? ` with ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''} and AI enrichment started`);
         fetchStats();
       } else {
         const { error } = await supabase
