@@ -667,6 +667,7 @@ export default function CustomerDashboard() {
   const [unlocks, setUnlocks] = useState<UserUnlock[]>([]);
   const [dashboardSearch, setDashboardSearch] = useState('');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -890,6 +891,13 @@ export default function CustomerDashboard() {
   })();
   const firstName = user.email?.split('@')[0] || 'Explorer';
 
+  const openProfileOverview = () => {
+    setActiveTab('overview');
+    requestAnimationFrame(() => {
+      document.getElementById('profile-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
   const activityTimeline = [
     {
       id: 'tasks',
@@ -995,7 +1003,7 @@ export default function CustomerDashboard() {
       </button>
     </aside>
 
-    <div className="relative px-4 pb-24 pt-4 sm:px-6 lg:ml-[260px] lg:px-8 lg:pb-8">
+    <div className="relative px-4 pb-40 pt-4 sm:px-6 lg:ml-[260px] lg:px-8 lg:pb-8">
       <main className="mx-auto max-w-[1180px] space-y-6">
           <div className="flex items-center justify-between lg:hidden">
             <div>
@@ -1135,334 +1143,90 @@ export default function CustomerDashboard() {
           </div>
 
           <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-[#070b18]/95 px-3 py-2 backdrop-blur-xl lg:hidden">
-            <div className="mx-auto grid max-w-md grid-cols-4 gap-2">
-              {[
-                { id: 'overview' as const, label: 'Home', icon: Home },
-                { id: 'airdrops' as const, label: 'Airdrops', icon: Rocket },
-                { id: 'tasks' as const, label: 'Tasks', icon: ListChecks },
-                { id: 'api' as const, label: 'API', icon: Key },
-              ].map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setActiveTab(id)}
-                  className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold ${activeTab === id ? 'text-sky-300' : 'text-gray-500'}`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </button>
-              ))}
+            <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab('overview')}
+                className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold ${activeTab === 'overview' ? 'text-sky-300' : 'text-gray-500'}`}
+              >
+                <Home className="h-4 w-4" />
+                Home
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('airdrops')}
+                className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold ${activeTab === 'airdrops' ? 'text-sky-300' : 'text-gray-500'}`}
+              >
+                <Rocket className="h-4 w-4" />
+                Browse
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiDrawerOpen(true)}
+                className="-mt-5 inline-flex h-14 w-14 items-center justify-center self-center rounded-full border border-sky-400/50 bg-gradient-to-r from-sky-500 to-neon-purple text-white shadow-[0_8px_28px_rgba(56,189,248,0.35)]"
+                aria-label="Open AI Copilot"
+              >
+                <Bot className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('tasks')}
+                className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold ${activeTab === 'tasks' ? 'text-sky-300' : 'text-gray-500'}`}
+              >
+                <ListChecks className="h-4 w-4" />
+                Tasks
+              </button>
+              <button
+                type="button"
+                onClick={openProfileOverview}
+                className="flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold text-gray-500"
+              >
+                <UserCircle2 className="h-4 w-4" />
+                Profile
+              </button>
             </div>
           </div>
 
     {activeTab === 'overview' && (
-      <div className="space-y-6">
-        <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-          <div id="copilot-chat" className="space-y-4">
-            <div className="relative overflow-hidden rounded-3xl border border-violet-400/25 bg-gradient-to-r from-[#0f1b37] via-[#101531] to-[#1a1340] p-5 shadow-[0_0_60px_rgba(139,92,246,0.2)] sm:p-6">
-              <div className="pointer-events-none absolute -right-12 -top-10 h-44 w-44 rounded-full bg-violet-500/20 blur-2xl" />
-              <div className="pointer-events-none absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-sky-500/20 blur-2xl" />
-              <div className="relative mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200">
-                    <Bot className="h-3.5 w-3.5" />
-                    Copilot Intelligence
-                  </div>
-                  <h2 className="mt-2 text-2xl font-black text-white">Your Airdrop Research Copilot</h2>
-                </div>
-                <div className="hidden h-20 w-20 items-center justify-center rounded-3xl border border-white/15 bg-white/[0.03] sm:flex">
-                  <Bot className="h-10 w-10 text-sky-300" />
-                </div>
-              </div>
-              <AirdropCopilot />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="glass-card p-4 border border-violet-500/20">
-              <div className="mb-3 flex items-center gap-2">
-                <Star className="h-4 w-4 text-violet-300" />
-                <h3 className="text-sm font-semibold text-white">Your Watchlist</h3>
-              </div>
-              {watchlistAirdrops.length === 0 ? (
-                <p className="text-xs text-gray-500">No bookmarked airdrops yet. Use the bookmark icon on any airdrop to build your watchlist.</p>
-              ) : (
-                <div className="space-y-2">
-                  {watchlistAirdrops.map(item => (
-                    <Link key={item.id} to={`/airdrop/${item.slug}`} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-gray-200 hover:border-sky-500/30">
-                      <span className="truncate pr-2">{item.name}</span>
-                      <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-200">
-                        {item.trust_score ?? 0}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="glass-card p-4 border border-emerald-500/20">
-              <div className="mb-3 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-emerald-300" />
-                <h3 className="text-sm font-semibold text-white">Market Pulse</h3>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                  <div className="text-sm font-black text-emerald-300">{marketPulse.momentum}%</div>
-                  <div className="text-[10px] text-gray-500">Momentum</div>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                  <div className="text-sm font-black text-amber-300">{marketPulse.reviewed}</div>
-                  <div className="text-[10px] text-gray-500">Under Review</div>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                  <div className="text-sm font-black text-rose-300">{marketPulse.riskSignals}</div>
-                  <div className="text-[10px] text-gray-500">Risk Alerts</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="glass-card p-4 border border-amber-500/20">
-              <div className="mb-2 flex items-center gap-2">
-                <Flame className="h-4 w-4 text-amber-300" />
-                <h3 className="text-sm font-semibold text-white">Your Streak</h3>
-              </div>
-              <p className="text-3xl font-black text-amber-300">{streakDays} day{streakDays === 1 ? '' : 's'}</p>
-              <p className="mt-1 text-xs text-gray-500">Stay active daily to maintain momentum and profile progression.</p>
-            </div>
-          </div>
-        </div>
-
+      <div className="space-y-6 animate-in">
         <div className="grid gap-4 lg:grid-cols-2">
-          <div className="glass-card p-4 border border-sky-500/20">
-            <div className="mb-3 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-sky-300" />
-              <h2 className="text-sm font-semibold text-white">Airdrop Opportunities</h2>
+          <div className="glass-card border border-sky-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-400/35">
+            <div className="mb-2 flex items-center gap-2">
+              <Zap className="h-4 w-4 text-amber-300" />
+              <h2 className="text-sm font-semibold text-white">Today&apos;s Best Opportunity</h2>
             </div>
-            <div className="grid grid-cols-[110px_1fr] items-center gap-4">
-              <div className="relative h-28 w-28 rounded-full p-2" style={opportunityDonutStyle}>
-                <div className="flex h-full w-full items-center justify-center rounded-full border border-white/10 bg-[#0a1022]">
-                  <span className="text-xs font-bold text-white">{safeAirdrops.length}</span>
-                </div>
-              </div>
-              <div className="space-y-2 text-xs">
-                {[
-                  { label: 'High Potential', value: highPotentialCount, tone: 'bg-cyan-400' },
-                  { label: 'Medium Potential', value: mediumPotentialCount, tone: 'bg-indigo-400' },
-                  { label: 'Low Potential', value: lowPotentialCount, tone: 'bg-amber-400' },
-                  { label: 'Under Review', value: underReviewCount, tone: 'bg-violet-400' },
-                ].map(row => (
-                  <div key={row.label} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
-                    <span className="inline-flex items-center gap-2 text-gray-300">
-                      <span className={`h-2.5 w-2.5 rounded-full ${row.tone}`} />
-                      {row.label}
-                    </span>
-                    <span className="font-bold text-white">{row.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-card p-4 border border-violet-500/20">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">Top Recommended Airdrops</h2>
-              <span className="text-[11px] text-gray-500">Trust-ranked</span>
-            </div>
-            <div className="space-y-2">
-              {priorityAirdrops.slice(0, 6).map(item => (
-                <Link key={item.id} to={`/airdrop/${item.slug}`} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs hover:border-sky-500/30">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-white">{item.name}</p>
-                    <p className="text-[10px] text-gray-500">{(item.tasks ?? []).length} tasks</p>
-                  </div>
-                  <span className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                    Trust {(item.trust_score ?? 0)}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="glass-card p-4 border border-white/10">
-            <div className="mb-3 flex items-center gap-2">
-              <Trophy className="h-4 w-4 text-amber-300" />
-              <h2 className="text-sm font-semibold text-white">Your Activity</h2>
-            </div>
-            <div className="space-y-3">
-              {activityTimeline.map((entry, idx) => (
-                <div key={entry.id} className="relative pl-5">
-                  <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-sky-400" />
-                  {idx < activityTimeline.length - 1 && <span className="absolute left-[4px] top-4 h-[calc(100%-8px)] w-px bg-white/10" />}
-                  <p className="text-xs font-semibold text-white">{entry.title}</p>
-                  <p className="text-[11px] text-gray-500">{entry.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
-            <div className="flex items-start gap-2">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            {focusAirdrops[0] ? (
               <div>
-                <h2 className="text-sm font-bold text-white">Safety First Always</h2>
-                <p className="mt-1 text-xs leading-relaxed text-gray-300">
-                  Verify project links, avoid suspicious wallet connections, and never share seed phrases or private keys. Treat every reward claim with caution until verified.
-                </p>
+                <p className="text-base font-bold text-white">{focusAirdrops[0].name}</p>
+                <p className="mt-1 text-xs text-gray-400">Complete priority tasks and verify official links before connecting your wallet.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link to={`/airdrop/${focusAirdrops[0].slug}`} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-300 transition-colors hover:bg-sky-500/20 hover:text-white">Review Opportunity</Link>
+                  <button onClick={() => setActiveTab('tasks')} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-gray-300 transition-colors hover:bg-white/[0.07] hover:text-white">Go to Tasks</button>
+                </div>
               </div>
+            ) : (
+              <p className="text-xs text-gray-500">No urgent opportunities right now. Check Browse for newly published listings.</p>
+            )}
+          </div>
+
+          <div className="glass-card border border-violet-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-400/35">
+            <div className="mb-2 flex items-center gap-2">
+              <Bot className="h-4 w-4 text-violet-300" />
+              <h2 className="text-sm font-semibold text-white">Copilot Access</h2>
             </div>
+            <p className="text-xs text-gray-400">Open AI Copilot for quick recommendations, safer picks, and personalized next actions.</p>
+            <button
+              type="button"
+              onClick={() => setAiDrawerOpen(true)}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-neon-purple px-4 py-2.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+            >
+              <Sparkles className="h-4 w-4" />
+              Ask AI Copilot
+            </button>
           </div>
         </div>
 
-        <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
-        <ReputationRulesNotice />
-        <DashboardEngagementPanel />
-        <AirdropGuardIntelligenceCentre />
-
-        <div className="glass-card p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center">
-              <Palette className="w-4 h-4 text-neon-purple" />
-            </div>
-            <h2 className="text-sm font-semibold text-white">Unlock Roadmap</h2>
-            <span className="text-[10px] text-gray-600 ml-auto">Unlocked by verified REP, not task clicks</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-            {REP_UNLOCKS.slice(0, 8).map(unlock => {
-              const unlocked = level >= unlock.level || unlocks.some(u => u.unlock_key === unlock.key);
-              return (
-                <div key={unlock.key} className={`rounded-xl border px-3 py-2.5 ${unlocked ? 'bg-emerald-500/[0.04] border-emerald-500/15' : 'bg-dark-700/25 border-white/5'}`}>
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className={`text-xs font-semibold ${unlocked ? 'text-white' : 'text-gray-500'}`}>{unlock.name}</span>
-                    {unlocked ? <Unlock className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-gray-700" />}
-                  </div>
-                  <div className="text-[10px] text-gray-600">Level {unlock.level} · {unlock.type}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="glass-card p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            </div>
-            <h2 className="text-sm font-semibold text-white">How REP is earned</h2>
-            <span className="text-[10px] text-gray-600 ml-auto">Anti-gaming rules</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-            {[
-              { label: 'Weekly wallet scan', value: '+25 REP', detail: 'Limited to once weekly' },
-              { label: 'Low visible risk', value: '+15 REP', detail: 'From scan result' },
-              { label: 'Strong Wallet IQ', value: '+10–20 REP', detail: 'From scan result' },
-              { label: 'Grade A scan', value: '+10 REP', detail: 'From scan result' },
-            ].map(item => (
-              <div key={item.label} className="rounded-xl border border-white/5 bg-dark-700/25 px-3 py-2.5">
-                <div className="text-sm font-black text-white">{item.value}</div>
-                <div className="text-xs font-semibold text-gray-300 mt-1">{item.label}</div>
-                <div className="text-[10px] text-gray-600 mt-0.5">{item.detail}</div>
-              </div>
-            ))}
-          </div>
-
-          <p className="text-[10px] text-gray-600 mt-3 leading-relaxed">
-            Manual task ticks, claimed airdrops and self-reported actions do not earn REP. This keeps AirdropGuard Reputation harder to fake.
-          </p>
-        </div>
-
-        {/* Today's Focus + Claim Calendar */}
-        {airdrops.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="glass-card p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-md bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                  <Zap className="w-3.5 h-3.5 text-amber-400" />
-                </div>
-                <h2 className="text-sm font-semibold text-white">Today&apos;s Focus</h2>
-                <span className="text-[10px] text-gray-600 ml-auto">Top priority</span>
-              </div>
-              {focusAirdrops.length === 0 ? (
-                <p className="text-xs text-gray-600 py-3 text-center">All tasks complete — great work!</p>
-              ) : (
-                <div className="space-y-0">
-                  {focusAirdrops.map((a, i) => {
-                    const done = doneByAirdrop[a.id] ?? 0;
-                    const safeTasks = a.tasks ?? [];
-                    const remaining = safeTasks.length - done;
-                    const u = urgencyOf(a.expiry_date);
-                    const daysLeft = a.expiry_date ? Math.ceil(msUntil(a.expiry_date) / 86_400_000) : null;
-                    return (
-                      <Link
-                        key={a.id}
-                        to={`/airdrop/${a.slug}`}
-                        className={`flex items-center gap-3 py-2.5 ${i < focusAirdrops.length - 1 ? 'border-b border-white/5' : ''} hover:bg-white/[0.03] -mx-4 px-4 transition-colors group`}
-                      >
-                        <div className="w-7 h-7 rounded-lg bg-dark-700 border border-white/10 shrink-0 overflow-hidden flex items-center justify-center">
-                          {a.logo_url
-                            ? <img src={a.logo_url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            : <span className="text-[10px] font-bold gradient-text">{a.name[0]}</span>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-white truncate group-hover:text-neon-purple transition-colors">{a.name}</p>
-                          <p className="text-[10px] text-gray-500">{remaining} task{remaining !== 1 ? 's' : ''} remaining</p>
-                        </div>
-                        {daysLeft !== null && u !== 'none' && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0 ${URGENCY_BADGE[u]}`}>
-                            {daysLeft === 0 ? '< 1d' : `${daysLeft}d`}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="glass-card p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-md bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0">
-                  <Calendar className="w-3.5 h-3.5 text-sky-400" />
-                </div>
-                <h2 className="text-sm font-semibold text-white">Upcoming Events</h2>
-                <span className="text-[10px] text-gray-600 ml-auto">Next 5</span>
-              </div>
-              {calendarEvents.length === 0 ? (
-                <p className="text-xs text-gray-600 py-3 text-center">No upcoming events.</p>
-              ) : (
-                <div className="space-y-0">
-                  {calendarEvents.map((a, i) => {
-                    const u = urgencyOf(a.expiry_date);
-                    const daysLeft = a.expiry_date ? Math.ceil(msUntil(a.expiry_date) / 86_400_000) : 0;
-                    const dateStr = new Date(a.expiry_date!).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                    return (
-                      <Link
-                        key={a.id}
-                        to={`/airdrop/${a.slug}`}
-                        className={`flex items-center gap-3 py-2.5 ${i < calendarEvents.length - 1 ? 'border-b border-white/5' : ''} hover:bg-white/[0.03] -mx-4 px-4 transition-colors group`}
-                      >
-                        <div className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center shrink-0 text-center ${URGENCY_BADGE[u]} border`}>
-                          <span className="text-[9px] font-bold leading-none tabular-nums">{daysLeft === 0 ? '<1' : daysLeft}</span>
-                          <span className="text-[8px] leading-none opacity-70">days</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-white truncate group-hover:text-neon-purple transition-colors">{a.name}</p>
-                          <p className="text-[10px] text-gray-500">Expiry · {dateStr}</p>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Continue Tasks preview */}
-        <div className="glass-card overflow-hidden border border-sky-500/10">
+        <div className="glass-card overflow-hidden border border-sky-500/10 transition-all duration-200 hover:-translate-y-0.5">
           <div className="p-4 flex items-center justify-between gap-3 border-b border-white/5">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
@@ -1494,6 +1258,134 @@ export default function CustomerDashboard() {
             ))
           )}
         </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="glass-card p-4 border border-violet-500/20 transition-all duration-200 hover:-translate-y-0.5">
+            <div className="mb-3 flex items-center gap-2">
+              <Star className="h-4 w-4 text-violet-300" />
+              <h3 className="text-sm font-semibold text-white">Your Watchlist</h3>
+            </div>
+            {watchlistAirdrops.length === 0 ? (
+              <p className="text-xs text-gray-500">No bookmarked airdrops yet. Use bookmarks in Browse to build your watchlist.</p>
+            ) : (
+              <div className="space-y-2">
+                {watchlistAirdrops.map(item => (
+                  <Link key={item.id} to={`/airdrop/${item.slug}`} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-gray-200 hover:border-sky-500/30">
+                    <span className="truncate pr-2">{item.name}</span>
+                    <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-200">{item.trust_score ?? 0}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="glass-card p-4 border border-emerald-500/20 transition-all duration-200 hover:-translate-y-0.5">
+            <div className="mb-3 flex items-center gap-2">
+              <Activity className="h-4 w-4 text-emerald-300" />
+              <h3 className="text-sm font-semibold text-white">Market Pulse</h3>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                <div className="text-sm font-black text-emerald-300">{marketPulse.momentum}%</div>
+                <div className="text-[10px] text-gray-500">Momentum</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                <div className="text-sm font-black text-amber-300">{marketPulse.reviewed}</div>
+                <div className="text-[10px] text-gray-500">Review</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+                <div className="text-sm font-black text-rose-300">{marketPulse.riskSignals}</div>
+                <div className="text-[10px] text-gray-500">Risk</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2" id="profile-section">
+          <div className="glass-card p-4 border border-sky-500/20 transition-all duration-200 hover:-translate-y-0.5">
+            <div className="mb-3 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-sky-300" />
+              <h2 className="text-sm font-semibold text-white">Airdrop Opportunities</h2>
+            </div>
+            <div className="grid grid-cols-[110px_1fr] items-center gap-4">
+              <div className="relative h-28 w-28 rounded-full p-2" style={opportunityDonutStyle}>
+                <div className="flex h-full w-full items-center justify-center rounded-full border border-white/10 bg-[#0a1022]">
+                  <span className="text-xs font-bold text-white">{safeAirdrops.length}</span>
+                </div>
+              </div>
+              <div className="space-y-2 text-xs">
+                {[
+                  { label: 'High', value: highPotentialCount, tone: 'bg-cyan-400' },
+                  { label: 'Medium', value: mediumPotentialCount, tone: 'bg-indigo-400' },
+                  { label: 'Low', value: lowPotentialCount, tone: 'bg-amber-400' },
+                  { label: 'Review', value: underReviewCount, tone: 'bg-violet-400' },
+                ].map(row => (
+                  <div key={row.label} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <span className="inline-flex items-center gap-2 text-gray-300">
+                      <span className={`h-2.5 w-2.5 rounded-full ${row.tone}`} />
+                      {row.label}
+                    </span>
+                    <span className="font-bold text-white">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card p-4 border border-violet-500/20 transition-all duration-200 hover:-translate-y-0.5">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white">Top Recommended Airdrops</h2>
+              <span className="text-[11px] text-gray-500">Trust-ranked</span>
+            </div>
+            <div className="space-y-2">
+              {priorityAirdrops.slice(0, 5).map(item => (
+                <Link key={item.id} to={`/airdrop/${item.slug}`} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs hover:border-sky-500/30">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-white">{item.name}</p>
+                    <p className="text-[10px] text-gray-500">{(item.tasks ?? []).length} tasks</p>
+                  </div>
+                  <span className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">{item.trust_score ?? 0}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="glass-card p-4 border border-white/10 transition-all duration-200 hover:-translate-y-0.5">
+            <div className="mb-3 flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-amber-300" />
+              <h2 className="text-sm font-semibold text-white">Your Activity</h2>
+            </div>
+            <div className="space-y-3">
+              {activityTimeline.map((entry, idx) => (
+                <div key={entry.id} className="relative pl-5">
+                  <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-sky-400" />
+                  {idx < activityTimeline.length - 1 && <span className="absolute left-[4px] top-4 h-[calc(100%-8px)] w-px bg-white/10" />}
+                  <p className="text-xs font-semibold text-white">{entry.title}</p>
+                  <p className="text-[11px] text-gray-500">{entry.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-amber-500/20 bg-amber-500/[0.06] p-4 transition-all duration-200 hover:-translate-y-0.5">
+            <div className="flex items-start gap-2">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+              <div>
+                <h2 className="text-sm font-bold text-white">Safety First Always</h2>
+                <p className="mt-1 text-xs leading-relaxed text-gray-300">
+                  Verify project links, avoid suspicious wallet connections, and never share seed phrases or private keys. Treat every reward claim with caution until verified.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
+        <ReputationRulesNotice />
+        <DashboardEngagementPanel />
+        <AirdropGuardIntelligenceCentre />
       </div>
     )}
 
@@ -1678,6 +1570,39 @@ export default function CustomerDashboard() {
         )}
       </div>
     )}
+
+          <button
+            type="button"
+            onClick={() => setAiDrawerOpen(true)}
+            className="fixed bottom-8 right-8 z-40 hidden items-center gap-2 rounded-2xl border border-sky-400/40 bg-gradient-to-r from-sky-500 to-neon-purple px-4 py-3 text-sm font-bold text-white shadow-[0_12px_32px_rgba(56,189,248,0.35)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(56,189,248,0.45)] lg:inline-flex"
+          >
+            <Bot className="h-4 w-4" />
+            Ask AI
+          </button>
+
+          <div className={`fixed inset-0 z-[70] ${aiDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+            <div
+              className={`absolute inset-0 bg-black/65 transition-opacity duration-300 ${aiDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
+              onClick={() => setAiDrawerOpen(false)}
+            />
+            <aside className={`absolute right-0 top-0 h-full w-full max-w-2xl overflow-y-auto border-l border-white/10 bg-[#070b18] p-4 shadow-[0_0_80px_rgba(0,0,0,0.5)] transition-transform duration-300 sm:p-5 ${aiDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300">AirdropGuard AI</p>
+                  <h2 className="text-lg font-black text-white">Copilot Panel</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiDrawerOpen(false)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-gray-300 hover:text-white"
+                  aria-label="Close AI drawer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <AirdropCopilot />
+            </aside>
+          </div>
         </main>
     </div>
   </div>
