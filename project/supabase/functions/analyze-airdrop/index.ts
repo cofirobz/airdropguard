@@ -2381,7 +2381,7 @@ function computeIntelligenceScore(args: {
   breakdown.opportunity_active_farming = activeFarming ? 10 : 0;
   breakdown.opportunity_speculative_cap_applied = speculativeOnly ? 1 : 0;
 
-  const opportunity_score = clamp(rawOpportunity);
+  const opportunity_score_raw = clamp(rawOpportunity);
 
   const sourceQuality = trustedSourceCount;
   const apiHits = [github.found, cg.found, dex.found, goplus.found, llama.found, web.found].filter(Boolean).length;
@@ -2402,6 +2402,109 @@ function computeIntelligenceScore(args: {
   const confidence_score = clamp(confidenceRaw);
   const confidence_level: ConfidenceLevel = confidence_score >= 75 ? "High" : confidence_score >= 45 ? "Medium" : "Low";
 
+  // ── Personalized Airdrop Scoring Layer ─────────────────────────────────────
+  // Final score must reflect this specific opportunity, not just project quality.
+  const project_strength_score = trust_score;
+
+  const timeRequiredText = safeString(airdrop.time_required).toLowerCase();
+  const estimatedRewardKnown = !!estimatedRewardText && !looksLikeUnsetToken(estimatedRewardText);
+  const rewardLikelihoodBoost = explicitAirdropConfirmed ? 10 : activeFarming ? 6 : 0;
+
+  const hasHighEffortSignal =
+    safeString(airdrop.difficulty) === "Hard" ||
+    taskCount >= 7 ||
+    /\b(6\+|8\+|10\+|12\+|multiple\s+days|week|weeks|hours?)\b/.test(timeRequiredText);
+
+  const hasMediumEffortSignal =
+    safeString(airdrop.difficulty) === "Moderate" ||
+    taskCount >= 4 ||
+    /\b(2\s*[-to]{0,3}\s*5|3\s*[-to]{0,3}\s*6|few\s+hours?)\b/.test(timeRequiredText);
+
+  const costHintText = [
+    safeString(airdrop.cost_required),
+    safeString(airdrop.estimated_cost),
+    safeString(airdrop.tasks_required),
+    safeString(airdrop.ai_risk_analysis),
+    safeString(airdrop.description),
+  ].join(" ").toLowerCase();
+
+  const highCostRequired =
+    Boolean(airdrop.requires_payment) ||
+    /\b(pay|fee|bridge\s+fee|gas\s+cost|deposit|stake|lp|liquidity|swap\s+required)\b/.test(costHintText);
+
+  const effort_required_score = clamp(
+    85
+      - (hasHighEffortSignal ? 28 : hasMediumEffortSignal ? 12 : 0)
+      - (highCostRequired ? 18 : 0)
+      - (actionSafetyMedium ? 8 : 0)
+      - (!timeRequiredText ? 6 : 0),
+  );
+
+  const risk_level_score = clamp(
+    90
+      - (criticalFlags.length * 35)
+      - (officialRiskEvidence.length * 10)
+      - (trustedRiskEvidence.length * 6)
+      - (communityRiskEvidence.length * 2)
+      - (brandImpersonationEvidence.length * 4)
+      - (suspiciousProvidedLinks.length * 6)
+      - (actionSafetyCritical ? 30 : 0)
+      - (actionSafetyMedium ? 12 : 0),
+  );
+
+  let opportunity_score = clamp(
+    opportunity_score_raw
+      + rewardLikelihoodBoost
+      + (estimatedRewardKnown ? 6 : -8)
+      - (highCostRequired && !explicitAirdropConfirmed ? 12 : 0)
+      - (hasHighEffortSignal && !explicitAirdropConfirmed ? 8 : 0)
+      - (negativeOpportunitySignals * 4),
+  );
+
+  const expiryDate = safeString(airdrop.expiry_date);
+  if (expiryDate) {
+    const expiry = new Date(expiryDate).getTime();
+    if (!Number.isNaN(expiry)) {
+      const daysLeft = Math.floor((expiry - Date.now()) / 86_400_000);
+      const urgencyPenalty = daysLeft <= 3 && hasHighEffortSignal ? 10 : daysLeft <= 7 && hasMediumEffortSignal ? 5 : 0;
+      const urgencyBoost = daysLeft >= 0 && daysLeft <= 14 && explicitAirdropConfirmed && !hasHighEffortSignal ? 4 : 0;
+      opportunity_score = clamp(opportunity_score - urgencyPenalty + urgencyBoost);
+      breakdown.expiry_days_remaining = daysLeft;
+    }
+  }
+
+  let final_score = clamp(
+    project_strength_score * 0.32 +
+    opportunity_score * 0.30 +
+    risk_level_score * 0.18 +
+    effort_required_score * 0.10 +
+    confidence_score * 0.10,
+  );
+
+  if (isEstablishedProject && speculativeOnly) final_score = Math.min(final_score, 68);
+  if (highCostRequired && speculativeOnly) final_score = Math.min(final_score, 55);
+  if (negativeOpportunitySignals >= 2) final_score = Math.min(final_score, 62);
+  if (actionSafetyCritical) final_score = Math.min(final_score, 25);
+
+  breakdown.project_strength = project_strength_score;
+  breakdown.airdrop_potential = opportunity_score;
+  breakdown.risk_level_score = risk_level_score;
+  breakdown.effort_required = effort_required_score;
+  breakdown.confidence = confidence_score;
+  breakdown.final_score = final_score;
+  breakdown.reward_data_known = estimatedRewardKnown ? 1 : 0;
+  breakdown.high_cost_required = highCostRequired ? 1 : 0;
+  breakdown.opportunity_raw = opportunity_score_raw;
+
+  const finalVerdict =
+    final_score >= 80
+      ? "High-quality opportunity with evidence-backed upside"
+      : final_score >= 65
+      ? "Promising but requires selective execution and verification"
+      : final_score >= 45
+      ? "Speculative or effort-heavy opportunity with limited clarity"
+      : "Low-quality opportunity for now; risk/uncertainty outweighs upside";
+
   // ── Intelligence Digest v15 ────────────────────────────────────────────────
   // This creates useful admin/user-facing intelligence without changing your DB schema.
   // It helps AirdropGuard explain what changed, what to watch, and what action is safest.
@@ -2417,18 +2520,18 @@ function computeIntelligenceScore(args: {
   ].filter(Boolean));
 
   const userVerdict =
-    criticalFlags.length || trust_score < 30 ? "Avoid"
-    : (criticalFlags.length || projectMisconductEvidence || (!isEstablishedProject && (officialRiskEvidence.length >= 2 || activeExploitEvidence.length >= 2 || trust_score < 30))) ? "High caution"
-    : trust_score >= 85 && opportunity_score >= 75 ? "Strong project + strong opportunity"
-    : trust_score >= 85 && opportunity_score < 50 ? "Trusted project, speculative opportunity"
-    : trust_score >= 70 && opportunity_score >= 70 ? "Promising opportunity, verify details"
-    : trust_score >= 70 ? "Legitimate-looking project, review opportunity"
+    criticalFlags.length || final_score < 30 ? "Avoid"
+    : (criticalFlags.length || projectMisconductEvidence || (!isEstablishedProject && (officialRiskEvidence.length >= 2 || activeExploitEvidence.length >= 2 || final_score < 30))) ? "High caution"
+    : project_strength_score >= 85 && opportunity_score >= 75 ? "Strong project + strong opportunity"
+    : project_strength_score >= 85 && opportunity_score < 50 ? "Trusted project, speculative opportunity"
+    : final_score >= 70 && opportunity_score >= 70 ? "Promising opportunity, verify details"
+    : final_score >= 70 ? "Legitimate-looking project, review opportunity"
     : "Needs manual review";
 
   const adminPriority =
     criticalFlags.length || officialLinkMismatch || actionSafetyCritical ? "urgent_review"
     : activeExploitEvidence.length > 0 || brandImpersonationEvidence.length > 3 ? "security_watch"
-    : opportunity_score >= 75 && trust_score >= 75 && confidence_score >= 70 ? "ready_for_human_verification"
+    : opportunity_score >= 75 && final_score >= 75 && confidence_score >= 70 ? "ready_for_human_verification"
     : missing.length >= 4 || confidence_score < 60 ? "data_enrichment_needed"
     : "normal_review";
 
@@ -2533,16 +2636,16 @@ function computeIntelligenceScore(args: {
   breakdown.v17_timeline_watch_items = timelineProfile.watchEventCount;
 
   const onlyBrandRisk = isEstablishedProject && !criticalFlags.length && scamWarnings.length === 0 && brandRiskWarnings.length > 0;
-  const risk_level: RiskLevel = criticalFlags.length || projectMisconductEvidence || (!isEstablishedProject && (officialRiskEvidence.length >= 2 || activeExploitEvidence.length >= 2 || trust_score < 30))
+  const risk_level: RiskLevel = criticalFlags.length || projectMisconductEvidence || (!isEstablishedProject && (officialRiskEvidence.length >= 2 || activeExploitEvidence.length >= 2 || final_score < 30))
     ? "High"
-    : onlyBrandRisk || scamWarnings.length > 2 || trust_score < 60
+    : onlyBrandRisk || scamWarnings.length > 2 || final_score < 60
     ? "Medium"
     : "Low";
   const reward_potential: RiskLevel = opportunity_score >= 75 ? "High" : opportunity_score >= 45 ? "Medium" : "Low";
   const difficulty = taskCount >= 6 || safeString(airdrop.difficulty) === "Hard" ? "Hard" : taskCount >= 3 || safeString(airdrop.difficulty) === "Moderate" ? "Moderate" : "Easy";
-  const ai_recommendation: Recommendation = criticalFlags.length || (!isEstablishedProject && trust_score < 25)
+  const ai_recommendation: Recommendation = criticalFlags.length || (!isEstablishedProject && final_score < 25)
     ? "blacklist"
-    : trust_score >= 70 && risk_level !== "High"
+    : final_score >= 70 && risk_level !== "High"
     ? "verify"
     : "review_further";
   const trust_label: TrustLabel = ai_recommendation === "blacklist" ? "scam_alert" : ai_recommendation === "verify" ? "verified" : "watch";
@@ -2571,6 +2674,7 @@ function computeIntelligenceScore(args: {
     isEstablishedProject ? "Established project profile detected" : "",
     activeFarming ? "Active farming/quest/testnet signals detected" : "",
     explicitAirdropConfirmed ? "Official airdrop/claim signal detected" : "",
+    `Final score ${final_score}/100: ${finalVerdict}`,
     threatIntelEvidence.length ? "Threat-intelligence sources checked" : "",
   ].filter(Boolean);
   const negativeReasons = [
@@ -2594,7 +2698,7 @@ function computeIntelligenceScore(args: {
   const combinedWarnings = uniq([...criticalFlags, ...scamWarnings, ...brandRiskWarnings]).slice(0, 12);
 
   return {
-    trust_score,
+    trust_score: final_score,
     opportunity_score,
     confidence_score,
     confidence_level,
@@ -2615,6 +2719,7 @@ function computeIntelligenceScore(args: {
         : isEstablishedProject
         ? "Project appears legitimate, but airdrop opportunity needs manual review. Verify official token/claim information before promoting."
         : "Needs manual review. Fill missing information and verify sources before publishing.",
+      `Final score ${final_score}/100 (${finalVerdict}).`,
       `AGIE v15 priority: ${asHumanLabel(adminPriority)}.`,
       nextBestActions.length ? `Next actions: ${nextBestActions.join(" | ")}` : "",
       advancedProfile.adminFocus.length ? `AGIE v16 focus: ${advancedProfile.adminFocus.join(" | ")}` : "",
