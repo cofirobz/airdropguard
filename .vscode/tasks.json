@@ -1,0 +1,29 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build-project",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "build-project-cmd",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		}
+	]
+}

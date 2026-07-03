@@ -186,6 +186,43 @@
     opacity: 1;
     animation: button-ripple 0.45s ease-out;
   }
+
+  .mission-control-hero {
+    background: linear-gradient(150deg, rgba(2, 10, 28, 0.98), rgba(3, 16, 40, 0.96) 50%, rgba(6, 26, 56, 0.98));
+  }
+
+  .mission-grid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(34, 211, 238, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34, 211, 238, 0.08) 1px, transparent 1px);
+    background-size: 46px 46px;
+    opacity: 0.38;
+    animation: mission-grid-drift 18s linear infinite;
+    pointer-events: none;
+  }
+
+  .mission-network {
+    background-image:
+      radial-gradient(circle at 14% 24%, rgba(34, 211, 238, 0.3) 0 2px, transparent 3px),
+      radial-gradient(circle at 34% 66%, rgba(56, 189, 248, 0.28) 0 2px, transparent 3px),
+      radial-gradient(circle at 63% 38%, rgba(34, 211, 238, 0.22) 0 2px, transparent 3px),
+      radial-gradient(circle at 82% 54%, rgba(56, 189, 248, 0.26) 0 2px, transparent 3px),
+      linear-gradient(120deg, transparent 25%, rgba(34, 211, 238, 0.1) 40%, transparent 55%),
+      linear-gradient(145deg, transparent 40%, rgba(56, 189, 248, 0.1) 52%, transparent 64%);
+    animation: mission-network-drift 20s ease-in-out infinite;
+  }
+
+  .mission-particle {
+    animation: mission-particle-float 7s ease-in-out infinite;
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.6);
+  }
+
+  .mission-orb-pulse {
+    animation: mission-orb-pulse 3.2s ease-in-out infinite;
+  }
 }
 
 @keyframes flow-pan {
@@ -214,6 +251,56 @@
   to {
     transform: translate(-50%, -50%) scale(28);
     opacity: 0;
+  }
+}
+
+@keyframes mission-grid-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(24px, 24px, 0);
+  }
+}
+
+@keyframes mission-network-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes mission-particle-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(0.9);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-10px) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes mission-orb-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.18), 0 0 26px rgba(34, 211, 238, 0.24);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(34, 211, 238, 0.02), 0 0 36px rgba(34, 211, 238, 0.36);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mission-grid::before,
+  .mission-network,
+  .mission-particle,
+  .mission-orb-pulse {
+    animation: none !important;
   }
 }
 

@@ -175,6 +175,7 @@ const SCAM_REPORT_REP = 50;
 
 type BannerPlacement = 'Homepage Hero Banner' | 'Homepage Mid-Page Banner' | 'Airdrop Detail Banner' | 'Dashboard Banner';
 type BannerStatus = 'Enquiry' | 'Awaiting Artwork' | 'Ready to Publish' | 'Live' | 'Expired';
+type BannerDisplayStatus = 'Active' | 'Scheduled' | 'Expired';
 type BannerPaymentState = 'Unpaid' | 'Pending' | 'Paid';
 
 interface BannerAd {
@@ -193,10 +194,28 @@ interface BannerAd {
   exclusivePlacement: boolean;
   notes: string;
   paymentState: BannerPaymentState;
+  archived: boolean;
   updatedAt: string;
 }
 
 type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt'>;
+
+type ContentView = 'airdrops' | 'articles' | 'hero' | 'featured' | 'trending' | 'learn' | 'sections';
+
+interface ControlArticle {
+  id: string;
+  title: string;
+  status: 'draft' | 'scheduled' | 'published';
+  updatedAt: string;
+}
+
+interface OpsUser {
+  id: string;
+  email: string;
+  createdAt: string;
+  lastSeenAt: string;
+  plan: 'free' | 'api' | 'premium';
+}
 
 const BANNER_PLACEMENT_OPTIONS: BannerPlacement[] = [
   'Homepage Hero Banner',
@@ -222,6 +241,7 @@ const BLANK_BANNER_FORM: BannerFormData = {
   exclusivePlacement: true,
   notes: '',
   paymentState: 'Unpaid',
+  archived: false,
 };
 
 function deriveBannerStatus(status: BannerStatus, startDate: string, endDate: string): BannerStatus {
@@ -240,6 +260,22 @@ function getBannerStatusClass(status: BannerStatus): string {
   if (status === 'Enquiry') return 'text-violet-300 border-violet-500/25 bg-violet-500/10';
   if (status === 'Expired') return 'text-rose-300 border-rose-500/25 bg-rose-500/10';
   return 'text-gray-300 border-white/15 bg-white/[0.04]';
+}
+
+function getBannerDisplayStatus(status: BannerStatus, startDate: string, endDate: string): BannerDisplayStatus {
+  const now = Date.now();
+  const start = startDate ? new Date(startDate).getTime() : Number.NaN;
+  const end = endDate ? new Date(endDate).getTime() : Number.NaN;
+
+  if (status === 'Expired' || (Number.isFinite(end) && end < now)) return 'Expired';
+  if ((status === 'Ready to Publish' || status === 'Awaiting Artwork' || status === 'Enquiry') && Number.isFinite(start) && start > now) return 'Scheduled';
+  return 'Active';
+}
+
+function getBannerDisplayClass(status: BannerDisplayStatus): string {
+  if (status === 'Active') return 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10';
+  if (status === 'Scheduled') return 'text-sky-300 border-sky-500/25 bg-sky-500/10';
+  return 'text-rose-300 border-rose-500/25 bg-rose-500/10';
 }
 
 function getPaymentStateClass(state: BannerPaymentState): string {
@@ -889,6 +925,7 @@ export default function AdminPage() {
         exclusivePlacement: true,
         notes: 'Placeholder banner to seed admin workflow.',
         paymentState: 'Pending',
+        archived: false,
         updatedAt: new Date().toISOString(),
       },
     ];
@@ -897,6 +934,21 @@ export default function AdminPage() {
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [bannerForm, setBannerForm] = useState<BannerFormData>(BLANK_BANNER_FORM);
   const [previewBannerId, setPreviewBannerId] = useState<string | null>(null);
+  const [contentView, setContentView] = useState<ContentView>('airdrops');
+  const [controlArticles, setControlArticles] = useState<ControlArticle[]>([
+    { id: 'article-1', title: 'How to avoid fake airdrop clones', status: 'draft', updatedAt: new Date().toISOString() },
+    { id: 'article-2', title: 'Layer 2 airdrop playbook 2026', status: 'scheduled', updatedAt: new Date().toISOString() },
+    { id: 'article-3', title: 'Wallet hygiene checklist', status: 'published', updatedAt: new Date().toISOString() },
+  ]);
+  const [homepageHeroTitle, setHomepageHeroTitle] = useState('Discover safer airdrops before you connect');
+  const [homepageHeroSubtext, setHomepageHeroSubtext] = useState('AI-assisted intelligence with human-reviewed trust signals.');
+  const [featuredProjectId, setFeaturedProjectId] = useState<string>('');
+  const [trendingProjectIds, setTrendingProjectIds] = useState<string>('');
+  const [learnHighlights, setLearnHighlights] = useState<string>('Airdrop basics\nWallet safety\nScam pattern recognition');
+  const [homepageSections, setHomepageSections] = useState<string>('Hero\nFeatured Project\nTrending Grid\nLearn Spotlight');
+  const [opsUsers, setOpsUsers] = useState<OpsUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
   const [lastEnrichmentStats, setLastEnrichmentStats] = useState<{
     websites_analyzed: number; docs_found: number; funding_found: number;
     github_found: number; token_detected: number; investors_found: number;
@@ -930,10 +982,148 @@ export default function AdminPage() {
     return Math.max(0, unpublished) + Math.max(0, unscored) + Math.max(0, unanalyzed);
   }, [stats]);
 
+  const expiringListings = useMemo(() => {
+    const now = Date.now();
+    const soon = now + 7 * 86_400_000;
+    return airdrops.filter((a) => {
+      if (!a.expiry_date) return false;
+      const ts = new Date(a.expiry_date).getTime();
+      return Number.isFinite(ts) && ts >= now && ts <= soon;
+    });
+  }, [airdrops]);
+
+  const failedAiQueue = useMemo(
+    () => airdrops.filter((a) => !(a.last_analyzed_at && String(a.last_analyzed_at).trim())),
+    [airdrops]
+  );
+
+  const missingProjectInfo = useMemo(() => {
+    const asRecord = (item: Airdrop) => item as unknown as Record<string, unknown>;
+    const asText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+    return airdrops.filter((a) => {
+      const rec = asRecord(a);
+      const hasLogo = asText(a.logo_url).length > 0;
+      const hasGithub = asText(rec.github_url).length > 0;
+      const hasDocs = asText(rec.docs_url).length > 0;
+      const hasFunding = asText(rec.funding_info).length > 0 || asText(rec.investors).length > 0;
+      return !(hasLogo && hasGithub && hasDocs && hasFunding);
+    });
+  }, [airdrops]);
+
+  const missingLogoCount = useMemo(() => airdrops.filter((a) => !String(a.logo_url ?? '').trim()).length, [airdrops]);
+  const missingGithubCount = useMemo(() => airdrops.filter((a) => !String((a as unknown as Record<string, unknown>).github_url ?? '').trim()).length, [airdrops]);
+  const missingDocsCount = useMemo(() => airdrops.filter((a) => !String((a as unknown as Record<string, unknown>).docs_url ?? '').trim()).length, [airdrops]);
+  const missingFundingCount = useMemo(() => airdrops.filter((a) => {
+    const row = a as unknown as Record<string, unknown>;
+    return !String(row.funding_info ?? '').trim() && !String(row.investors ?? '').trim();
+  }).length, [airdrops]);
+  const missingWebsiteCount = useMemo(() => airdrops.filter((a) => !String(a.website_url ?? '').trim()).length, [airdrops]);
+  const seoWarningCount = useMemo(() => airdrops.filter((a) => !String(a.ai_summary ?? '').trim()).length, [airdrops]);
+
+  const articlesAwaitingPublication = useMemo(
+    () => controlArticles.filter((a) => a.status !== 'published'),
+    [controlArticles]
+  );
+
+  const bannerDisplaySummary = useMemo(() => {
+    let active = 0;
+    let scheduled = 0;
+    let expired = 0;
+
+    banners.forEach((banner) => {
+      const display = getBannerDisplayStatus(banner.status, banner.startDate, banner.endDate);
+      if (display === 'Active') active += 1;
+      if (display === 'Scheduled') scheduled += 1;
+      if (display === 'Expired') expired += 1;
+    });
+
+    return { active, scheduled, expired };
+  }, [banners]);
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearch.trim()) return opsUsers;
+    const needle = userSearch.trim().toLowerCase();
+    return opsUsers.filter((u) => u.email.toLowerCase().includes(needle));
+  }, [opsUsers, userSearch]);
+
+  const newUsersCount = useMemo(() => {
+    const last7 = Date.now() - 7 * 86_400_000;
+    return opsUsers.filter((u) => new Date(u.createdAt).getTime() >= last7).length;
+  }, [opsUsers]);
+
+  const activeUsersCount = useMemo(() => {
+    const last14 = Date.now() - 14 * 86_400_000;
+    return opsUsers.filter((u) => new Date(u.lastSeenAt).getTime() >= last14).length;
+  }, [opsUsers]);
+
+  const apiUsersCount = useMemo(() => opsUsers.filter((u) => u.plan === 'api' || u.plan === 'premium').length, [opsUsers]);
+  const premiumUsersCount = stats ? stats.proSubs + stats.businessSubs : 0;
+
+  const featuredListingEnquiries = useMemo(
+    () => submissions.filter((s) => (s.airdrop_type ?? '').toLowerCase().includes('featured')).length,
+    [submissions]
+  );
+
+  const estimatedRevenuePipeline = useMemo(
+    () => pendingBannerEnquiries * 149 + featuredListingEnquiries * 299,
+    [pendingBannerEnquiries, featuredListingEnquiries]
+  );
+
   const jumpToSection = (id: string) => {
     const section = document.getElementById(id);
     section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  const openFirstAirdropMatch = async (
+    matcher: (airdrop: Airdrop) => boolean,
+    noMatchMessage: string
+  ) => {
+    const match = airdrops.find(matcher);
+    if (!match) {
+      showToast(noMatchMessage, 'error');
+      return;
+    }
+    await openEdit(match);
+  };
+
+  const fetchOpsUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id,email,created_at,last_login_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      const rows = (data ?? []) as Array<Record<string, unknown>>;
+      const mapped: OpsUser[] = rows.map((row) => ({
+        id: String(row.id ?? crypto.randomUUID()),
+        email: String(row.email ?? 'unknown@user.local'),
+        createdAt: String(row.created_at ?? new Date().toISOString()),
+        lastSeenAt: String(row.last_login_at ?? row.created_at ?? new Date().toISOString()),
+        plan: 'free',
+      }));
+
+      setOpsUsers(mapped);
+    } catch {
+      const synthetic = submissions
+        .slice(0, 20)
+        .map((sub, index): OpsUser => ({
+          id: `submission-user-${sub.id}`,
+          email: sub.website_url ? `founder+${index + 1}@submission.local` : `unknown+${index + 1}@submission.local`,
+          createdAt: sub.submitted_at,
+          lastSeenAt: sub.submitted_at,
+          plan: index % 4 === 0 ? 'premium' : index % 3 === 0 ? 'api' : 'free',
+        }));
+
+      setOpsUsers(synthetic);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [submissions]);
 
   const openAdd = () => { setForm(BLANK_FORM); setEditingId(null); setModalMode('add'); };
 
@@ -959,6 +1149,7 @@ export default function AdminPage() {
       exclusivePlacement: banner.exclusivePlacement,
       notes: banner.notes,
       paymentState: banner.paymentState,
+      archived: banner.archived,
     });
     setEditingBannerId(banner.id);
     setBannerModalMode('edit');
@@ -1004,6 +1195,13 @@ export default function AdminPage() {
     setBanners((prev) => prev.filter((banner) => banner.id !== id));
     if (previewBannerId === id) setPreviewBannerId(null);
     showToast('Banner deleted');
+  };
+
+  const archiveBanner = (id: string) => {
+    setBanners((prev) => prev.map((banner) => banner.id === id
+      ? { ...banner, archived: true, enabled: false, status: 'Expired', updatedAt: new Date().toISOString() }
+      : banner));
+    showToast('Banner archived');
   };
 
   const openEdit = async (a: Airdrop) => {
@@ -1288,6 +1486,12 @@ export default function AdminPage() {
     }
   }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports]);
 
+  useEffect(() => {
+    if (isAdmin) {
+      fetchOpsUsers();
+    }
+  }, [isAdmin, fetchOpsUsers]);
+
   const updateSubmissionStatus = async (id: string, status: string) => {
     await supabase.from('airdrop_submissions').update({ status, reviewed_at: new Date().toISOString() }).eq('id', id);
     setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status } : s));
@@ -1496,128 +1700,297 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <section id="admin-banners">
+      <section id="admin-needs-attention">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">What Needs Action</h2>
+          <h2 className="text-lg font-bold text-amber-300">🚨 Needs Attention Today</h2>
           {statsLoading && <Loader2 className="w-3 h-3 text-gray-600 animate-spin" />}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           <ActionCard
             title="Pending Airdrop Reviews"
             count={stats?.pendingSubmissions ?? 0}
-            status={`${stats?.pendingSubmissions ?? 0} waiting`}
-            blurb="Submitted projects waiting for manual review and decision."
-            actionLabel="Review Submissions"
+            status="Needs review"
+            blurb="Approve, reject, or request more info."
+            actionLabel="Review Submission"
             onAction={() => jumpToSection('admin-submissions')}
           />
           <ActionCard
-            title="Banner Ad Enquiries"
+            title="Banner Enquiries"
             count={pendingBannerEnquiries}
-            status="Waiting for artwork or approval"
-            blurb="New ad requests that still need setup before publishing."
-            actionLabel="Manage Banners"
-            onAction={() => jumpToSection('admin-banners')}
+            status="Waiting for artwork"
+            blurb="Activate and schedule campaigns quickly."
+            actionLabel="Manage Banner"
+            onAction={() => jumpToSection('admin-advertising')}
           />
           <ActionCard
-            title="Live Banner Ads"
-            count={liveBannerAds}
-            status="Currently visible"
-            blurb="Exclusive placements now active across the site."
-            actionLabel="View Live Ads"
-            onAction={() => jumpToSection('admin-banners')}
-          />
-          <ActionCard
-            title="Expiring Banner Ads"
-            count={expiringBannerAds}
-            status="Ending within 7 days"
-            blurb="Check replacements early so premium slots stay filled."
-            actionLabel="Set Dates"
-            onAction={() => jumpToSection('admin-banners')}
-          />
-          <ActionCard
-            title="User Reports / Scam Reports"
+            title="Scam Reports"
             count={pendingScamReports}
-            status="Need review"
-            blurb="Review reports to protect users and update status."
-            actionLabel="Review Reports"
+            status="Needs triage"
+            blurb="Review reports and protect user trust."
+            actionLabel="Open Reports"
             onAction={() => jumpToSection('admin-scam-reports')}
           />
           <ActionCard
-            title="Site Health"
-            count={siteHealthIssues}
-            status="Publish, scoring, and AI checks"
-            blurb="Tracks content that still needs publish or quality checks."
-            actionLabel="Open Airdrops"
+            title="Expiring Listings"
+            count={expiringListings.length}
+            status="Ending in 7 days"
+            blurb="Renew, replace, or expire safely."
+            actionLabel="Publish Project"
             onAction={() => jumpToSection('admin-airdrops')}
+          />
+          <ActionCard
+            title="Failed AI Analyses"
+            count={failedAiQueue.length}
+            status="AI queue"
+            blurb="Projects with no fresh analysis data."
+            actionLabel="Refresh AI"
+            onAction={() => jumpToSection('admin-ai-control')}
+          />
+          <ActionCard
+            title="Missing Project Information"
+            count={missingProjectInfo.length}
+            status="Content quality"
+            blurb="Fill docs, GitHub, funding, and logos."
+            actionLabel="Fix Project"
+            onAction={() => jumpToSection('admin-site-health')}
+          />
+          <ActionCard
+            title="Articles Awaiting Publication"
+            count={articlesAwaitingPublication.length}
+            status="Content pending"
+            blurb="Draft and scheduled articles waiting to go live."
+            actionLabel="Open Articles"
+            onAction={() => {
+              setContentView('articles');
+              jumpToSection('admin-content');
+            }}
           />
         </div>
       </section>
 
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.06] p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-cyan-200">Admin Guidance</p>
-          <p className="text-xs text-gray-300 mt-2">Banner ads are manually managed for now. When a customer enquires, create a banner record, upload artwork, set dates, then mark it Live.</p>
+      <section id="admin-content" className="rounded-2xl border border-sky-500/20 bg-sky-500/[0.05] p-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-sky-200">CONTENT</h2>
+            <p className="text-xs text-gray-300 mt-1">Run homepage and publishing from one place.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => { setContentView('airdrops'); jumpToSection('admin-airdrops'); }} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Manage Airdrops</button>
+            <button onClick={() => setContentView('articles')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Manage Articles</button>
+            <button onClick={() => setContentView('hero')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Edit Homepage Hero</button>
+            <button onClick={() => setContentView('featured')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Feature Project</button>
+            <button onClick={() => setContentView('trending')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Trending Projects</button>
+            <button onClick={() => setContentView('learn')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Learn Articles</button>
+            <button onClick={() => setContentView('sections')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Homepage Sections</button>
+          </div>
         </div>
-        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-amber-200">Placement Rule</p>
-          <p className="text-xs text-gray-300 mt-2">Each placement is exclusive. Only one banner should be Live per placement at a time.</p>
+
+        {contentView === 'articles' && (
+          <div className="glass-card p-4">
+            <p className="text-xs uppercase tracking-wider text-sky-200 mb-2">Articles</p>
+            <div className="space-y-2">
+              {controlArticles.map((article) => (
+                <div key={article.id} className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-xs">
+                  <div>
+                    <p className="text-white font-medium">{article.title}</p>
+                    <p className="text-gray-500">{article.status}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setControlArticles((prev) => prev.map((row) => row.id === article.id ? { ...row, status: 'draft', updatedAt: new Date().toISOString() } : row))}
+                      className="px-2.5 py-1 rounded-lg border border-white/15 text-gray-300"
+                    >Draft</button>
+                    <button
+                      onClick={() => setControlArticles((prev) => prev.map((row) => row.id === article.id ? { ...row, status: 'published', updatedAt: new Date().toISOString() } : row))}
+                      className="px-2.5 py-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
+                    >Publish</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {contentView === 'hero' && (
+          <div className="glass-card p-4 space-y-3">
+            <p className="text-xs uppercase tracking-wider text-sky-200">Homepage Hero</p>
+            <input value={homepageHeroTitle} onChange={(e) => setHomepageHeroTitle(e.target.value)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white" />
+            <textarea value={homepageHeroSubtext} onChange={(e) => setHomepageHeroSubtext(e.target.value)} rows={2} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white" />
+            <button onClick={() => window.open('/', '_blank', 'noopener,noreferrer')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Preview Homepage</button>
+          </div>
+        )}
+
+        {contentView === 'featured' && (
+          <div className="glass-card p-4 space-y-3">
+            <p className="text-xs uppercase tracking-wider text-sky-200">Featured Project</p>
+            <select value={featuredProjectId} onChange={(e) => setFeaturedProjectId(e.target.value)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white">
+              <option value="">Select project</option>
+              {airdrops.slice(0, 30).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            <button
+              onClick={async () => {
+                if (!featuredProjectId) {
+                  showToast('Select a project first', 'error');
+                  return;
+                }
+                const project = airdrops.find((a) => a.id === featuredProjectId);
+                if (!project) {
+                  showToast('Selected project not found', 'error');
+                  return;
+                }
+                await openEdit(project);
+              }}
+              className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200"
+            >Feature Project</button>
+          </div>
+        )}
+
+        {contentView === 'trending' && (
+          <div className="glass-card p-4 space-y-3">
+            <p className="text-xs uppercase tracking-wider text-sky-200">Trending Projects</p>
+            <textarea value={trendingProjectIds} onChange={(e) => setTrendingProjectIds(e.target.value)} rows={3} placeholder="Enter project IDs, one per line" className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white" />
+            <button
+              onClick={async () => {
+                const ids = trendingProjectIds.split('\n').map((id) => id.trim()).filter(Boolean);
+                if (!ids.length) {
+                  showToast('Enter at least one project ID', 'error');
+                  return;
+                }
+                const project = airdrops.find((a) => ids.includes(a.id));
+                if (!project) {
+                  showToast('No matching project found', 'error');
+                  return;
+                }
+                await openEdit(project);
+              }}
+              className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200"
+            >Update Trending</button>
+          </div>
+        )}
+
+        {contentView === 'learn' && (
+          <div className="glass-card p-4 space-y-3">
+            <p className="text-xs uppercase tracking-wider text-sky-200">Learn Articles</p>
+            <textarea value={learnHighlights} onChange={(e) => setLearnHighlights(e.target.value)} rows={3} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white" />
+            <button onClick={() => window.open('/learn', '_blank', 'noopener,noreferrer')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Open Learn Page</button>
+          </div>
+        )}
+
+        {contentView === 'sections' && (
+          <div className="glass-card p-4 space-y-3">
+            <p className="text-xs uppercase tracking-wider text-sky-200">Homepage Sections</p>
+            <textarea value={homepageSections} onChange={(e) => setHomepageSections(e.target.value)} rows={3} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white" />
+            <button onClick={() => window.open('/', '_blank', 'noopener,noreferrer')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Open Homepage</button>
+          </div>
+        )}
+      </section>
+
+      <section id="admin-ai-control" className="rounded-2xl border border-violet-500/20 bg-violet-500/[0.05] p-4 space-y-3">
+        <h2 className="text-sm font-bold text-violet-200">AI CONTROL</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          <button onClick={refreshAllAnalysis} className="px-3 py-2 rounded-xl border border-violet-400/25 bg-violet-500/10 text-xs text-violet-200">Refresh all projects</button>
+          <button onClick={() => jumpToSection('admin-ai-queue')} className="px-3 py-2 rounded-xl border border-violet-400/25 bg-violet-500/10 text-xs text-violet-200">Failed AI queue</button>
+          <button onClick={() => openFirstAirdropMatch((a) => !(a.last_analyzed_at && String(a.last_analyzed_at).trim()), 'No failed AI analysis found')} className="px-3 py-2 rounded-xl border border-violet-400/25 bg-violet-500/10 text-xs text-violet-200">Reanalyse project</button>
+          <button onClick={() => window.open('https://status.openai.com', '_blank', 'noopener,noreferrer')} className="px-3 py-2 rounded-xl border border-violet-400/25 bg-violet-500/10 text-xs text-violet-200">OpenAI status</button>
         </div>
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-200">Ad Trust Rule</p>
-          <p className="text-xs text-gray-300 mt-2">Always label ads as Sponsored or Advertisement. Never present ads as AI recommendations, human verification, Trust Scores, or Featured by AirdropGuard.</p>
+        <div className="text-xs text-gray-300">AI health: {stats?.analyzedAirdrops ?? 0}/{stats?.totalAirdrops ?? 0} projects analysed.</div>
+      </section>
+
+      <section id="admin-ai-queue" className="glass-card p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs uppercase tracking-wider text-violet-300 font-semibold">Failed AI queue</h3>
+          <span className="text-xs text-gray-400">{failedAiQueue.length} pending</span>
+        </div>
+        <div className="space-y-2">
+          {failedAiQueue.slice(0, 8).map((airdrop) => (
+            <div key={airdrop.id} className="flex items-center justify-between border border-white/10 rounded-xl px-3 py-2 text-xs">
+              <span className="text-white">{airdrop.name}</span>
+              <button onClick={() => runAnalysis(airdrop, true)} className="px-2.5 py-1 rounded-lg border border-violet-500/25 bg-violet-500/10 text-violet-300">Refresh AI</button>
+            </div>
+          ))}
+          {failedAiQueue.length === 0 && <p className="text-xs text-gray-500">No failed AI analyses.</p>}
         </div>
       </section>
 
-      {/* ── Stats ─────────────────────────────────────────────────────────── */}
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Overview</h2>
-          {statsLoading && <Loader2 className="w-3 h-3 text-gray-600 animate-spin" />}
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-          <StatCard label="Total Airdrops" value={stats?.totalAirdrops ?? '—'} icon={Database}
-            iconBg="bg-neon-purple/10 border border-neon-purple/20" iconClass="text-neon-purple" />
-          <StatCard label="Published" value={stats?.publishedAirdrops ?? '—'} icon={Eye}
-            iconBg="bg-emerald-500/10 border border-emerald-500/20" iconClass="text-emerald-400"
-            sub={stats ? `${stats.totalAirdrops - stats.publishedAirdrops} drafts` : undefined} />
-          <StatCard label="Trust Scored" value={stats?.scoredAirdrops ?? '—'} icon={Shield}
-            iconBg="bg-sky-500/10 border border-sky-500/20" iconClass="text-sky-400"
-            sub={stats ? `${stats.totalAirdrops - stats.scoredAirdrops} pending` : undefined} />
-          <StatCard label="AI Analyzed" value={stats?.analyzedAirdrops ?? '—'} icon={Brain}
-            iconBg="bg-violet-500/10 border border-violet-500/20" iconClass="text-violet-400"
-            sub={stats ? `${stats.totalAirdrops - stats.analyzedAirdrops} unanalyzed` : undefined} />
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <StatCard label="Total Tasks" value={stats?.totalTasks ?? '—'} icon={Activity}
-            iconBg="bg-amber-500/10 border border-amber-500/20" iconClass="text-amber-400" />
-          <StatCard label="Newsletter Subs" value={stats?.newsletterSubs ?? '—'} icon={Mail}
-            iconBg="bg-rose-500/10 border border-rose-500/20" iconClass="text-rose-400" />
-          <StatCard label="Paid API Users" value={stats ? stats.proSubs + stats.businessSubs : '—'} icon={Users}
-            iconBg="bg-teal-500/10 border border-teal-500/20" iconClass="text-teal-400"
-            sub={stats ? `${stats.proSubs} pro · ${stats.businessSubs} biz` : undefined} />
-          <StatCard label="Active API Keys" value={stats?.activeKeys ?? '—'} icon={Key}
-            iconBg="bg-orange-500/10 border border-orange-500/20" iconClass="text-orange-400" />
-          <StatCard label="API Calls" value={stats?.apiCallsTotal ?? '—'} icon={Zap}
-            iconBg="bg-lime-500/10 border border-lime-500/20" iconClass="text-lime-400"
-            sub={stats ? `${stats.apiCallsToday} today` : undefined} />
+      <section id="admin-site-health" className="rounded-2xl border border-rose-500/20 bg-rose-500/[0.04] p-4 space-y-3">
+        <h2 className="text-sm font-bold text-rose-200">SITE HEALTH</h2>
+        <div className="space-y-2 text-xs">
+          {[
+            { label: 'Broken links (missing website URL)', count: missingWebsiteCount, action: () => openFirstAirdropMatch((a) => !String(a.website_url ?? '').trim(), 'No website issues detected') },
+            { label: 'Missing logos', count: missingLogoCount, action: () => openFirstAirdropMatch((a) => !String(a.logo_url ?? '').trim(), 'No logo issues detected') },
+            { label: 'Missing GitHub', count: missingGithubCount, action: () => openFirstAirdropMatch((a) => !String((a as unknown as Record<string, unknown>).github_url ?? '').trim(), 'No GitHub issues detected') },
+            { label: 'Missing Docs', count: missingDocsCount, action: () => openFirstAirdropMatch((a) => !String((a as unknown as Record<string, unknown>).docs_url ?? '').trim(), 'No docs issues detected') },
+            { label: 'Missing Funding', count: missingFundingCount, action: () => openFirstAirdropMatch((a) => !String((a as unknown as Record<string, unknown>).funding_info ?? '').trim() && !String((a as unknown as Record<string, unknown>).investors ?? '').trim(), 'No funding issues detected') },
+            { label: 'Sitemap health', count: 0, action: () => window.open('/sitemap.xml', '_blank', 'noopener,noreferrer') },
+            { label: 'SEO warnings (missing summary)', count: seoWarningCount, action: () => openFirstAirdropMatch((a) => !String(a.ai_summary ?? '').trim(), 'No SEO warnings detected') },
+            { label: 'Expiring projects', count: expiringListings.length, action: () => jumpToSection('admin-airdrops') },
+          ].map((row) => (
+            <div key={row.label} className="flex items-center justify-between border border-white/10 rounded-xl px-3 py-2">
+              <div>
+                <p className="text-gray-100">{row.label}</p>
+                <p className="text-gray-500">{row.count} items</p>
+              </div>
+              <button onClick={row.action} className="px-2.5 py-1 rounded-lg border border-rose-500/25 bg-rose-500/10 text-rose-200">Fix</button>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* ── Submission stats ───────────────────────────────────────────────── */}
-      <section>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Submissions</h2>
-        <div className="grid grid-cols-3 gap-3">
-          <StatCard label="Pending Review" value={stats?.pendingSubmissions ?? '—'} icon={Inbox}
-            iconBg="bg-amber-500/10 border border-amber-500/20" iconClass="text-amber-400" />
-          <StatCard label="Approved" value={stats?.approvedSubmissions ?? '—'} icon={CheckCheck}
-            iconBg="bg-emerald-500/10 border border-emerald-500/20" iconClass="text-emerald-400" />
-          <StatCard label="Rejected" value={stats?.rejectedSubmissions ?? '—'} icon={XCircle}
-            iconBg="bg-rose-500/10 border border-rose-500/20" iconClass="text-rose-400" />
+      <section id="admin-users" className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold text-white">USERS</h2>
+          <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search users" className="w-52 bg-dark-900/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+          <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">New users</p><p className="text-white font-semibold">{newUsersCount}</p></div>
+          <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">Active users</p><p className="text-white font-semibold">{activeUsersCount}</p></div>
+          <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">API users</p><p className="text-white font-semibold">{apiUsersCount}</p></div>
+          <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">Premium users</p><p className="text-white font-semibold">{premiumUsersCount}</p></div>
+          <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">Latest signups</p><p className="text-white font-semibold">{opsUsers.length}</p></div>
+        </div>
+        <div className="glass-card overflow-x-auto">
+          <table className="w-full text-xs min-w-[680px]">
+            <thead>
+              <tr className="border-b border-white/10">
+                <th className="text-left px-3 py-2 text-gray-400">Email</th>
+                <th className="text-left px-3 py-2 text-gray-400">Plan</th>
+                <th className="text-left px-3 py-2 text-gray-400">Created</th>
+                <th className="text-left px-3 py-2 text-gray-400">Last seen</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {(usersLoading ? [] : filteredUsers.slice(0, 20)).map((u) => (
+                <tr key={u.id}>
+                  <td className="px-3 py-2 text-gray-200">{u.email}</td>
+                  <td className="px-3 py-2 text-gray-400 capitalize">{u.plan}</td>
+                  <td className="px-3 py-2 text-gray-500">{new Date(u.createdAt).toLocaleDateString()}</td>
+                  <td className="px-3 py-2 text-gray-500">{new Date(u.lastSeenAt).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {usersLoading && <p className="px-3 py-2 text-xs text-gray-500">Loading users...</p>}
+        </div>
+      </section>
+
+      <section id="admin-revenue" className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.05] p-4 space-y-3">
+        <h2 className="text-sm font-bold text-emerald-200">REVENUE</h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+          <div className="rounded-xl border border-emerald-500/20 px-3 py-2"><p className="text-emerald-100/80">Banner enquiries</p><p className="text-white font-semibold">{pendingBannerEnquiries}</p></div>
+          <div className="rounded-xl border border-emerald-500/20 px-3 py-2"><p className="text-emerald-100/80">Featured enquiries</p><p className="text-white font-semibold">{featuredListingEnquiries}</p></div>
+          <div className="rounded-xl border border-emerald-500/20 px-3 py-2"><p className="text-emerald-100/80">API subscriptions</p><p className="text-white font-semibold">{stats ? stats.proSubs + stats.businessSubs : 0}</p></div>
+          <div className="rounded-xl border border-emerald-500/20 px-3 py-2"><p className="text-emerald-100/80">Revenue summary</p><p className="text-white font-semibold">${estimatedRevenuePipeline}</p></div>
+          <div className="rounded-xl border border-emerald-500/20 px-3 py-2"><p className="text-emerald-100/80">Stripe status</p><p className="text-white font-semibold">Ready when re-enabled</p></div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => jumpToSection('admin-advertising')} className="px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-200">Manage Banner</button>
+          <button onClick={() => jumpToSection('admin-submissions')} className="px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-200">Review Submission</button>
+          <button onClick={() => window.open('/pricing', '_blank', 'noopener,noreferrer')} className="px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-200">Open API Access</button>
         </div>
       </section>
 
       {/* ── Airdrop table ──────────────────────────────────────────────────── */}
-      <section>
+      <section id="admin-advertising">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
@@ -1686,6 +2059,7 @@ export default function AdminPage() {
             <tbody className="divide-y divide-white/5">
               {banners.map((banner) => {
                 const effectiveStatus = deriveBannerStatus(banner.status, banner.startDate, banner.endDate);
+                const displayStatus = getBannerDisplayStatus(banner.status, banner.startDate, banner.endDate);
                 return (
                   <tr key={banner.id} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-4 py-3">
@@ -1710,11 +2084,14 @@ export default function AdminPage() {
                         {banner.exclusivePlacement && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-300">Exclusive</span>
                         )}
+                        {banner.archived && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full border border-white/20 bg-white/[0.06] text-gray-300">Archived</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-[10px] font-semibold border rounded-full px-2.5 py-1 ${getBannerStatusClass(effectiveStatus)}`}>
-                        {effectiveStatus}
+                      <span className={`text-[10px] font-semibold border rounded-full px-2.5 py-1 ${getBannerDisplayClass(displayStatus)}`}>
+                        {displayStatus}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-400">{banner.startDate || '—'}</td>
@@ -1761,6 +2138,15 @@ export default function AdminPage() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        {!banner.archived && (
+                          <button
+                            onClick={() => archiveBanner(banner.id)}
+                            title="Archive banner"
+                            className="px-2 py-1 rounded-lg border border-white/15 text-[10px] text-gray-300 hover:bg-white/10"
+                          >
+                            Archive
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

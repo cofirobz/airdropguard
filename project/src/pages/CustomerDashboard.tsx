@@ -652,6 +652,49 @@ function ReputationCard({
   );
 }
 
+function AnimatedCounter({
+  value,
+  duration = 900,
+  decimals = 0,
+  prefix = '',
+  suffix = '',
+  className = '',
+}: {
+  value: number;
+  duration?: number;
+  decimals?: number;
+  prefix?: string;
+  suffix?: string;
+  className?: string;
+}) {
+  const [displayValue, setDisplayValue] = useState(value);
+
+  useEffect(() => {
+    const start = performance.now();
+    const from = displayValue;
+    const delta = value - from;
+    let frame = 0;
+
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(from + delta * eased);
+      if (progress < 1) frame = requestAnimationFrame(animate);
+    };
+
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [duration, displayValue, value]);
+
+  return (
+    <span className={className}>
+      {prefix}
+      {displayValue.toFixed(decimals)}
+      {suffix}
+    </span>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function CustomerDashboard() {
@@ -897,6 +940,8 @@ export default function CustomerDashboard() {
   const featuredMission = focusAirdrops[0] ?? priorityAirdrops[0] ?? null;
   const missionTrust = Math.max(0, Math.min(100, featuredMission?.trust_score ?? avgTrustScore));
   const missionReward = featuredMission?.estimated_reward || 'Reward window updating';
+  const missionCountdownMs = useCountdown(featuredMission?.expiry_date ?? null);
+  const missionCountdown = formatCountdown(missionCountdownMs);
   const favoriteChain = (() => {
     const counts: Record<string, number> = {};
     safeAirdrops.forEach((item) => {
@@ -1129,245 +1174,224 @@ export default function CustomerDashboard() {
 
  return (
   <>
-          <div className="hidden rounded-3xl border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(4,10,24,0.96),rgba(5,13,32,0.96))] p-4 shadow-[0_18px_50px_rgba(3,8,24,0.65),0_0_42px_rgba(34,211,238,0.14)] md:block sm:p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">{greeting}, {firstName} 👋</p>
-                <h1 className="mt-1 text-2xl font-black text-white sm:text-3xl">{dashboardHero.title}</h1>
-                <p className="mt-1 text-sm text-gray-200">
-                  {dashboardHero.detail}
-                </p>
-                <p className={`mt-1.5 text-xs font-semibold ${trustDelta === null ? 'text-cyan-100' : trustDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
-                  {heroConfidenceLine}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
-                    AI Online
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-semibold text-cyan-200">
-                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 animate-pulse" />
-                    Market Pulse Live
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-200">
-                    {dashboardHero.subtitle}
-                  </span>
+    {activeTab === 'overview' && (
+      <div className="space-y-4 animate-in">
+        <section className="mission-control-hero mission-grid relative isolate overflow-hidden rounded-[30px] border border-cyan-300/30 p-4 shadow-[0_30px_80px_rgba(2,6,23,0.65)] sm:p-6">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(34,211,238,0.23),transparent_35%),radial-gradient(circle_at_15%_90%,rgba(56,189,248,0.16),transparent_32%),linear-gradient(150deg,rgba(2,10,28,0.98),rgba(3,16,40,0.94)_52%,rgba(6,26,56,0.96))]" />
+          <div className="mission-network pointer-events-none absolute inset-0 opacity-55" />
+          <div className="pointer-events-none absolute -right-28 -top-24 h-72 w-72 rounded-full bg-cyan-400/18 blur-3xl" />
+          <div className="pointer-events-none absolute -left-20 bottom-0 h-64 w-64 rounded-full bg-blue-500/18 blur-3xl" />
+
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((particle) => (
+            <span
+              key={particle}
+              className="mission-particle pointer-events-none absolute h-1.5 w-1.5 rounded-full bg-cyan-200/75"
+              style={{
+                left: `${8 + particle * 12}%`,
+                top: `${15 + (particle % 4) * 18}%`,
+                animationDelay: `${particle * 0.6}s`,
+              }}
+            />
+          ))}
+
+          <div className="relative z-10 grid min-h-[100svh] gap-5 md:min-h-[620px] lg:grid-cols-[1.2fr_0.8fr] lg:gap-6">
+            <div className="flex flex-col justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/12 px-2.5 py-1 text-emerald-100">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                  AI Online
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/12 px-2.5 py-1 text-cyan-100">
+                  <Activity className="h-3.5 w-3.5 animate-pulse" />
+                  Mission Control Live
+                </span>
+                <span className="inline-flex items-center rounded-full border border-white/20 bg-white/[0.08] px-2.5 py-1 text-white/85">
+                  {dashboardHero.subtitle}
+                </span>
+              </div>
+
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/90">{greeting}, {firstName}</p>
+                  <h1 className="mt-2 text-3xl font-black leading-[1.02] text-white sm:text-4xl lg:text-5xl">
+                    AirdropGuard Mission Control
+                  </h1>
+                  <p className="mt-2 max-w-2xl text-sm text-sky-100/95 sm:text-base">
+                    AI operating system for safer, faster mission execution. Your next highest-value move is pre-ranked and live.
+                  </p>
+                  <p className={`mt-2 text-xs font-semibold ${trustDelta === null ? 'text-cyan-100' : trustDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
+                    {heroConfidenceLine}
+                  </p>
+                </div>
+                <div className="mission-orb-pulse hidden h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/35 bg-cyan-500/12 shadow-[0_0_36px_rgba(34,211,238,0.36)] sm:flex">
+                  <AiOrb className="h-8 w-8" />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="relative hidden sm:block">
+              <div className="grid gap-3 md:grid-cols-[1.1fr_0.9fr]">
+                <div className="rounded-2xl border border-cyan-300/25 bg-[#07182f]/85 p-4 backdrop-blur">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/85">Featured Opportunity</p>
+                  {featuredMission ? (
+                    <>
+                      <div className="mt-3 flex items-center gap-3">
+                        <div className="h-12 w-12 overflow-hidden rounded-2xl border border-cyan-300/35 bg-[#0b2142]">
+                          {featuredMission.logo_url ? (
+                            <img
+                              src={featuredMission.logo_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-100">{featuredMission.name[0]}</div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-lg font-black text-white">{featuredMission.name}</p>
+                          <p className="mt-0.5 text-xs text-cyan-100/90">AI + human verified workflow</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                        <div className="rounded-xl border border-white/15 bg-white/[0.06] px-2 py-2">
+                          <p className="text-[10px] uppercase tracking-[0.14em] text-cyan-100/75">Trust</p>
+                          <AnimatedCounter value={missionTrust} suffix="%" className="mt-1 block text-lg font-black text-cyan-100 tabular-nums" />
+                        </div>
+                        <div className="rounded-xl border border-white/15 bg-white/[0.06] px-2 py-2">
+                          <p className="text-[10px] uppercase tracking-[0.14em] text-cyan-100/75">AI confidence</p>
+                          <AnimatedCounter value={copilotConfidencePct} suffix="%" className="mt-1 block text-lg font-black text-emerald-200 tabular-nums" />
+                        </div>
+                        <div className="rounded-xl border border-white/15 bg-white/[0.06] px-2 py-2">
+                          <p className="text-[10px] uppercase tracking-[0.14em] text-cyan-100/75">Time left</p>
+                          <p className="mt-1 truncate text-sm font-black text-amber-100">
+                            {featuredMission.expiry_date ? `${missionCountdown.days}d ${pad(missionCountdown.hours)}h` : 'Updating'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="max-w-full truncate rounded-full border border-cyan-300/35 bg-cyan-500/18 px-2.5 py-1 text-[10px] font-semibold text-cyan-100">Estimated Reward: {missionReward}</span>
+                        <span className="rounded-full border border-emerald-400/35 bg-emerald-500/16 px-2.5 py-1 text-[10px] font-semibold text-emerald-100">{featuredMission.risk_level || 'Risk unknown'}</span>
+                        <span className="rounded-full border border-white/20 bg-white/[0.1] px-2.5 py-1 text-[10px] font-semibold text-white">{featuredMission.time_required || 'Time window updating'}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-3 rounded-xl border border-white/10 bg-white/[0.05] p-3 text-xs text-gray-200">Mission is loading from your active queue.</p>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-cyan-300/22 bg-[#071a34]/85 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/80">Live Trust Ring</p>
+                      <p className="text-xs text-cyan-100/80">Realtime trust and confidence telemetry</p>
+                    </div>
+                    <div className="relative h-[84px] w-[84px]">
+                      <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-xl" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <RingProgress pct={missionTrust} size={84} stroke={5.5} />
+                        <div className="absolute text-center">
+                          <AnimatedCounter value={missionTrust} suffix="%" className="block text-lg font-black text-white tabular-nums" />
+                          <span className="text-[10px] text-cyan-100/80">trust</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 space-y-2">
+                    {briefingRecommendations.slice(0, 3).map((item, index) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleBriefingActionClick(item, index)}
+                        className="flex w-full items-center justify-between gap-2 rounded-xl border border-white/15 bg-white/[0.05] px-3 py-2 text-left transition-colors hover:border-cyan-300/35 hover:bg-white/[0.09]"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-[10px] uppercase tracking-[0.14em] text-cyan-100/75">AI insight {index + 1}</span>
+                          <span className="block truncate text-xs font-semibold text-white">{item.title}</span>
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-cyan-100/80" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                <div className="relative sm:max-w-xs">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     value={dashboardSearch}
                     onChange={(event) => setDashboardSearch(event.target.value)}
-                    placeholder="Search dashboard"
-                    className="h-11 w-full rounded-2xl border border-cyan-500/20 bg-white/[0.04] pl-10 pr-3 text-sm text-white placeholder:text-gray-400 focus:border-cyan-400/50 focus:outline-none sm:w-64"
+                    placeholder="Search missions"
+                    className="h-11 w-full rounded-2xl border border-cyan-500/25 bg-white/[0.07] pl-10 pr-3 text-sm text-white placeholder:text-gray-400 focus:border-cyan-300/55 focus:outline-none"
                   />
                 </div>
                 <button
-                  type="button"
-                  className="hidden h-11 items-center gap-2 rounded-2xl border border-cyan-500/35 bg-cyan-500/12 px-3 text-xs font-semibold text-cyan-200 lg:inline-flex"
-                >
-                  <Activity className="h-3.5 w-3.5 animate-pulse" />
-                  Market Pulse Live
-                </button>
-                <button
-                  type="button"
-                  className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 transition-colors hover:border-sky-500/30 hover:text-white sm:inline-flex"
-                  aria-label="Notifications"
-                >
-                  <Bell className="h-4 w-4" />
-                </button>
-                <div className="hidden h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-3 text-xs text-gray-100 lg:inline-flex">
-                  <UserCircle2 className="h-4 w-4 text-cyan-200" />
-                  <span className="max-w-[150px] truncate">{user.email}</span>
-                </div>
-                <button
                   onClick={fetchData}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-cyan-500/20 bg-white/[0.04] px-3 text-xs font-semibold text-gray-100 hover:border-cyan-400/45 hover:text-white transition-colors"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-cyan-300/35 bg-cyan-500/18 px-4 text-xs font-bold text-cyan-100 transition-colors hover:bg-cyan-500/28"
                   title="Refresh"
                 >
                   <RefreshCw className="h-4 w-4" />
-                  <span className="hidden sm:inline">Refresh Data</span>
+                  Refresh
                 </button>
-                <button
-                  onClick={async () => { await supabase.auth.signOut(); navigate('/auth'); }}
-                  className="hidden h-11 rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 text-sm font-semibold text-rose-300 hover:bg-rose-500/20 hover:text-white transition-colors lg:inline-flex"
-                >
-                  Log Out
-                </button>
-              </div>
-            </div>
-          </div>
-
-    {activeTab === 'overview' && (
-      <div className="space-y-4 animate-in">
-        <section className="md:hidden rounded-[28px] border border-cyan-400/22 bg-[linear-gradient(145deg,rgba(8,20,42,0.96),rgba(6,14,32,0.94))] p-4 shadow-[0_18px_40px_rgba(3,8,24,0.45),0_0_24px_rgba(14,165,233,0.1)]">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">{greeting}, {firstName}</p>
-              <h2 className="mt-1 text-lg font-black text-white">Your AirdropGuard briefing</h2>
-              <p className="mt-1 text-xs text-sky-100/90">
-                {remainingCount} tasks left. {recentlyVerifiedCount} recently verified. {avgTrustScore}% average trust.
-              </p>
-            </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-500/10 shadow-[0_0_18px_rgba(34,211,238,0.12)]">
-              <AiOrb className="h-6 w-6" />
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]">
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
-              AI Online
-            </span>
-            <span className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1 text-gray-300">
-              Updated moments ago
-            </span>
-            <span className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">
-              Market Pulse Live
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={featuredMission ? undefined : openCopilot}
-            className="mt-3 w-full rounded-2xl border border-cyan-300/30 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(59,130,246,0.18))] px-3 py-3 text-left"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">Best next action</p>
-                <p className="mt-1 truncate text-sm font-bold text-white">
-                  {featuredMission ? `Start ${featuredMission.name}` : 'Ask AI what to do next'}
-                </p>
-              </div>
-              {featuredMission ? (
-                <Link
-                  to={`/airdrop/${featuredMission.slug}`}
-                  className="inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-xl border border-cyan-300/35 bg-cyan-500/20 px-3 py-2 text-[11px] font-bold text-cyan-100"
-                >
-                  Open
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-              ) : (
-                <span className="inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-xl border border-cyan-300/35 bg-cyan-500/20 px-3 py-2 text-[11px] font-bold text-cyan-100">
-                  Ask AI
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </span>
-              )}
-            </div>
-          </button>
-        </section>
-
-        <section className="relative overflow-hidden rounded-[30px] border border-cyan-400/30 bg-[linear-gradient(145deg,rgba(3,12,28,0.95),rgba(8,20,42,0.95)_48%,rgba(6,14,32,0.95))] p-4 shadow-[0_24px_60px_rgba(3,8,24,0.6),0_0_44px_rgba(14,165,233,0.12)] soft-flow sm:p-5">
-          <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-400/20 blur-3xl" />
-          <div className="pointer-events-none absolute -left-24 bottom-0 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl" />
-
-          <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <p className="hidden text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200 md:block">{greeting}, {firstName} 👋</p>
-              <h2 className="mt-1 text-2xl font-black leading-tight text-white sm:text-3xl">Today&apos;s Mission</h2>
-              <p className="mt-2 max-w-xl text-sm text-sky-100/95">Focus on your best opportunity, complete priority tasks, then ask AI what to do next.</p>
-              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-200/90">Check Before You Connect.</p>
-
-              {featuredMission ? (
-                <div className="mt-4 rounded-2xl border border-cyan-400/25 bg-[#07162f]/85 p-3 backdrop-blur">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 overflow-hidden rounded-2xl border border-cyan-300/30 bg-[#0a1f3d]">
-                      {featuredMission.logo_url ? (
-                        <img
-                          src={featuredMission.logo_url}
-                          alt=""
-                          className="h-full w-full object-cover"
-                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-100">{featuredMission.name[0]}</div>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-black text-white">{featuredMission.name}</p>
-                      <p className="mt-0.5 text-xs text-cyan-100">AI + human verified workflow ready</p>
-                    </div>
-                    <div className="rounded-xl border border-amber-400/35 bg-amber-500/12 px-2 py-1 text-[10px] font-semibold text-amber-100">
-                      <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> Reward</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="max-w-full truncate rounded-full border border-cyan-400/30 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-semibold text-cyan-100">{missionReward}</span>
-                    <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold text-emerald-100">{featuredMission.risk_level || 'Risk unknown'}</span>
-                    <span className="rounded-full border border-white/20 bg-white/[0.08] px-2.5 py-1 text-[10px] font-semibold text-white">{featuredMission.time_required || 'Time window updating'}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 rounded-2xl border border-white/15 bg-white/[0.05] px-3 py-3 text-xs text-gray-200">
-                  Mission is loading from your active airdrop queue.
-                </div>
-              )}
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {featuredMission && (
+                {featuredMission ? (
                   <Link
                     to={`/airdrop/${featuredMission.slug}`}
-                    className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-cyan-300/40 bg-cyan-500/20 px-4 py-2 text-xs font-bold text-cyan-100 transition-colors hover:bg-cyan-500/30"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-cyan-300/45 bg-gradient-to-r from-cyan-500/36 to-blue-500/34 px-4 text-xs font-black text-white shadow-[0_14px_34px_rgba(6,182,212,0.28)] transition-colors hover:from-cyan-500/48 hover:to-blue-500/45"
                   >
                     <Target className="h-3.5 w-3.5" />
                     Open Mission
                   </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openCopilot}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-cyan-300/45 bg-gradient-to-r from-cyan-500/36 to-blue-500/34 px-4 text-xs font-black text-white shadow-[0_14px_34px_rgba(6,182,212,0.28)] transition-colors hover:from-cyan-500/48 hover:to-blue-500/45"
+                  >
+                    <AiOrb className="h-3.5 w-3.5" />
+                    Open Mission
+                  </button>
                 )}
-                <button
-                  type="button"
-                  onClick={openCopilot}
-                  className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-blue-300/35 bg-blue-500/20 px-4 py-2 text-xs font-bold text-blue-100 transition-colors hover:bg-blue-500/30"
-                >
-                  <AiOrb className="h-3.5 w-3.5" />
-                  Ask AI
-                </button>
               </div>
             </div>
 
-            <div className="grid shrink-0 grid-cols-2 gap-3 sm:w-[300px]">
-              <div className="rounded-2xl border border-cyan-400/28 bg-[#081c3b]/88 p-3 text-center">
-                <div className="mx-auto w-fit">
-                  <RingProgress pct={missionTrust} size={72} stroke={5} />
-                </div>
-                <p className="mt-1 text-xs font-bold text-white">Trust Score</p>
-                <p className="text-[11px] text-cyan-100">{missionTrust}% confidence</p>
-              </div>
-              <div className="rounded-2xl border border-blue-400/25 bg-[#0b1a37]/90 p-3">
-                <div className="mb-2 inline-flex rounded-lg border border-amber-400/30 bg-amber-500/12 p-1.5">
-                  <Award className="h-4 w-4 text-amber-200" />
-                </div>
-                <p className="text-[11px] uppercase tracking-[0.14em] text-blue-200">Reward Forecast</p>
-                <p className="mt-1 line-clamp-2 text-sm font-bold text-white">{missionReward}</p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-amber-300 via-cyan-300 to-blue-400" />
-                </div>
-              </div>
-              <div className="col-span-2 rounded-2xl border border-emerald-400/25 bg-[#071a2e]/88 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-bold text-emerald-100">Market Pulse Live</p>
-                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-200"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" /> updated recently</span>
+            <aside className="flex flex-col justify-between gap-3 lg:pt-1">
+              <div className="rounded-2xl border border-white/15 bg-white/[0.05] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] uppercase tracking-[0.14em] text-cyan-100/75">Live indicators</span>
+                  <Bell className="h-4 w-4 text-cyan-100/80" />
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-center">
                   <div className="rounded-xl border border-white/15 bg-white/[0.06] p-2">
-                    <p className="text-base font-black text-emerald-300">{marketPulse.momentum}%</p>
+                    <AnimatedCounter value={marketPulse.momentum} suffix="%" className="block text-base font-black text-emerald-300" />
                     <p className="text-[10px] text-gray-300">Momentum</p>
                   </div>
                   <div className="rounded-xl border border-white/15 bg-white/[0.06] p-2">
-                    <p className="text-base font-black text-amber-300">{marketPulse.reviewed}</p>
-                    <p className="text-[10px] text-gray-300">Review</p>
+                    <AnimatedCounter value={recentlyVerifiedCount} className="block text-base font-black text-amber-200" />
+                    <p className="text-[10px] text-gray-300">Verified</p>
                   </div>
                   <div className="rounded-xl border border-white/15 bg-white/[0.06] p-2">
-                    <p className="text-base font-black text-rose-300">{marketPulse.riskSignals}</p>
+                    <AnimatedCounter value={marketPulse.riskSignals} className="block text-base font-black text-rose-300" />
                     <p className="text-[10px] text-gray-300">Risk</p>
                   </div>
                 </div>
               </div>
-            </div>
+
+              <div className="hidden rounded-2xl border border-white/15 bg-white/[0.05] p-3 lg:block">
+                <div className="flex items-center gap-2 text-xs text-gray-100">
+                  <UserCircle2 className="h-4 w-4 text-cyan-200" />
+                  <span className="truncate">{user.email}</span>
+                </div>
+                <button
+                  onClick={async () => { await supabase.auth.signOut(); navigate('/auth'); }}
+                  className="mt-3 inline-flex h-10 w-full items-center justify-center rounded-xl border border-rose-500/25 bg-rose-500/12 px-3 text-xs font-semibold text-rose-200 transition-colors hover:bg-rose-500/22 hover:text-white"
+                >
+                  Log Out
+                </button>
+              </div>
+            </aside>
           </div>
         </section>
 

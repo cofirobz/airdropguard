@@ -1,0 +1,43 @@
+name: Purge Cloudflare Cache After Production Deploy
+
+on:
+  workflow_run:
+    # Must match the production deployment workflow name exactly.
+    workflows:
+      - Deploy to Cloudflare Pages
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  purge-cache:
+    name: Purge Cloudflare Zone Cache
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event == 'push' }}
+    steps:
+      - name: Purge Cloudflare cache
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CF_API_TOKEN}" ] || [ -z "${CF_ZONE_ID}" ]; then
+            echo "CF_API_TOKEN and CF_ZONE_ID must be configured in GitHub Secrets."
+            exit 1
+          fi
+
+          RESPONSE=$(curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}')
+
+          echo "Cloudflare API response: ${RESPONSE}"
+
+          if ! echo "${RESPONSE}" | grep -q '"success":true'; then
+            echo "Cloudflare cache purge failed."
+            exit 1
+          fi
