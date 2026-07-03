@@ -66,6 +66,14 @@ type HeroHints = {
   userLabel?: string;
 };
 
+type ContextualAiState = {
+  label: string;
+  recommendation: string;
+  cta: string;
+  copilotContext: string;
+  tip: string;
+};
+
 export function isAuthenticatedAppPath(pathname: string): boolean {
   return (
     pathname === '/' ||
@@ -83,22 +91,99 @@ export function AppShellLoadingSkeleton() {
   return (
     <div className="space-y-5">
       <div className="h-24 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-        <div className="h-3 w-24 animate-pulse rounded bg-white/10" />
-        <div className="mt-4 h-7 w-56 animate-pulse rounded bg-white/10" />
-        <div className="mt-3 h-3 w-72 max-w-full animate-pulse rounded bg-white/10" />
+        <div className="shimmer-line h-3 w-24 rounded" />
+        <div className="mt-4 shimmer-line h-7 w-56 rounded" />
+        <div className="mt-3 shimmer-line h-3 w-72 max-w-full rounded" />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         {[0, 1, 2, 3].map((item) => (
           <div key={item} className="h-48 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="h-4 w-28 animate-pulse rounded bg-white/10" />
-            <div className="mt-4 h-3 w-full animate-pulse rounded bg-white/10" />
-            <div className="mt-2 h-3 w-5/6 animate-pulse rounded bg-white/10" />
-            <div className="mt-8 h-10 w-32 animate-pulse rounded-2xl bg-white/10" />
+            <div className="shimmer-line h-4 w-28 rounded" />
+            <div className="mt-4 shimmer-line h-3 w-full rounded" />
+            <div className="mt-2 shimmer-line h-3 w-5/6 rounded" />
+            <div className="mt-8 shimmer-line h-10 w-32 rounded-2xl" />
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function buildContextualAiState(pathname: string, search: string, hints: HeroHints): ContextualAiState {
+  const filter = new URLSearchParams(search).get('filter');
+  const remainingTasks = hints.remainingTasks ?? 0;
+  const watchlistCount = hints.watchlistCount ?? 0;
+  const trust = hints.avgTrustScore ?? 0;
+
+  if (pathname.startsWith('/dashboard')) {
+    return {
+      label: 'Continue Today\'s Mission',
+      recommendation: remainingTasks > 0
+        ? `You have ${remainingTasks} tasks left. Start with the highest-trust unfinished mission.`
+        : 'Your checklist is clear. Ask AI to pick your next high-trust mission.',
+      cta: 'Continue Today\'s Mission',
+      copilotContext: `Dashboard guidance. ${remainingTasks} tasks remaining, ${watchlistCount} watchlist projects, trust baseline ${trust}%. Recommend the single best next action for today and why it matters.`,
+      tip: 'Tip: Task Tracking keeps execution clear while Trust Score helps you prioritize safer missions first.',
+    };
+  }
+
+  if (pathname === '/wallet-checker') {
+    return {
+      label: 'Wallet Intelligence',
+      recommendation: 'Your wallet looks healthy? Let AI confirm risk posture and suggest the safest next connect step.',
+      cta: 'Interpret Wallet Results',
+      copilotContext: 'Wallet Intelligence page. Summarize wallet health in plain language, highlight any red flags, and provide the safest next action.',
+      tip: 'Tip: Wallet Intelligence is read-only and never requests seed phrases or private keys.',
+    };
+  }
+
+  if (pathname.startsWith('/airdrop/')) {
+    return {
+      label: 'Airdrop Report Intelligence',
+      recommendation: 'Want a fast go or no-go? Ask AI to summarize trust, effort, rewards and hidden risks.',
+      cta: 'Summarize This Report',
+      copilotContext: 'Airdrop detail report page. Summarize trust score, reward potential, risk level and required tasks. Then recommend go/no-go with the next concrete step.',
+      tip: 'Tip: Trust Score helps safety confidence, while Opportunity Score estimates potential upside.',
+    };
+  }
+
+  if (pathname === '/scam-alerts') {
+    return {
+      label: 'Risk Radar',
+      recommendation: 'Clear high-risk alerts first, then return to opportunities with verified signals.',
+      cta: 'Prioritize Risk Alerts',
+      copilotContext: 'Scam Alerts page. Help me triage current warnings by urgency and identify what I should avoid today.',
+      tip: 'Tip: Trust Score reflects confidence quality, while Scam Alerts surface active threat patterns.',
+    };
+  }
+
+  if (pathname === '/pricing' || pathname === '/api-pricing' || pathname === '/api-docs') {
+    return {
+      label: 'Developer Mission Control',
+      recommendation: 'New endpoint documentation may be available. Ask AI for the fastest integration plan.',
+      cta: 'Get API Next Steps',
+      copilotContext: 'API page. Explain the fastest path from account access to first successful endpoint call, including practical setup steps.',
+      tip: 'Tip: AI Analysis can be operationalized via API to turn research into repeatable workflows.',
+    };
+  }
+
+  if (pathname === '/' && filter === 'trending') {
+    return {
+      label: 'Trending Intelligence',
+      recommendation: 'Three trending projects likely fit your profile. Ask AI to compare trust, effort and reward.' ,
+      cta: 'Compare Trending Picks',
+      copilotContext: `Trending browse page. Compare top opportunities for my profile with emphasis on trust, effort and reward. Current watchlist size: ${watchlistCount}.`,
+      tip: 'Tip: Opportunity Score estimates upside potential while Trust Score indicates verification confidence.',
+    };
+  }
+
+  return {
+    label: 'Browse Intelligence',
+    recommendation: 'Want AI to compare these for you? Get one clear recommendation and next action.',
+    cta: 'Ask AI For My Best Pick',
+    copilotContext: `Browse page. Select my best next mission from current opportunities using trust, urgency and expected effort. Watchlist: ${watchlistCount}.`,
+    tip: 'Tip: AI Analysis combines trust, urgency, reward and task effort to prioritize your next move.',
+  };
 }
 
 function buildSidebarItems(pathname: string, search: string): NavItem[] {
@@ -277,11 +362,14 @@ export default function AppShell({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pageCopilotContext, setPageCopilotContext] = useState<string | null>(null);
   const [heroHints, setHeroHints] = useState<HeroHints>({});
+  const [statusTick, setStatusTick] = useState(0);
   const sidebarItems = buildSidebarItems(location.pathname, location.search);
   const mobileItems = buildMobileItems(location.pathname);
   const effectiveCopilotContext = pageCopilotContext ?? routeContext.copilotContext;
   const contentClasses = contentClassName ?? 'space-y-6';
   const shellHeroState = buildShellHeroState(location.pathname, location.search, heroHints);
+  const contextualAiState = buildContextualAiState(location.pathname, location.search, heroHints);
+  const analysisLabel = statusTick % 4 === 0 ? 'AI analysing.' : statusTick % 4 === 1 ? 'AI analysing..' : statusTick % 4 === 2 ? 'AI analysing...' : 'AI analysing';
 
   useEffect(() => {
     setPageCopilotContext(null);
@@ -300,6 +388,18 @@ export default function AppShell({
       document.documentElement.style.overflow = '';
     };
   }, [aiDrawerOpen, mobileMenuOpen]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setStatusTick((prev) => prev + 1);
+    }, 3000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const openCopilotWithContext = (context: string) => {
+    window.dispatchEvent(new CustomEvent('ag:copilot-context', { detail: { context } }));
+    setAiDrawerOpen(true);
+  };
 
   useEffect(() => {
     const handleContext = (event: Event) => {
@@ -442,7 +542,7 @@ export default function AppShell({
                 </div>
               </div>
 
-              <div className={`rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,rgba(8,20,42,0.9),rgba(7,12,24,0.95))] p-4 shadow-[0_0_30px_rgba(34,211,238,0.1)] ${shellHeroState.glowClass}`}>
+              <div className={`premium-hover rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,rgba(8,20,42,0.9),rgba(7,12,24,0.95))] p-4 shadow-[0_0_30px_rgba(34,211,238,0.1)] ${shellHeroState.glowClass}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">AI + Human Verified</p>
@@ -475,6 +575,38 @@ export default function AppShell({
             </div>
           </section>
         )}
+
+        <section className="premium-hover mx-4 mt-4 rounded-2xl border border-cyan-400/18 bg-[linear-gradient(155deg,rgba(5,14,30,0.93),rgba(7,17,36,0.92))] px-3 py-3 shadow-[0_12px_30px_rgba(2,6,23,0.4)] sm:mx-6 sm:px-4 lg:mx-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]">
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                  AI Online
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-cyan-200">Market Pulse Live</span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.05] px-2 py-0.5 text-gray-300">Updated moments ago</span>
+              </div>
+              <p className="mt-2 text-xs font-bold text-cyan-100">{contextualAiState.label}</p>
+              <p className="mt-1 text-sm text-white">{contextualAiState.recommendation}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => openCopilotWithContext(contextualAiState.copilotContext)}
+              className="ripple-btn inline-flex min-h-[46px] shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-300/35 bg-cyan-500/22 px-4 py-2 text-xs font-black text-white transition-colors hover:bg-cyan-500/30"
+            >
+              <AiOrb className="h-4 w-4" />
+              {contextualAiState.cta}
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[11px] text-gray-200">{contextualAiState.tip}</p>
+            <p className="text-[11px] font-semibold text-cyan-200">{analysisLabel}</p>
+          </div>
+        </section>
 
         <div key={`${location.pathname}${location.search}`} className={`animate-in px-4 pb-6 pt-4 duration-300 sm:px-6 lg:px-8 ${contentClasses}`}>
           {children}

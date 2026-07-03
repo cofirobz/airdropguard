@@ -614,6 +614,7 @@ export default function Layout() {
                         <Link
                           key={label}
                           to={to}
+                          onClick={() => setMobileOpen(false)}
                           className="group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
                         >
                           <span className="flex items-center gap-3">
@@ -635,6 +636,7 @@ export default function Layout() {
                       </p>
                       <Link
                         to="/auth"
+                        onClick={() => setMobileOpen(false)}
                         className="group flex min-h-[48px] items-center justify-between rounded-2xl border border-sky-400/25 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-sky-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
                       >
                         <span className="flex items-center gap-3">
@@ -657,6 +659,7 @@ export default function Layout() {
                         <Link
                           key={label}
                           to={to}
+                          onClick={() => setMobileOpen(false)}
                           className="group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
                         >
                           <span className="flex items-center gap-3">
@@ -681,6 +684,7 @@ export default function Layout() {
                           <Link
                             key={label}
                             to={to}
+                            onClick={() => setMobileOpen(false)}
                             className={`group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950 ${tone}`}
                           >
                             <span className="flex items-center gap-3">
@@ -701,6 +705,7 @@ export default function Layout() {
                       <>
                         <Link
                           to="/dashboard"
+                          onClick={() => setMobileOpen(false)}
                           className="group flex min-h-[48px] items-center justify-between rounded-xl bg-gradient-to-r from-neon-purple to-neon-blue px-4 py-3 text-sm font-black text-white shadow-sm shadow-neon-purple/15 transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
                         >
                           <span className="flex items-center gap-3">
@@ -725,6 +730,7 @@ export default function Layout() {
 
                     <Link
                       to="/admin"
+                      onClick={() => setMobileOpen(false)}
                       className="group flex min-h-[48px] items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
                     >
                       <span className="flex items-center gap-3">
