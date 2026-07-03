@@ -172,6 +172,71 @@
 			],
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "build-project-cmd-api-docs-audit",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "build-project-cmd-copilot-object-fix",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "build-project-cmd-copilot-object-fix-v2",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "build-project-cmd-copilot-live-check-fix",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "build-project-cmd-copilot-availability-fix",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }

@@ -108,7 +108,7 @@ function extractTextFromArray(payload: unknown[]): string | null {
 }
 
 function extractTextFromObject(payload: Record<string, unknown>): string | null {
-  const directKeys = ['answer', 'message', 'content', 'response', 'text', 'result'];
+  const directKeys = ['answer', 'reply', 'message', 'content', 'response', 'text', 'result', 'value', 'output_text', 'delta'];
 
   for (const key of directKeys) {
     const direct = normalizeText(payload[key]);
@@ -147,6 +147,54 @@ function extractTextFromObject(payload: Record<string, unknown>): string | null 
     if (arrayContent) return arrayContent;
   }
 
+  if (Array.isArray(payload.choices)) {
+    for (const choice of payload.choices) {
+      if (!choice || typeof choice !== 'object' || Array.isArray(choice)) continue;
+
+      const choiceObj = choice as Record<string, unknown>;
+      const directChoiceText = normalizeText(choiceObj.text);
+      if (directChoiceText) return directChoiceText;
+
+      const choiceMessage = choiceObj.message;
+      if (choiceMessage && typeof choiceMessage === 'object' && !Array.isArray(choiceMessage)) {
+        const nestedChoiceMessage = extractTextFromObject(choiceMessage as Record<string, unknown>);
+        if (nestedChoiceMessage) return nestedChoiceMessage;
+      }
+
+      if (Array.isArray(choiceObj.content)) {
+        const choiceArrayContent = extractTextFromArray(choiceObj.content);
+        if (choiceArrayContent) return choiceArrayContent;
+      }
+    }
+  }
+
+  const deepFallback = findFirstReadableText(payload);
+  if (deepFallback) return deepFallback;
+
+  return null;
+}
+
+function findFirstReadableText(value: unknown, depth = 0): string | null {
+  if (depth > 6 || value == null) return null;
+
+  const direct = normalizeText(value);
+  if (direct) return direct;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const nested = findFirstReadableText(item, depth + 1);
+      if (nested) return nested;
+    }
+    return null;
+  }
+
+  if (typeof value === 'object') {
+    for (const nestedValue of Object.values(value as Record<string, unknown>)) {
+      const nested = findFirstReadableText(nestedValue, depth + 1);
+      if (nested) return nested;
+    }
+  }
+
   return null;
 }
 
@@ -172,19 +220,22 @@ async function extractInvokeError(error: unknown): Promise<string> {
   if (!(error instanceof Error)) return fallback;
 
   const response = 'context' in error ? (error as Error & { context?: unknown }).context : undefined;
-  if (!(response instanceof Response)) return error.message || fallback;
+  if (!(response instanceof Response)) {
+    return normalizeText(error.message) ?? fallback;
+  }
 
   try {
     const rawText = await response.clone().text();
-    if (!rawText) return error.message || fallback;
+    if (!rawText) return normalizeText(error.message) ?? fallback;
 
     try {
-      return getFunctionErrorMessage(JSON.parse(rawText), error.message || fallback);
+      const parsedMessage = getFunctionErrorMessage(JSON.parse(rawText), normalizeText(error.message) ?? fallback);
+      return normalizeText(parsedMessage) ?? fallback;
     } catch {
-      return rawText.trim() || error.message || fallback;
+      return normalizeText(rawText) ?? normalizeText(error.message) ?? fallback;
     }
   } catch {
-    return error.message || fallback;
+    return normalizeText(error.message) ?? fallback;
   }
 }
 
@@ -378,16 +429,17 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
       }]);
     } catch (invokeError) {
       const userMessage = await extractInvokeError(invokeError);
+      const safeUserMessage = ensureAssistantMessage(userMessage);
       logCopilot('error', 'Response error', {
         functionName: FUNCTION_NAME,
         error: invokeError,
-        userMessage,
+        userMessage: safeUserMessage,
       });
-      setError(userMessage);
+      setError(safeUserMessage);
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: String(userMessage || UNREADABLE_RESPONSE_MESSAGE),
+        content: safeUserMessage,
       }]);
     } finally {
       setLoading(false);

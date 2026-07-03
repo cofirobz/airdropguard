@@ -47,6 +47,66 @@ type CompactAirdrop = {
   tasks: string[];
 };
 
+type AirdropRow = Record<string, unknown>;
+
+function buildFallbackAnswer(message: string, rows: CompactAirdrop[]): string {
+  const top = rows.slice(0, 3);
+
+  const shortlist = top.length > 0
+    ? top
+        .map((item, index) => {
+          const trust = item.trust_score ?? "Unknown";
+          const risk = item.risk_level ?? "Unknown";
+          const time = item.time_required ?? "Unknown";
+          return `${index + 1}. ${item.name} (Trust: ${trust}, Risk: ${risk}, Time: ${time})`;
+        })
+        .join("\n")
+    : "1. No published airdrops are available in the current dataset.";
+
+  return [
+    "I can still help right now, but live AI generation is temporarily unavailable.",
+    "",
+    `You asked: ${message}`,
+    "",
+    "Best available shortlist from current AirdropGuard data:",
+    shortlist,
+    "",
+    "Next step: review the first item, check task effort, and prioritize lower-risk opportunities first.",
+    "",
+    "AirdropGuard provides educational analysis only, not financial advice. Never share your seed phrase or connect your wallet to unknown sites.",
+  ].join("\n");
+}
+
+async function fetchAirdropsForCopilot(supabase: ReturnType<typeof createClient>) {
+  const selectFields = "name, slug, category, blockchain, trust_score, opportunity_score, risk_level, difficulty, time_required, estimated_reward, funding_info, investors, team_info, docs_url, github_url, expiry_date, status, ai_summary, listing_state, airdrop_tasks(title, sort_order)";
+
+  const withReviewStatus = await supabase
+    .from("airdrops")
+    .select(selectFields)
+    .eq("published", true)
+    .eq("is_demo", false)
+    .not("review_status", "eq", "replaced_demo")
+    .order("sort_order", { ascending: true });
+
+  if (!withReviewStatus.error) {
+    return withReviewStatus;
+  }
+
+  const reviewStatusMissing = withReviewStatus.error.message.toLowerCase().includes("review_status")
+    || withReviewStatus.error.message.toLowerCase().includes("column");
+
+  if (!reviewStatusMissing) {
+    return withReviewStatus;
+  }
+
+  return await supabase
+    .from("airdrops")
+    .select(selectFields)
+    .eq("published", true)
+    .eq("is_demo", false)
+    .order("sort_order", { ascending: true });
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -168,13 +228,7 @@ Deno.serve(async (req: Request) => {
     const userId = authData.user.id;
 
     const [airdropsRes, preferencesRes] = await Promise.all([
-      supabase
-        .from("airdrops")
-        .select("name, slug, category, blockchain, trust_score, opportunity_score, risk_level, difficulty, time_required, estimated_reward, funding_info, investors, team_info, docs_url, github_url, expiry_date, status, ai_summary, listing_state, airdrop_tasks(title, sort_order)")
-        .eq("published", true)
-        .eq("is_demo", false)
-        .not("review_status", "eq", "replaced_demo")
-        .order("sort_order", { ascending: true }),
+      fetchAirdropsForCopilot(supabase),
       supabase
         .from("user_preferences")
         .select("user_id, experience_level, daily_time_available, preferred_chains, risk_tolerance")
@@ -185,7 +239,7 @@ Deno.serve(async (req: Request) => {
     if (airdropsRes.error) throw airdropsRes.error;
     if (preferencesRes.error) throw preferencesRes.error;
 
-    const allAirdrops = (airdropsRes.data ?? []) as Record<string, unknown>[];
+    const allAirdrops = (airdropsRes.data ?? []) as AirdropRow[];
     const relevantSlugs = detectRelevantAirdrops(message, allAirdrops.map(row => ({
       name: safeString(row.name),
       slug: safeString(row.slug),
@@ -221,12 +275,24 @@ Deno.serve(async (req: Request) => {
       JSON.stringify(compactRows),
     ].join("\n");
 
-    const answer = await callOpenAI(prompt);
+    let answer: string;
+    let degraded = false;
+
+    try {
+      const liveAnswer = await callOpenAI(prompt);
+      answer = liveAnswer || buildFallbackAnswer(message, compactRows);
+      degraded = !liveAnswer;
+    } catch (openAiError) {
+      degraded = true;
+      console.warn("[airdrop-copilot] Falling back because live AI call failed", openAiError);
+      answer = buildFallbackAnswer(message, compactRows);
+    }
 
     return json({
       answer,
       used_preferences: Boolean(preferences),
       airdrop_count: compactRows.length,
+      degraded,
     });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : String(error) }, 500);
