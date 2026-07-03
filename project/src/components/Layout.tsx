@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type React from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
@@ -21,9 +21,14 @@ import {
   ChevronRight,
   ChevronDown,
   AlertTriangle,
+  Sparkles,
+  Star,
+  UserCircle2,
 } from "lucide-react";
 import AppShell, { isAuthenticatedAppPath } from "./AppShell";
 import { useAuth } from "../contexts/AuthContext";
+
+const PUBLIC_MENU_GROUPS_STORAGE_KEY = "ag_public_mobile_menu_groups_v1";
 
 declare function gtag(...args: unknown[]): void;
 
@@ -72,6 +77,78 @@ function buildCopilotRouteContext(pathname: string, search: string) {
   }
 
   return null;
+}
+
+function buildRouteHeaderContent(pathname: string, search: string) {
+  if (pathname.startsWith('/dashboard')) {
+    return {
+      eyebrow: 'AirdropGuard AI',
+      title: 'Mission Control',
+      subtitle: 'Live mission execution, trust signals and AI guidance.',
+    };
+  }
+
+  if (pathname === '/' && search === '?filter=trending') {
+    return {
+      eyebrow: 'Discover',
+      title: 'Trending Opportunities',
+      subtitle: 'Momentum, trust and timing in one view.',
+    };
+  }
+
+  if (pathname === '/') {
+    return {
+      eyebrow: 'Discover',
+      title: 'Discover the Safest Opportunities',
+      subtitle: 'AI-ranked airdrops with trust-first signals.',
+    };
+  }
+
+  if (pathname.startsWith('/airdrop/')) {
+    return {
+      eyebrow: 'Intelligence',
+      title: 'Airdrop Intelligence Report',
+      subtitle: 'Review trust, effort and action steps quickly.',
+    };
+  }
+
+  if (pathname === '/wallet-checker') {
+    return {
+      eyebrow: 'Tools',
+      title: 'Wallet Health Report',
+      subtitle: 'Read-only safety checks before you connect.',
+    };
+  }
+
+  if (pathname === '/learn' || pathname === '/articles' || pathname.startsWith('/articles/')) {
+    return {
+      eyebrow: 'Learn',
+      title: 'Grow Your Web3 Knowledge',
+      subtitle: 'Research, tactics and safer decision frameworks.',
+    };
+  }
+
+  if (pathname === '/scam-alerts') {
+    return {
+      eyebrow: 'Alerts',
+      title: 'Opportunity Alerts',
+      subtitle: 'Spot threats and protect your next move.',
+    };
+  }
+
+  if (pathname === '/api-docs' || pathname === '/pricing' || pathname === '/api-pricing') {
+    return {
+      eyebrow: 'Developer',
+      title: 'Developer Mission Control',
+      subtitle: 'API access, docs and integration guidance.',
+    };
+  }
+
+  return {
+    eyebrow: 'AirdropGuard',
+    title: 'AI Operating System',
+    subtitle: 'Safer Web3 decisions with AI and human review.',
+  };
 }
 
 const primaryNavItems = [
@@ -325,36 +402,37 @@ function NavLink({
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [navHidden, setNavHidden] = useState(false);
+  const [mobileMenuGroups, setMobileMenuGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') {
+      return { discover: true, tools: false, account: true };
+    }
+
+    try {
+      const raw = window.localStorage.getItem(PUBLIC_MENU_GROUPS_STORAGE_KEY);
+      if (!raw) return { discover: true, tools: false, account: true };
+      return { discover: true, tools: false, account: true, ...(JSON.parse(raw) as Record<string, boolean>) };
+    } catch {
+      return { discover: true, tools: false, account: true };
+    }
+  });
+  const lastScrollYRef = useRef(0);
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
   const { user, signOut } = useAuth();
   const isAppRoute = Boolean(user) && !isAdmin && isAuthenticatedAppPath(location.pathname);
   const routeCopilotContext = buildCopilotRouteContext(location.pathname, location.search);
-  const routeTitle = (() => {
-    if (location.pathname.startsWith('/dashboard')) return 'Mission Control';
-    if (location.pathname === '/' && location.search === '?filter=trending') return 'Trending';
-    if (location.pathname === '/') return 'Browse';
-    if (location.pathname.startsWith('/airdrop/')) return 'Airdrop Report';
-    if (location.pathname === '/wallet-checker') return 'Wallet Intelligence';
-    if (location.pathname === '/scam-alerts') return 'Alerts';
-    if (location.pathname === '/api-docs' || location.pathname === '/pricing' || location.pathname === '/api-pricing') return 'API Access';
-    return 'AirdropGuard App';
-  })();
-  const routeSubtitle = (() => {
-    if (location.pathname.startsWith('/dashboard')) return 'AI operating system for airdrops, trust signals and live mission execution.';
-    if (location.pathname === '/') return 'Browse live opportunities with a consistent app layout.';
-    if (location.pathname.startsWith('/airdrop/')) return 'Review project context, trust and action steps without leaving the shell.';
-    if (location.pathname === '/wallet-checker') return 'Run read-only wallet intelligence inside the shared app workspace.';
-    if (location.pathname === '/scam-alerts') return 'Track safety warnings and blacklisted projects in the same app frame.';
-    if (location.pathname === '/api-docs' || location.pathname === '/pricing' || location.pathname === '/api-pricing') return 'Manage API access and pricing from the authenticated workspace.';
-    return 'A shared authenticated shell for future AirdropGuard SaaS workflows.';
-  })();
+  const routeHeader = buildRouteHeaderContent(location.pathname, location.search);
+  const routeTitle = routeHeader.title;
+  const routeSubtitle = routeHeader.subtitle;
 
   usePageTracking();
 
   useEffect(() => {
     setMobileOpen(false);
     setMoreOpen(false);
+    setNavHidden(false);
+    lastScrollYRef.current = 0;
   }, [location.pathname, location.search]);
 
   useEffect(() => {
@@ -363,6 +441,77 @@ export default function Layout() {
       document.body.style.overflow = "";
     };
   }, [mobileOpen]);
+
+  useEffect(() => {
+    if (mobileOpen) {
+      setNavHidden(false);
+      return;
+    }
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const delta = currentScrollY - lastScrollYRef.current;
+
+      if (currentScrollY <= 24) {
+        setNavHidden(false);
+      } else if (delta > 8 && currentScrollY > 96) {
+        setNavHidden(true);
+      } else if (delta < -8) {
+        setNavHidden(false);
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    lastScrollYRef.current = window.scrollY;
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(PUBLIC_MENU_GROUPS_STORAGE_KEY, JSON.stringify(mobileMenuGroups));
+  }, [mobileMenuGroups]);
+
+  const toggleMobileGroup = (group: string) => {
+    setMobileMenuGroups((prev) => ({ ...prev, [group]: !prev[group] }));
+  };
+
+  const publicMenuSections = [
+    {
+      key: 'discover',
+      title: 'Discover',
+      items: [
+        { to: '/', label: 'Browse Airdrops', icon: Home },
+        { to: '/?filter=trending', label: 'Trending', icon: Flame },
+        { to: '/learn', label: 'Learn', icon: BookOpen },
+      ],
+    },
+    {
+      key: 'tools',
+      title: 'Tools',
+      items: [
+        { to: '/wallet-checker', label: 'Wallet Intelligence', icon: Wallet },
+        { to: user ? '/dashboard' : '/auth', label: 'AI Copilot', icon: Bot },
+        { to: '/scam-alerts', label: 'Alerts', icon: AlertTriangle },
+        { to: '/pricing', label: 'API', icon: Key },
+      ],
+    },
+    {
+      key: 'account',
+      title: 'Account',
+      items: user
+        ? [
+            { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+            { to: '/dashboard?view=overview', label: 'Watchlist', icon: Star },
+            { to: '/dashboard?view=profile', label: 'Profile', icon: UserCircle2 },
+            { to: '/dashboard?view=profile', label: 'Settings', icon: Shield },
+          ]
+        : [
+            { to: '/auth', label: 'Sign In', icon: LogIn },
+          ],
+    },
+  ];
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-dark-950 text-white">
@@ -388,8 +537,7 @@ export default function Layout() {
         </AppShell>
       ) : (
         <>
-
-      <nav className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-dark-950/98 supports-[backdrop-filter]:bg-dark-950/95">
+      <nav className={`fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-dark-950/98 supports-[backdrop-filter]:bg-dark-950/95 transition-transform duration-300 ease-out ${navHidden ? '-translate-y-full' : 'translate-y-0'}`}>
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
           <div className="flex h-20 items-center justify-between gap-4">
             <Link
@@ -406,7 +554,7 @@ export default function Layout() {
                   height={44}
                   loading="eager"
                   decoding="async"
-                  className="h-11 w-11 shrink-0 rounded-2xl object-cover shadow-sm shadow-neon-purple/20 transition-shadow group-hover:shadow-neon-purple/45"
+                  className="h-11 w-11 shrink-0 rounded-2xl object-cover shadow-sm shadow-neon-purple/20 transition-transform transition-shadow duration-300 group-hover:scale-[1.03] group-hover:shadow-neon-purple/45"
                 />
               </picture>
 
@@ -419,6 +567,14 @@ export default function Layout() {
                 </span>
               </div>
             </Link>
+
+            <div className="hidden min-w-0 flex-1 xl:flex xl:items-center xl:justify-start xl:px-4">
+              <div className="max-w-[280px] rounded-2xl border border-cyan-400/15 bg-cyan-500/[0.05] px-4 py-2 shadow-[0_0_24px_rgba(34,211,238,0.08)]">
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">{routeHeader.eyebrow}</p>
+                <p className="truncate text-sm font-semibold text-white">{routeHeader.title}</p>
+                <p className="truncate text-[11px] text-gray-400">{routeHeader.subtitle}</p>
+              </div>
+            </div>
 
             <div className="hidden flex-1 items-center justify-center lg:flex">
               <div className="flex items-center gap-1 rounded-3xl border border-white/10 bg-white/[0.035] p-1 shadow-sm shadow-black/10">
@@ -522,7 +678,7 @@ export default function Layout() {
                   className="flex min-h-[46px] items-center gap-1.5 rounded-2xl border border-neon-purple/30 bg-gradient-to-r from-neon-purple to-neon-blue px-4 py-2 text-sm font-black text-white shadow-sm shadow-neon-purple/20 transition-colors hover:opacity-95"
                 >
                   <LayoutDashboard className="h-3.5 w-3.5" />
-                  Dashboard
+                  Mission Control
                 </Link>
               ) : (
                 <Link
@@ -582,159 +738,103 @@ export default function Layout() {
 
             <div
               id="mobile-menu"
-              className="fixed left-3 right-3 top-24 z-50 overflow-hidden rounded-3xl border border-white/10 bg-dark-950 shadow-xl shadow-black/70 lg:hidden animate-slide-up"
+              className="fixed left-3 right-3 top-24 z-50 overflow-hidden rounded-[32px] border border-cyan-400/18 bg-[linear-gradient(160deg,rgba(6,14,30,0.98),rgba(8,20,42,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.72),0_0_34px_rgba(34,211,238,0.12)] lg:hidden animate-slide-up"
             >
-              <div className="border-b border-white/10 bg-gradient-to-r from-neon-purple/10 via-white/[0.03] to-sky-500/10 px-4 py-4">
+              <div className="border-b border-cyan-400/12 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_28%),linear-gradient(135deg,rgba(14,165,233,0.12),rgba(15,23,42,0.96))] px-5 py-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-black uppercase tracking-wider text-neon-purple">
-                      Full Site Menu
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">
+                      {routeHeader.eyebrow}
                     </p>
-                    <p className="mt-1 text-xs leading-relaxed text-gray-300">
-                      Navigate AirdropGuard quickly from one place.
+                    <p className="mt-1 text-base font-black text-white">
+                      {routeHeader.title}
+                    </p>
+                    <p className="mt-1 max-w-[240px] text-xs leading-relaxed text-gray-300">
+                      {routeHeader.subtitle}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-right">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                      Safety first
+                  <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-right shadow-[0_0_18px_rgba(34,211,238,0.12)]">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-200">
+                      AI online
                     </p>
-                    <p className="text-[10px] text-gray-300">No seed phrases</p>
+                    <p className="text-[10px] text-gray-300">Updated just now</p>
                   </div>
                 </div>
               </div>
 
-              <div className="max-h-[calc(100dvh-8rem)] overflow-y-auto px-3 py-3 pb-28">
+              <div className="max-h-[calc(100dvh-8rem)] overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(7rem+env(safe-area-inset-bottom))]" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <div className="space-y-4">
-                  <div>
-                    <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                      Explore
-                    </p>
-                    <div className="grid gap-1">
-                      {primaryNavItems.map(({ to, label, icon: Icon }) => (
-                        <Link
-                          key={label}
-                          to={to}
-                          onClick={() => setMobileOpen(false)}
-                          className="group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
-                        >
-                          <span className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-gray-300">
-                              <Icon className="h-4 w-4" />
-                            </span>
-                            {label}
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-gray-300" />
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-
-                  {!user && (
-                    <div>
-                      <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                        Account
-                      </p>
-                      <Link
-                        to="/auth"
-                        onClick={() => setMobileOpen(false)}
-                        className="group flex min-h-[48px] items-center justify-between rounded-2xl border border-sky-400/25 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-sky-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
-                      >
-                        <span className="flex items-center gap-3">
-                          <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-400/25 bg-white/[0.04] text-sky-200">
-                            <LogIn className="h-4 w-4" />
-                          </span>
-                          Sign In / Create Account
-                        </span>
-                        <ChevronRight className="h-4 w-4 text-gray-300" />
-                      </Link>
-                    </div>
-                  )}
-
-                  <div>
-                    <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                      Research & Education
-                    </p>
-                    <div className="grid gap-1">
-                      {researchNavItems.map(({ to, label, icon: Icon }) => (
-                        <Link
-                          key={label}
-                          to={to}
-                          onClick={() => setMobileOpen(false)}
-                          className="group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
-                        >
-                          <span className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-gray-300">
-                              <Icon className="h-4 w-4" />
-                            </span>
-                            {label}
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-gray-300" />
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
-                      Projects & Developers
-                    </p>
-                    <div className="grid gap-1">
-                      {projectNavItems.map(
-                        ({ to, label, icon: Icon, tone }) => (
-                          <Link
-                            key={label}
-                            to={to}
-                            onClick={() => setMobileOpen(false)}
-                            className={`group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950 ${tone}`}
-                          >
-                            <span className="flex items-center gap-3">
-                              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
-                                <Icon className="h-4 w-4" />
-                              </span>
-                              {label}
-                            </span>
-                            <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-gray-300" />
-                          </Link>
-                        ),
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-2">
-                    {user ? (
-                      <>
-                        <Link
-                          to="/dashboard"
-                          onClick={() => setMobileOpen(false)}
-                          className="group flex min-h-[48px] items-center justify-between rounded-xl bg-gradient-to-r from-neon-purple to-neon-blue px-4 py-3 text-sm font-black text-white shadow-sm shadow-neon-purple/15 transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
-                        >
-                          <span className="flex items-center gap-3">
-                            <LayoutDashboard className="h-4 w-4" />
-                            Dashboard
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-gray-400" />
-                        </Link>
+                  {publicMenuSections.map((section) => {
+                    const open = mobileMenuGroups[section.key];
+                    return (
+                      <div key={section.key} className="rounded-[26px] border border-white/10 bg-white/[0.03] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
                         <button
                           type="button"
-                          onClick={() => {
-                            setMobileOpen(false);
-                            signOut();
-                          }}
-                          className="flex min-h-[48px] w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-semibold text-gray-300 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
+                          onClick={() => toggleMobileGroup(section.key)}
+                          className="flex min-h-[56px] w-full items-center justify-between rounded-2xl px-3 py-3 text-left"
                         >
-                          <LogIn className="h-4 w-4" />
-                          Sign Out
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">{section.title}</p>
+                            <p className="mt-1 text-xs text-gray-400">{section.items.length} item{section.items.length === 1 ? '' : 's'}</p>
+                          </div>
+                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-gray-200">
+                            <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+                          </span>
                         </button>
-                      </>
-                    ) : null}
 
+                        {open && (
+                          <div className="grid gap-1 px-1 pb-1">
+                            {section.items.map(({ to, label, icon: Icon }) => (
+                              <Link
+                                key={label}
+                                to={to}
+                                onClick={() => setMobileOpen(false)}
+                                className="group flex min-h-[58px] items-center justify-between rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-sm font-semibold text-gray-100 transition-all hover:border-cyan-400/20 hover:bg-white/[0.08] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
+                              >
+                                <span className="flex items-center gap-3">
+                                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-gray-300 shadow-[0_8px_20px_rgba(0,0,0,0.18)] transition-transform duration-200 group-hover:scale-[1.03] group-hover:text-cyan-200">
+                                    <Icon className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" />
+                                  </span>
+                                  {label}
+                                </span>
+                                <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-200" />
+                              </Link>
+                            ))}
+
+                            {section.key === 'account' && user && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMobileOpen(false);
+                                  signOut();
+                                }}
+                                className="group flex min-h-[58px] w-full items-center justify-between rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-left text-sm font-semibold text-rose-300 transition-all hover:border-rose-500/20 hover:bg-rose-500/10 hover:text-white active:scale-[0.99]"
+                              >
+                                <span className="flex items-center gap-3">
+                                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-500/15 bg-rose-500/[0.08] text-rose-300">
+                                    <LogIn className="h-4 w-4" />
+                                  </span>
+                                  Sign Out
+                                </span>
+                                <ChevronRight className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-2">
                     <Link
                       to="/admin"
                       onClick={() => setMobileOpen(false)}
-                      className="group flex min-h-[48px] items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
+                      className="group flex min-h-[58px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
                     >
                       <span className="flex items-center gap-3">
-                        <Shield className="h-4 w-4" />
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+                          <Shield className="h-4 w-4" />
+                        </span>
                         Admin
                       </span>
                       <ChevronRight className="h-4 w-4 text-gray-400" />

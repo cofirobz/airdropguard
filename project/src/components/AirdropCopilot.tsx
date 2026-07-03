@@ -74,7 +74,7 @@ function getFunctionErrorMessage(payload: unknown, fallback: string): string {
 
 function logCopilot(level: 'info' | 'error', message: string, details?: unknown) {
   if (!import.meta.env.DEV) return;
-  const logger = level === 'error' ? console.error : console.info;
+  const logger = level === 'error' ? console.warn : console.info;
   logger(`[AirdropCopilot] ${message}`, details);
 }
 
@@ -82,6 +82,29 @@ function normalizeText(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed && trimmed !== '[object Object]' ? trimmed : null;
+}
+
+function extractTextFromArray(payload: unknown[]): string | null {
+  const joined = payload
+    .map((item) => {
+      const direct = normalizeText(item);
+      if (direct) return direct;
+
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        return extractTextFromObject(item as Record<string, unknown>) ?? '';
+      }
+
+      if (Array.isArray(item)) {
+        return extractTextFromArray(item) ?? '';
+      }
+
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+
+  return joined && joined !== '[object Object]' ? joined : null;
 }
 
 function extractTextFromObject(payload: Record<string, unknown>): string | null {
@@ -120,19 +143,8 @@ function extractTextFromObject(payload: Record<string, unknown>): string | null 
   }
 
   if (Array.isArray(payload.content)) {
-    const joined = payload.content
-      .map(item => {
-        if (typeof item === 'string') return item.trim();
-        if (item && typeof item === 'object') {
-          return normalizeText((item as Record<string, unknown>).text) ?? normalizeText((item as Record<string, unknown>).content) ?? '';
-        }
-        return '';
-      })
-      .filter(Boolean)
-      .join('\n\n')
-      .trim();
-
-    if (joined && joined !== '[object Object]') return joined;
+    const arrayContent = extractTextFromArray(payload.content);
+    if (arrayContent) return arrayContent;
   }
 
   return null;
@@ -142,8 +154,16 @@ function extractAssistantText(payload: unknown): string | null {
   const direct = normalizeText(payload);
   if (direct) return direct;
 
+  if (Array.isArray(payload)) {
+    return extractTextFromArray(payload);
+  }
+
   if (!payload || typeof payload !== 'object') return null;
   return extractTextFromObject(payload as Record<string, unknown>);
+}
+
+function ensureAssistantMessage(payload: unknown): string {
+  return extractAssistantText(payload) ?? UNREADABLE_RESPONSE_MESSAGE;
 }
 
 async function extractInvokeError(error: unknown): Promise<string> {
@@ -349,8 +369,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
         throw response.error;
       }
 
-      const answer = extractAssistantText(response.data)
-        ?? UNREADABLE_RESPONSE_MESSAGE;
+      const answer = ensureAssistantMessage(response.data);
 
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
@@ -441,7 +460,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
         <div className="space-y-4">
           {messages.map((message, index) => {
-            const isWelcome = index === 0 && message.role === 'assistant' && message.content === WELCOME_MESSAGE;
+            const isWelcome = index === 0 && message.role === 'assistant' && message.content.startsWith(WELCOME_MESSAGE);
             return (
               <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`flex max-w-[88%] items-start gap-2 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>

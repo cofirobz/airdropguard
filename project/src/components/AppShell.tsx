@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
   Activity,
+  BookOpen,
   ChevronRight,
   Flame,
   Home,
@@ -80,6 +81,7 @@ type FloatingAiPosition = {
 };
 
 const FLOATING_AI_STORAGE_KEY = 'ag_desktop_ai_position_v1';
+const APP_MOBILE_MENU_GROUPS_STORAGE_KEY = 'ag_app_mobile_menu_groups_v1';
 const FLOATING_AI_WIDTH = 170;
 const FLOATING_AI_HEIGHT = 56;
 const FLOATING_AI_MARGIN = 32;
@@ -393,6 +395,19 @@ export default function AppShell({
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [headerHidden, setHeaderHidden] = useState(false);
+  const [mobileMenuGroups, setMobileMenuGroups] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') {
+      return { discover: true, tools: false, account: true };
+    }
+
+    try {
+      const raw = window.localStorage.getItem(APP_MOBILE_MENU_GROUPS_STORAGE_KEY);
+      if (!raw) return { discover: true, tools: false, account: true };
+      return { discover: true, tools: false, account: true, ...(JSON.parse(raw) as Record<string, boolean>) };
+    } catch {
+      return { discover: true, tools: false, account: true };
+    }
+  });
   const [pageCopilotContext, setPageCopilotContext] = useState<string | null>(null);
   const [heroHints, setHeroHints] = useState<HeroHints>({});
   const [statusTick, setStatusTick] = useState(0);
@@ -452,6 +467,41 @@ export default function AppShell({
         'WALLET READY',
       ]
     : [];
+  const mobileNavHidden = headerHidden && !mobileMenuOpen && !aiDrawerOpen;
+  const toggleMobileGroup = (group: string) => {
+    setMobileMenuGroups((prev) => ({ ...prev, [group]: !prev[group] }));
+  };
+  const appMobileMenuSections = [
+    {
+      key: 'discover',
+      title: 'Discover',
+      items: [
+        { to: '/', label: 'Browse Airdrops', icon: Home },
+        { to: '/?filter=trending', label: 'Trending', icon: Flame },
+        { to: '/learn', label: 'Learn', icon: BookOpen },
+      ],
+    },
+    {
+      key: 'tools',
+      title: 'Tools',
+      items: [
+        { to: '/wallet-checker', label: 'Wallet Intelligence', icon: Wallet },
+        { to: '__copilot__', label: 'AI Copilot', icon: Sparkles },
+        { to: '/scam-alerts', label: 'Alerts', icon: AlertTriangle },
+        { to: '/pricing', label: 'API', icon: Key },
+      ],
+    },
+    {
+      key: 'account',
+      title: 'Account',
+      items: [
+        { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { to: '/dashboard?view=overview', label: 'Watchlist', icon: Star },
+        { to: '/dashboard?view=profile', label: 'Profile', icon: UserCircle2 },
+        { to: '/dashboard?view=profile', label: 'Settings', icon: Shield },
+      ],
+    },
+  ];
 
   useEffect(() => {
     setPageCopilotContext(null);
@@ -460,6 +510,11 @@ export default function AppShell({
     setHeaderHidden(false);
     lastScrollYRef.current = 0;
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(APP_MOBILE_MENU_GROUPS_STORAGE_KEY, JSON.stringify(mobileMenuGroups));
+  }, [mobileMenuGroups]);
 
   useEffect(() => {
     const shouldLockScroll = (mobileMenuOpen || aiDrawerOpen) && window.matchMedia('(max-width: 1023px)').matches;
@@ -813,15 +868,15 @@ export default function AppShell({
         </div>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-cyan-400/20 bg-[linear-gradient(180deg,rgba(3,10,24,0.95),rgba(2,8,18,0.98))] px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+      <div className={`fixed bottom-0 left-0 right-0 z-30 border-t border-cyan-400/20 bg-[linear-gradient(180deg,rgba(3,10,24,0.95),rgba(2,8,18,0.98))] px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl transition-transform duration-[250ms] ease-out lg:hidden ${mobileNavHidden ? 'translate-y-full' : 'translate-y-0'}`}>
+        <div className="mx-auto grid max-w-md grid-cols-[1fr_1fr_auto_1fr_1fr] items-end gap-1.5">
           {mobileItems.slice(0, 2).map((item) => {
             const Icon = item.icon;
             return (
               <Link
                 key={item.label}
                 to={item.to}
-                className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-[10px] font-semibold transition-colors ${item.active ? 'border-cyan-400/35 bg-cyan-500/15 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.2)]' : 'border-transparent text-gray-400'}`}
+                className={`flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-2xl border px-1 py-2 text-[10px] font-semibold transition-all duration-200 active:scale-[0.98] ${item.active ? 'border-cyan-400/35 bg-cyan-500/15 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.2)]' : 'border-transparent text-gray-400 hover:text-white'}`}
               >
                 <Icon className="h-4 w-4" />
                 {item.label}
@@ -832,7 +887,7 @@ export default function AppShell({
           <button
             type="button"
             onClick={() => setAiDrawerOpen(true)}
-            className="-mt-8 inline-flex h-[76px] w-[76px] flex-col items-center justify-center self-center rounded-full border border-cyan-200/85 bg-[radial-gradient(circle_at_30%_30%,#67e8f9,transparent_42%),linear-gradient(145deg,#06b6d4,#2563eb_55%,#0b1225)] text-white shadow-[0_0_0_10px_rgba(34,211,238,0.2),0_22px_40px_rgba(14,165,233,0.45),0_0_30px_rgba(6,182,212,0.22)] transition-all duration-200 hover:scale-105"
+            className="-mt-8 inline-flex h-[78px] w-[78px] flex-col items-center justify-center self-center justify-self-center rounded-full border border-cyan-200/85 bg-[radial-gradient(circle_at_30%_30%,#67e8f9,transparent_42%),linear-gradient(145deg,#06b6d4,#2563eb_55%,#0b1225)] text-white shadow-[0_0_0_10px_rgba(34,211,238,0.2),0_22px_40px_rgba(14,165,233,0.45),0_0_30px_rgba(6,182,212,0.22)] transition-all duration-200 active:scale-[0.97] hover:scale-105"
             aria-label="Open AI Copilot"
           >
             <AiOrb className="h-6 w-6" />
@@ -841,7 +896,7 @@ export default function AppShell({
 
           <Link
             to="/scam-alerts"
-            className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-[10px] font-semibold transition-colors ${location.pathname === '/scam-alerts' ? 'border-cyan-400/35 bg-cyan-500/15 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.2)]' : 'border-transparent text-gray-400'}`}
+            className={`flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-2xl border px-1 py-2 text-[10px] font-semibold transition-all duration-200 active:scale-[0.98] ${location.pathname === '/scam-alerts' ? 'border-cyan-400/35 bg-cyan-500/15 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.2)]' : 'border-transparent text-gray-400 hover:text-white'}`}
           >
             <AlertTriangle className="h-4 w-4" />
             Alerts
@@ -850,7 +905,7 @@ export default function AppShell({
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
-            className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-[10px] font-semibold transition-colors ${mobileMenuOpen ? 'border-cyan-400/35 bg-cyan-500/15 text-cyan-100' : 'border-transparent text-gray-400'}`}
+            className={`flex min-h-[48px] flex-col items-center justify-center gap-1 rounded-2xl border px-1 py-2 text-[10px] font-semibold transition-all duration-200 active:scale-[0.98] ${mobileMenuOpen ? 'border-cyan-400/35 bg-cyan-500/15 text-cyan-100' : 'border-transparent text-gray-400 hover:text-white'}`}
           >
             <UserCircle2 className="h-4 w-4" />
             More
@@ -867,11 +922,12 @@ export default function AppShell({
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
           />
 
-          <aside className="absolute inset-x-3 top-16 bottom-16 overflow-hidden rounded-[28px] border border-white/10 bg-[#070b18]/98 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
-            <div className="flex items-center justify-between border-b border-white/10 bg-[linear-gradient(135deg,rgba(14,165,233,0.12),rgba(15,23,42,0.95))] px-4 py-4">
+          <aside className="absolute inset-x-3 top-16 bottom-16 overflow-hidden rounded-[30px] border border-cyan-400/14 bg-[linear-gradient(160deg,rgba(5,12,28,0.99),rgba(7,18,38,0.98))] shadow-[0_24px_70px_rgba(0,0,0,0.52),0_0_30px_rgba(34,211,238,0.12)] animate-slide-up">
+            <div className="flex items-center justify-between border-b border-cyan-400/12 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_28%),linear-gradient(135deg,rgba(14,165,233,0.12),rgba(15,23,42,0.95))] px-5 py-5">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">AirdropGuard AI</div>
                 <div className="mt-1 text-sm font-black text-white">Mission Menu</div>
+                <div className="mt-1 text-xs text-gray-400">Command surfaces, tools and account controls.</div>
               </div>
               <button
                 type="button"
@@ -882,98 +938,93 @@ export default function AppShell({
               </button>
             </div>
 
-            <div className="max-h-full overflow-y-auto px-3 py-3 pb-28">
+            <div className="max-h-full overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(7rem+env(safe-area-inset-bottom))]" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="space-y-4">
-                <div>
-                  <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Primary</p>
-                  <div className="grid gap-1">
-                    {[
-                      { to: '/dashboard', label: 'Mission Control', icon: LayoutDashboard },
-                      { to: '/', label: 'Browse Airdrops', icon: Home },
-                      { to: '/?filter=trending', label: 'Trending', icon: Flame },
-                      { to: '/wallet-checker', label: 'Wallet Check', icon: Wallet },
-                      { to: '/scam-alerts', label: 'Alerts', icon: AlertTriangle },
-                    ].map(item => {
-                      const Icon = item.icon;
-                      return (
-                        <Link
-                          key={item.label}
-                          to={item.to}
-                          className="group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100 transition-colors hover:bg-white/10"
-                        >
-                          <span className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-gray-300">
-                              <Icon className="h-4 w-4" />
-                            </span>
-                            {item.label}
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-gray-400" />
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Mission Views</p>
-                  <div className="grid gap-1">
-                    {[
-                      { to: '/dashboard?view=overview', label: 'Watchlist', icon: Star },
-                      { to: '/dashboard?view=tasks', label: 'Task Tracking', icon: ListChecks },
-                      { to: '/dashboard?view=profile', label: 'Profile', icon: UserCircle2 },
-                      { to: '/dashboard?view=api', label: 'API Access', icon: Key },
-                      { to: '/dashboard?view=profile', label: 'Settings', icon: Shield },
-                    ].map(item => {
-                      const Icon = item.icon;
-                      return (
-                        <Link
-                          key={item.label}
-                          to={item.to}
-                          className="group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100 transition-colors hover:bg-white/10"
-                        >
-                          <span className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-gray-300">
-                              <Icon className="h-4 w-4" />
-                            </span>
-                            {item.label}
-                          </span>
-                          <ChevronRight className="h-4 w-4 text-gray-400" />
-                        </Link>
-                      );
-                    })}
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        setAiDrawerOpen(true);
-                      }}
-                      className="group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100 transition-colors hover:bg-white/10"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-500/10 text-cyan-200">
-                          <Sparkles className="h-4 w-4" />
+                {appMobileMenuSections.map((section) => {
+                  const open = mobileMenuGroups[section.key];
+                  return (
+                    <div key={section.key} className="rounded-[26px] border border-white/10 bg-white/[0.03] p-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleMobileGroup(section.key)}
+                        className="flex min-h-[56px] w-full items-center justify-between rounded-2xl px-3 py-3 text-left"
+                      >
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">{section.title}</p>
+                          <p className="mt-1 text-xs text-gray-400">{section.items.length} item{section.items.length === 1 ? '' : 's'}</p>
+                        </div>
+                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-gray-200">
+                          <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
                         </span>
-                        AI Analyzer
-                      </span>
-                      <ChevronRight className="h-4 w-4 text-gray-400" />
-                    </button>
-                  </div>
-                </div>
+                      </button>
 
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-2">
-                  <button
-                    type="button"
-                    onClick={() => void onSignOut()}
-                    className="flex min-h-[48px] w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-semibold text-rose-300 transition-colors hover:bg-rose-500/10 hover:text-white"
-                  >
-                    <span className="flex items-center gap-3">
-                      <LogOut className="h-4 w-4" />
-                      Logout
-                    </span>
-                    <ChevronRight className="h-4 w-4 text-rose-300" />
-                  </button>
-                </div>
+                      {open && (
+                        <div className="grid gap-1 px-1 pb-1">
+                          {section.items.map((item) => {
+                            const Icon = item.icon;
+                            if (item.to === '__copilot__') {
+                              return (
+                                <button
+                                  key={item.label}
+                                  type="button"
+                                  onClick={() => {
+                                    setMobileMenuOpen(false);
+                                    setAiDrawerOpen(true);
+                                  }}
+                                  className="group flex min-h-[58px] w-full items-center justify-between rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-left text-sm font-semibold text-gray-100 transition-all hover:border-cyan-400/20 hover:bg-white/[0.08] active:scale-[0.99]"
+                                >
+                                  <span className="flex items-center gap-3">
+                                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-500/10 text-cyan-200 shadow-[0_8px_20px_rgba(0,0,0,0.18)]">
+                                      <Icon className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" />
+                                    </span>
+                                    {item.label}
+                                  </span>
+                                  <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-200" />
+                                </button>
+                              );
+                            }
+
+                            return (
+                              <Link
+                                key={item.label}
+                                to={item.to}
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="group flex min-h-[58px] items-center justify-between rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-sm font-semibold text-gray-100 transition-all hover:border-cyan-400/20 hover:bg-white/[0.08] active:scale-[0.99]"
+                              >
+                                <span className="flex items-center gap-3">
+                                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-gray-300 shadow-[0_8px_20px_rgba(0,0,0,0.18)] transition-transform duration-200 group-hover:scale-[1.03] group-hover:text-cyan-200">
+                                    <Icon className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" />
+                                  </span>
+                                  {item.label}
+                                </span>
+                                <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-200" />
+                              </Link>
+                            );
+                          })}
+
+                          {section.key === 'account' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMobileMenuOpen(false);
+                                void onSignOut();
+                              }}
+                              className="group flex min-h-[58px] w-full items-center justify-between rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-left text-sm font-semibold text-rose-300 transition-all hover:border-rose-500/20 hover:bg-rose-500/10 hover:text-white active:scale-[0.99]"
+                            >
+                              <span className="flex items-center gap-3">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-500/15 bg-rose-500/[0.08] text-rose-300">
+                                  <LogOut className="h-4 w-4" />
+                                </span>
+                                Sign Out
+                              </span>
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </aside>
