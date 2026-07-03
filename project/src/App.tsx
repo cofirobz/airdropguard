@@ -1,11 +1,13 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
+import AppShell, { AppShellLoadingSkeleton, isAuthenticatedAppPath } from './components/AppShell';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
 import HomePage from './pages/HomePage';
 import { FcaRiskBanner } from './components/FcaRiskBanner';
+import { useAuth } from './contexts/AuthContext';
 
 const AirdropDetailPage = lazy(() => import('./pages/AirdropDetailPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
@@ -27,10 +29,16 @@ const Whitepaper = lazy(() => import('./pages/Whitepaper'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function PageLoader() {
+  const location = useLocation();
+  const { user, isAdmin } = useAuth();
+  const shouldUseAppSkeleton = Boolean(user) && !isAdmin && isAuthenticatedAppPath(location.pathname);
+
   return (
-    <div className="min-h-[50vh] flex items-center justify-center text-sm text-gray-500">
-      Loading...
-    </div>
+    shouldUseAppSkeleton ? <AppShellLoadingSkeleton /> : (
+      <div className="min-h-[50vh] flex items-center justify-center text-sm text-gray-500">
+        Loading...
+      </div>
+    )
   );
 }
 
