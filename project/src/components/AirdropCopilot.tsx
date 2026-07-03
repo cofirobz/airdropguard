@@ -184,7 +184,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
 
   return (
     <div className={`flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#08101f] text-white ${className ?? ''}`}>
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[#08101f]/95 px-4 py-4 backdrop-blur sm:px-5">
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-cyan-400/10 bg-[#08101f]/95 px-4 py-3 backdrop-blur sm:px-5 sm:py-4">
         <div className="min-w-0">
           <h2 className="text-lg font-black text-white sm:text-xl">AirdropGuard Copilot</h2>
           <div className="mt-1 inline-flex items-center gap-2 text-xs text-emerald-300">
@@ -202,19 +202,19 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
           <button
             type="button"
             onClick={startNewChat}
-            className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/20"
+            className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center gap-1 rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/20"
           >
             <Plus className="h-3.5 w-3.5" />
-            New Chat
+            <span className="hidden sm:inline">New Chat</span>
           </button>
           {onClose && (
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-gray-200 transition-colors hover:bg-white/[0.08]"
+              className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-gray-200 transition-colors hover:bg-white/[0.08]"
             >
               <X className="h-3.5 w-3.5" />
-              Close
+              <span className="hidden sm:inline">Close</span>
             </button>
           )}
         </div>
@@ -263,7 +263,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
         </div>
       </main>
 
-      <footer className="shrink-0 border-t border-white/10 bg-[#08101f]/95 px-4 py-4 backdrop-blur sm:px-5">
+      <footer className="shrink-0 border-t border-cyan-400/10 bg-[#08101f]/98 px-4 py-3 backdrop-blur sm:px-5 sm:py-4">
         <form
           onSubmit={event => {
             event.preventDefault();
@@ -278,7 +278,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
               onKeyDown={handleComposerKeyDown}
               rows={2}
               placeholder="Ask anything about crypto airdrops..."
-              className="min-h-[56px] max-h-40 min-w-0 flex-1 resize-none rounded-2xl border border-white/10 bg-[#0f1731] px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:border-sky-500/45 focus:outline-none"
+              className="min-h-[56px] max-h-40 min-w-0 flex-1 resize-none rounded-2xl border border-cyan-400/10 bg-[#0f1731] px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:border-sky-500/45 focus:outline-none"
               disabled={loading}
               maxLength={900}
             />

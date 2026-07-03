@@ -243,10 +243,10 @@ export default function AppShell({
       </aside>
 
       <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-[#070b18]/95 backdrop-blur-xl lg:left-[260px]">
-        <div className="flex h-20 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between gap-4 px-4 sm:h-20 sm:px-6 lg:px-8">
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300">AirdropGuard App</div>
-            <h1 className="mt-1 truncate text-lg font-black text-white sm:text-2xl">{routeContext.title}</h1>
+            <div className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300 sm:block">AirdropGuard App</div>
+            <h1 className="truncate text-base font-black text-white sm:mt-1 sm:text-2xl">{routeContext.title}</h1>
             <p className="hidden text-xs text-gray-400 sm:block">{routeContext.subtitle}</p>
           </div>
 
@@ -258,7 +258,7 @@ export default function AppShell({
             <button
               type="button"
               onClick={() => void onSignOut()}
-              className="inline-flex min-h-[42px] items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-gray-300 transition-colors hover:border-white/25 hover:text-white"
+              className="inline-flex min-h-[42px] min-w-[42px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-gray-300 transition-colors hover:border-white/25 hover:text-white"
             >
               <LogOut className="h-4 w-4" />
               <span className="hidden sm:inline">Sign Out</span>
@@ -267,7 +267,7 @@ export default function AppShell({
         </div>
       </header>
 
-      <main id="main-content" className="relative pb-28 pt-24 lg:ml-[260px] lg:pb-10" tabIndex={-1}>
+      <main id="main-content" className="relative pb-28 pt-20 lg:ml-[260px] lg:pb-10 lg:pt-24" tabIndex={-1}>
         <div key={`${location.pathname}${location.search}`} className={`animate-in px-4 pb-6 pt-4 duration-300 sm:px-6 lg:px-8 ${contentClasses}`}>
           {children}
         </div>
@@ -281,7 +281,7 @@ export default function AppShell({
               <Link
                 key={item.label}
                 to={item.to}
-                className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold ${item.active ? 'text-sky-300' : 'text-gray-500'}`}
+                className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold ${item.active ? 'text-sky-300' : 'text-gray-500'}`}
               >
                 <Icon className="h-4 w-4" />
                 {item.label}
@@ -292,7 +292,7 @@ export default function AppShell({
           <button
             type="button"
             onClick={() => setAiDrawerOpen(true)}
-            className="-mt-7 inline-flex h-[72px] w-[72px] flex-col items-center justify-center self-center rounded-full border border-sky-300/55 bg-gradient-to-br from-sky-500 to-violet-500 text-white shadow-[0_0_0_6px_rgba(56,189,248,0.16),0_14px_34px_rgba(56,189,248,0.34)] transition-all duration-200 hover:scale-105"
+            className="-mt-8 inline-flex h-[76px] w-[76px] flex-col items-center justify-center self-center rounded-full border border-cyan-300/70 bg-[radial-gradient(circle_at_30%_30%,#67e8f9,transparent_42%),linear-gradient(145deg,#0ea5e9,#2563eb_55%,#7c3aed)] text-white shadow-[0_0_0_8px_rgba(34,211,238,0.14),0_18px_36px_rgba(14,165,233,0.34)] transition-all duration-200 hover:scale-105"
             aria-label="Open AI Copilot"
           >
             <Bot className="h-5 w-5" />
@@ -305,7 +305,7 @@ export default function AppShell({
               <Link
                 key={item.label}
                 to={item.to}
-                className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold ${item.active ? 'text-sky-300' : 'text-gray-500'}`}
+                className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold ${item.active ? 'text-sky-300' : 'text-gray-500'}`}
               >
                 <Icon className="h-4 w-4" />
                 {item.label}
@@ -330,7 +330,7 @@ export default function AppShell({
           className={`absolute inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity duration-300 ${aiDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setAiDrawerOpen(false)}
         />
-        <aside className={`absolute inset-0 h-[100dvh] w-full max-w-full overflow-hidden rounded-none border border-white/10 bg-[#060a18]/95 p-0 shadow-[0_0_70px_rgba(56,189,248,0.2)] transition-transform duration-300 lg:inset-auto lg:bottom-3 lg:right-0 lg:top-3 lg:h-auto lg:w-[min(420px,100vw)] lg:max-w-[420px] lg:rounded-l-[32px] lg:rounded-tr-none lg:rounded-br-none lg:border-l lg:border-t lg:border-b lg:border-r-0 ${aiDrawerOpen ? 'translate-y-0 lg:translate-x-0' : 'translate-y-full lg:translate-y-0 lg:translate-x-full'}`}>
+        <aside className={`absolute inset-0 h-[100dvh] w-full max-w-full overflow-hidden rounded-none border border-cyan-400/10 bg-[#060a18]/98 p-0 shadow-[0_0_70px_rgba(56,189,248,0.2)] transition-transform duration-300 lg:inset-auto lg:bottom-3 lg:right-0 lg:top-3 lg:h-auto lg:w-[min(420px,100vw)] lg:max-w-[420px] lg:rounded-l-[32px] lg:rounded-tr-none lg:rounded-br-none lg:border-l lg:border-t lg:border-b lg:border-r-0 ${aiDrawerOpen ? 'translate-y-0 lg:translate-x-0' : 'translate-y-full lg:translate-y-0 lg:translate-x-full'}`}>
           <AirdropCopilot
             onClose={() => setAiDrawerOpen(false)}
             className="h-full"

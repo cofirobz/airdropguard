@@ -59,10 +59,10 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
   return (
     <Link
       to={`/airdrop/${airdrop.slug}`}
-      className="glass-card group flex h-full min-w-0 flex-col rounded-2xl p-4 transition-colors duration-200 hover:border-white/10 sm:p-5"
+      className="glass-card group flex h-full min-w-0 flex-col rounded-[26px] p-3.5 transition-colors duration-200 hover:border-white/10 sm:rounded-2xl sm:p-5"
       aria-label={`Open ${airdrop.name} airdrop report`}
     >
-      <div className="mb-4 flex items-start gap-3">
+      <div className="mb-3 flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-neon-purple/20 to-neon-blue/20 sm:h-12 sm:w-12">
           {airdrop.logo_url && !imgError ? (
             <img
@@ -140,11 +140,7 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
         </div>
       )}
 
-      <p className="mb-3 line-clamp-2 flex-1 text-[11px] leading-relaxed text-gray-500 sm:mb-4 sm:line-clamp-2 sm:text-xs">
-        {airdrop.ai_summary || 'Airdrop intelligence report available. Open this listing to review trust, reward, risk and task details.'}
-      </p>
-
-      <div className="mb-4 grid grid-cols-2 gap-2">
+      <div className="mb-3 grid grid-cols-2 gap-2">
         <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
           <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
             <Zap className="h-3 w-3" />
@@ -194,7 +190,7 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
         <LightweightTrustScoreBadge score={airdrop.trust_score ?? null} />
       </div>
 
-      <details className="mb-4 rounded-xl border border-white/5 bg-white/[0.03] sm:hidden">
+      <details className="mb-3 rounded-xl border border-white/5 bg-white/[0.03] sm:hidden">
         <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-3 text-[11px] font-semibold text-gray-300">
           More details
           <ChevronDown className="h-4 w-4 text-gray-500" />
@@ -266,8 +262,8 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
 
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-white/5 pt-3">
         <div className="min-w-0">
-          <span className="inline-flex rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-200">
-            Open report
+          <span className="inline-flex min-h-[36px] items-center rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-semibold text-cyan-200">
+            View airdrop
           </span>
         </div>
 

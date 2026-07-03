@@ -100,23 +100,73 @@ function CounterCard({ item }: { item: CounterItem }) {
 
 function MobileActionCards() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-5 md:hidden">
+    <section className="mx-auto max-w-7xl px-4 py-4 md:hidden">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link to="/auth" className="rounded-3xl border border-violet-500/20 bg-violet-500/[0.06] p-4">
+        <Link to="/auth" className="rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(34,211,238,0.12),rgba(15,23,42,0.96))] p-4 shadow-[0_0_24px_rgba(34,211,238,0.08)]">
           <div className="flex items-center gap-2 text-sm font-bold text-white">
-            <Bot className="h-4 w-4 text-violet-300" />
-            Ask Copilot
+            <Bot className="h-4 w-4 text-cyan-300" />
+            Ask AI
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-gray-300">Get quick help choosing safer airdrops and your next best move.</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-gray-300">Get a fast recommendation before you spend time or connect anywhere.</p>
         </Link>
 
-        <Link to="/wallet-checker" className="rounded-3xl border border-sky-500/20 bg-sky-500/[0.06] p-4">
+        <Link to="/wallet-checker" className="rounded-[28px] border border-sky-500/20 bg-[linear-gradient(160deg,rgba(14,165,233,0.1),rgba(15,23,42,0.96))] p-4 shadow-[0_0_24px_rgba(56,189,248,0.08)]">
           <div className="flex items-center gap-2 text-sm font-bold text-white">
             <Wallet className="h-4 w-4 text-sky-300" />
-            Wallet Intelligence
+            Wallet Check
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-gray-300">Check wallet safety and readiness without connecting or signing.</p>
+          <p className="mt-2 text-[11px] leading-relaxed text-gray-300">Read-only wallet safety and readiness in one quick scan.</p>
         </Link>
+      </div>
+    </section>
+  );
+}
+
+function TodaysBestOpportunityCard({ airdrop }: { airdrop: Airdrop | null }) {
+  if (!airdrop) return null;
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 pb-4 md:hidden">
+      <div className="overflow-hidden rounded-[30px] border border-cyan-400/15 bg-[linear-gradient(155deg,rgba(8,145,178,0.14),rgba(6,10,24,0.98)_42%,rgba(17,24,39,0.96)_100%)] p-4 shadow-[0_0_28px_rgba(34,211,238,0.08)]">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-300">Today&apos;s Best Opportunity</div>
+            <h2 className="mt-1 text-lg font-black text-white">{airdrop.name}</h2>
+          </div>
+          <div className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold text-emerald-300">
+            Trust {airdrop.trust_score ?? 'TBA'}
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] text-gray-300">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+            <div className="text-gray-500">Risk</div>
+            <div className="mt-1 font-semibold text-white">{airdrop.risk_level}</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+            <div className="text-gray-500">Reward</div>
+            <div className="mt-1 truncate font-semibold text-white">{airdrop.estimated_reward || 'TBA'}</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+            <div className="text-gray-500">Time</div>
+            <div className="mt-1 font-semibold text-white">{airdrop.time_required || 'TBA'}</div>
+          </div>
+        </div>
+
+        <div className="mt-3 flex gap-2">
+          <Link
+            to={`/airdrop/${airdrop.slug}`}
+            className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-500/15"
+          >
+            Open report
+          </Link>
+          <Link
+            to="/auth"
+            className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-bold text-white"
+          >
+            Ask AI
+          </Link>
+        </div>
       </div>
     </section>
   );
@@ -188,42 +238,43 @@ function HeroSection({
         ))}
       </div>
 
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-10 pt-10 sm:px-6 sm:pb-20 sm:pt-16 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:px-8 lg:pb-24 lg:pt-20">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-8 pt-8 sm:px-6 sm:pb-20 sm:pt-16 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:px-8 lg:pb-24 lg:pt-20">
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/25 bg-sky-500/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200 sm:text-xs">
+          <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200 sm:text-xs">
             <Sparkles className="h-3.5 w-3.5 text-sky-300" />
-            Premium AI-powered Web3 intelligence
+            <span className="sm:hidden">Live AI crypto app</span>
+            <span className="hidden sm:inline">Premium AI-powered Web3 intelligence</span>
           </div>
 
-          <h1 className="mt-5 max-w-4xl text-3xl font-black leading-[1.04] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-6xl">
-            <span className="sm:hidden">Smarter crypto airdrops</span>
+          <h1 className="mt-5 max-w-4xl text-[2rem] font-black leading-[0.95] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-6xl">
+            <span className="sm:hidden">AI-Powered Crypto Intelligence</span>
             <span className="hidden sm:inline">The AI-Powered Platform for Smarter Crypto Airdrops</span>
           </h1>
 
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-300 sm:mt-5 sm:text-lg">
-            <span className="sm:hidden">Find safer airdrops, check risk fast and focus on what deserves your time.</span>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray-300 sm:mt-5 sm:text-lg">
+            <span className="sm:hidden">Find safer airdrops. Avoid scams. Farm smarter.</span>
             <span className="hidden sm:inline">Discover verified opportunities, analyse risks with AI, check your wallet safely and focus on the projects that deserve your time.</span>
           </p>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-            <Link
-              to="/auth"
-              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-sky-500 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-sky-400"
-            >
-              Get Started Free
-              <ArrowRight className="h-4 w-4" />
-            </Link>
             <a
               href="#airdrops"
-              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]"
+              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-500/20 transition-colors hover:bg-cyan-400"
             >
               Explore Airdrops
+              <ArrowRight className="h-4 w-4" />
             </a>
+            <Link
+              to="/auth"
+              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]"
+            >
+              Ask AI
+            </Link>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-2 text-[11px] font-semibold text-gray-300 sm:hidden">
-            {['AI scored', 'Human reviewed', 'Read-only checks', 'No seed phrases'].map(item => (
-              <span key={item} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-center">
+          <div className="mt-5 grid grid-cols-2 gap-2 text-[11px] font-semibold text-gray-300 sm:hidden">
+            {['Live trust scores', 'Scam alerts', 'Read-only wallet checks', 'AI research'].map(item => (
+              <span key={item} className="rounded-full border border-cyan-400/15 bg-white/[0.04] px-3 py-2 text-center backdrop-blur">
                 {item}
               </span>
             ))}
@@ -1042,6 +1093,7 @@ export default function HomePage() {
         topVerified={topVerified}
       />
 
+      <TodaysBestOpportunityCard airdrop={topVerified[0] ?? featured} />
       <MobileActionCards />
       <MobileInfoAccordions />
 
@@ -1056,7 +1108,7 @@ export default function HomePage() {
         <AudienceSection />
       </div>
 
-      <section id="airdrops" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+      <section id="airdrops" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-20">
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Explore Airdrops</div>
@@ -1107,7 +1159,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="sticky top-20 z-20 -mx-4 mb-6 bg-[#050b18]/95 px-4 py-3 backdrop-blur sm:static sm:m-0 sm:mb-8 sm:bg-transparent sm:px-0 sm:py-0">
+        <div className="sticky top-20 z-20 -mx-4 mb-5 bg-[#050b18]/95 px-4 py-3 backdrop-blur sm:static sm:m-0 sm:mb-8 sm:bg-transparent sm:px-0 sm:py-0">
           <FilterBar filters={filters} onChange={setFilters} />
         </div>
 
@@ -1169,7 +1221,9 @@ export default function HomePage() {
       <div className="hidden md:block">
         <SocialProofSection featured={featured ?? topVerified[0] ?? null} latestVerified={topVerified} />
       </div>
-      <FinalCtaSection />
+      <div className="hidden md:block">
+        <FinalCtaSection />
+      </div>
       <div className="hidden md:block">
         <NewsletterSection />
       </div>

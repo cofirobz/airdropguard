@@ -1043,9 +1043,9 @@ export default function CustomerDashboard() {
           </div>
 
     {activeTab === 'overview' && (
-      <div className="space-y-6 animate-in">
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="glass-card border border-sky-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-400/35">
+      <div className="space-y-4 animate-in">
+        <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
+          <div className="glass-card rounded-[28px] border border-sky-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-400/35">
             <div className="mb-2 flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-300" />
               <h2 className="text-sm font-semibold text-white">Today&apos;s Focus</h2>
@@ -1053,7 +1053,7 @@ export default function CustomerDashboard() {
             {focusAirdrops[0] ? (
               <div>
                 <p className="text-base font-bold text-white">{focusAirdrops[0].name}</p>
-                <p className="mt-1 text-xs text-gray-400">Complete priority tasks and verify official links before connecting your wallet.</p>
+                <p className="mt-1 text-[11px] text-gray-400">Complete the priority tasks first, then verify official links.</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Link to={`/airdrop/${focusAirdrops[0].slug}`} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-300 transition-colors hover:bg-sky-500/20 hover:text-white">Review Opportunity</Link>
                   <button onClick={() => setActiveTab('tasks')} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-gray-300 transition-colors hover:bg-white/[0.07] hover:text-white">Go to Tasks</button>
@@ -1064,16 +1064,16 @@ export default function CustomerDashboard() {
             )}
           </div>
 
-          <div className="glass-card border border-violet-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-400/35">
+          <div className="glass-card rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(155deg,rgba(6,182,212,0.1),rgba(17,24,39,0.96))] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300/35">
             <div className="mb-2 flex items-center gap-2">
-              <Bot className="h-4 w-4 text-violet-300" />
-              <h2 className="text-sm font-semibold text-white">Copilot Insights</h2>
+              <Bot className="h-4 w-4 text-cyan-300" />
+              <h2 className="text-sm font-semibold text-white">Ask AI</h2>
             </div>
-            <p className="text-xs text-gray-400">Live AI guidance for your next move, risk balance, and high-signal opportunities.</p>
+            <p className="text-[11px] text-gray-300">Get a quick recommendation before you browse deeper.</p>
             <button
               type="button"
               onClick={openCopilot}
-              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-neon-purple px-4 py-2.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+              className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-sky-500 px-4 py-2.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
             >
               <Sparkles className="h-4 w-4" />
               Open Copilot
@@ -1081,7 +1081,7 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
-        <div className="glass-card overflow-hidden border border-sky-500/10 transition-all duration-200 hover:-translate-y-0.5">
+        <div className="glass-card overflow-hidden rounded-[28px] border border-sky-500/10 transition-all duration-200 hover:-translate-y-0.5">
           <div className="p-4 flex items-center justify-between gap-3 border-b border-white/5">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
@@ -1089,7 +1089,7 @@ export default function CustomerDashboard() {
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-white">Continue Your Tasks</h2>
-                <p className="text-[10px] text-gray-600">{completedCount} complete · {remainingCount} remaining · no REP from self-clicks</p>
+                <p className="text-[10px] text-gray-600">{completedCount} done · {remainingCount} left</p>
               </div>
             </div>
             <button
@@ -1114,8 +1114,8 @@ export default function CustomerDashboard() {
           )}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="glass-card p-4 border border-violet-500/20 transition-all duration-200 hover:-translate-y-0.5">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="glass-card rounded-[28px] p-4 border border-violet-500/20 transition-all duration-200 hover:-translate-y-0.5">
             <div className="mb-3 flex items-center gap-2">
               <Star className="h-4 w-4 text-violet-300" />
               <h3 className="text-sm font-semibold text-white">Your Watchlist</h3>
@@ -1134,7 +1134,7 @@ export default function CustomerDashboard() {
                   <button
                     type="button"
                     onClick={() => setActiveTab('profile')}
-                    className="text-xs font-semibold text-sky-300 transition-colors hover:text-sky-200"
+                    className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-sky-300 transition-colors hover:text-sky-200"
                   >
                     View full watchlist
                   </button>
