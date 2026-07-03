@@ -223,163 +223,154 @@ function HeroSection({
   const previewRows = topVerified.slice(0, 3);
 
   return (
-    <section className="relative overflow-hidden border-b border-white/5 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(139,92,246,0.16),transparent_24%),linear-gradient(180deg,#050b18_0%,#081225_55%,#060d1b_100%)]">
-      <div className="pointer-events-none absolute inset-0 opacity-80">
-        {[0, 1, 2, 3, 4, 5].map(index => (
-          <span
-            key={index}
-            className="absolute h-1.5 w-1.5 rounded-full bg-sky-300/40 animate-pulse"
-            style={{
-              top: `${14 + index * 12}%`,
-              left: `${10 + ((index * 13) % 70)}%`,
-              animationDuration: `${2.8 + index * 0.35}s`,
-            }}
-          />
-        ))}
+    <section className="relative overflow-hidden border-b border-cyan-500/10 bg-[radial-gradient(circle_at_8%_8%,rgba(34,211,238,0.22),transparent_26%),radial-gradient(circle_at_88%_14%,rgba(59,130,246,0.22),transparent_24%),linear-gradient(180deg,#030712_0%,#061025_52%,#040a17_100%)]">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 top-8 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="absolute -right-20 top-20 h-72 w-72 rounded-full bg-blue-500/25 blur-3xl" />
       </div>
 
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-8 pt-8 sm:px-6 sm:pb-20 sm:pt-16 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:px-8 lg:pb-24 lg:pt-20">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-6 pt-6 sm:px-6 sm:pb-14 sm:pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:px-8 lg:pb-20">
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200 sm:text-xs">
-            <Sparkles className="h-3.5 w-3.5 text-sky-300" />
-            <span className="sm:hidden">Live AI crypto app</span>
-            <span className="hidden sm:inline">Premium AI-powered Web3 intelligence</span>
+          <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100 sm:text-xs">
+            <Sparkles className="h-3.5 w-3.5" />
+            Premium AI Mission Control
           </div>
 
-          <h1 className="mt-5 max-w-4xl text-[2rem] font-black leading-[0.95] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-6xl">
-            <span className="sm:hidden">AI-Powered Crypto Intelligence</span>
-            <span className="hidden sm:inline">The AI-Powered Platform for Smarter Crypto Airdrops</span>
+          <h1 className="mt-4 max-w-3xl text-[1.9rem] font-black leading-[0.95] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-6xl">
+            Find crypto airdrops worth your time.
           </h1>
 
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray-300 sm:mt-5 sm:text-lg">
-            <span className="sm:hidden">Find safer airdrops. Avoid scams. Farm smarter.</span>
-            <span className="hidden sm:inline">Discover verified opportunities, analyse risks with AI, check your wallet safely and focus on the projects that deserve your time.</span>
+          <p className="mt-3 max-w-xl text-sm font-medium text-gray-200 sm:mt-5 sm:text-lg">
+            AI finds them. Humans verify them. You stay safe.
           </p>
 
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-5 grid grid-cols-2 gap-2 sm:mt-6 sm:flex sm:flex-wrap sm:gap-2.5">
+            {[
+              { label: 'AI Online', tone: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100' },
+              { label: 'Human Verified', tone: 'border-emerald-300/35 bg-emerald-400/10 text-emerald-100' },
+              { label: 'Updated Live', tone: 'border-blue-300/35 bg-blue-400/10 text-blue-100' },
+              { label: 'No Seed Phrases', tone: 'border-violet-300/35 bg-violet-400/10 text-violet-100' },
+            ].map(item => (
+              <span key={item.label} className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${item.tone}`}>
+                {item.label}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2.5 sm:mt-7 sm:flex-row">
             <a
               href="#airdrops"
-              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-cyan-500/20 transition-colors hover:bg-cyan-400"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-6 py-3 text-sm font-black text-white shadow-[0_12px_26px_rgba(34,211,238,0.26)] transition-colors hover:bg-cyan-400"
             >
-              Explore Airdrops
+              Browse Airdrops
               <ArrowRight className="h-4 w-4" />
             </a>
             <Link
               to="/auth"
-              className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] px-6 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/[0.1]"
             >
               Ask AI
             </Link>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-2 text-[11px] font-semibold text-gray-300 sm:hidden">
-            {['Live trust scores', 'Scam alerts', 'Read-only wallet checks', 'AI research'].map(item => (
-              <span key={item} className="rounded-full border border-cyan-400/15 bg-white/[0.04] px-3 py-2 text-center backdrop-blur">
-                {item}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-7 hidden flex-wrap gap-2.5 text-xs font-semibold text-gray-300 sm:flex">
-            {['Dashboard', 'Airdrops', 'Wallet Intelligence', 'Copilot', 'Pricing'].map(item => (
-              <span key={item} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
-                {item}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-8 hidden max-w-2xl gap-3 sm:grid sm:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur">
-              <div className="text-2xl font-black text-white">{stats.analysed}</div>
-              <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-gray-500">Projects analysed</div>
+          <div className="mt-5 grid grid-cols-3 gap-2 sm:hidden">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2">
+              <div className="text-base font-black text-white">{stats.analysed}</div>
+              <div className="text-[10px] uppercase tracking-[0.15em] text-gray-500">Tracked</div>
             </div>
-            <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.06] px-4 py-3 backdrop-blur">
-              <div className="text-2xl font-black text-white">{stats.verified}</div>
-              <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-emerald-300">Verified listings</div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2">
+              <div className="text-base font-black text-white">{stats.verified}</div>
+              <div className="text-[10px] uppercase tracking-[0.15em] text-gray-500">Verified</div>
             </div>
-            <div className="rounded-2xl border border-violet-500/15 bg-violet-500/[0.06] px-4 py-3 backdrop-blur">
-              <div className="text-2xl font-black text-white">{stats.aiAnalyses}</div>
-              <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-violet-300">AI analyses</div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2">
+              <div className="text-base font-black text-white">{stats.aiAnalyses}</div>
+              <div className="text-[10px] uppercase tracking-[0.15em] text-gray-500">AI Scored</div>
             </div>
           </div>
         </div>
 
-        <div className="relative z-10 hidden lg:block">
-          <div className="absolute -inset-6 rounded-[36px] bg-sky-500/10 blur-3xl" />
-          <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(160deg,rgba(7,11,24,0.96)_8%,rgba(8,14,34,0.96)_50%,rgba(12,9,35,0.96)_100%)] p-5 shadow-[0_0_40px_rgba(56,189,248,0.15),0_0_90px_rgba(99,102,241,0.1)] backdrop-blur-xl sm:p-6">
-            <div className="mb-5 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+        <div className="relative z-10 lg:block">
+          <div className="rounded-[30px] border border-cyan-300/20 bg-[linear-gradient(150deg,rgba(6,12,28,0.95),rgba(5,16,36,0.94)_48%,rgba(9,10,28,0.94))] p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_56px_rgba(15,23,42,0.6),0_0_40px_rgba(34,211,238,0.12)] backdrop-blur-xl sm:p-5">
+            <div className="mb-3 flex items-center justify-between gap-3 border-b border-white/10 pb-3">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-300">Live platform preview</div>
-                <h2 className="mt-1 text-xl font-black text-white">AirdropGuard Command Centre</h2>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">Live command board</div>
+                <div className="mt-1 text-sm font-black text-white sm:text-base">Today&apos;s priority queue</div>
               </div>
-              <div className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-300">
-                Live intelligence
-              </div>
+              {featured && <div className="rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1 text-[10px] font-semibold text-gray-200">Featured: {featured.name}</div>}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Verified</div>
-                <div className="mt-2 text-2xl font-black text-white">{stats.verified}</div>
-                <div className="mt-1 text-xs text-gray-400">Projects reviewed by AirdropGuard</div>
+            {loading ? (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-5 text-sm text-gray-400">
+                Loading live opportunities...
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Wallet safety</div>
-                <div className="mt-2 text-2xl font-black text-white">Read-only</div>
-                <div className="mt-1 text-xs text-gray-400">No signatures, no seed phrase</div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Copilot</div>
-                <div className="mt-2 text-2xl font-black text-white">AI+</div>
-                <div className="mt-1 text-xs text-gray-400">Research guidance in seconds</div>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-3xl border border-white/10 bg-[#0d152b]/80 p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Priority opportunities</div>
-                  <div className="mt-1 text-sm font-bold text-white">What deserves attention right now</div>
-                </div>
-                {featured && <div className="text-xs text-sky-300">Featured: {featured.name}</div>}
-              </div>
-
-              <div className="space-y-3">
-                {loading && (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-6 text-sm text-gray-400">
-                    Loading dashboard preview...
-                  </div>
-                )}
-
-                {!loading && previewRows.map((airdrop, index) => (
-                  <div key={airdrop.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sky-400/25 bg-sky-500/10 text-sm font-black text-sky-200">
-                      0{index + 1}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-white">{airdrop.name}</div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-gray-400">
-                        <span>Trust {airdrop.trust_score ?? 'Unknown'}</span>
-                        <span>Risk {airdrop.risk_level}</span>
-                        <span>{airdrop.estimated_reward || 'Reward TBA'}</span>
+            ) : (
+              <div className="space-y-2.5">
+                {previewRows.map((airdrop, index) => (
+                  <Link key={airdrop.id} to={`/airdrop/${airdrop.slug}`} className="block rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 transition-colors hover:bg-white/[0.08]">
+                    <div className="flex items-center gap-3">
+                      <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-cyan-300/25 bg-cyan-400/10 text-xs font-black text-cyan-100">
+                        {index + 1}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-white">{airdrop.name}</div>
+                        <div className="mt-1 text-[11px] text-gray-400">Trust {airdrop.trust_score ?? 'Unknown'} • {airdrop.risk_level}</div>
+                      </div>
+                      <div className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-200">
+                        {airdrop.listing_state === 'verified' || airdrop.human_verified ? 'Verified' : 'Review'}
                       </div>
                     </div>
-                    <div className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-300">
-                      {airdrop.listing_state === 'verified' || airdrop.human_verified ? 'Verified' : 'Review'}
-                    </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
-
-              <div className="mt-4 rounded-2xl border border-violet-500/20 bg-violet-500/[0.07] p-4">
-                <div className="text-[10px] uppercase tracking-[0.14em] text-violet-300">Copilot recommendation</div>
-                <p className="mt-2 text-sm leading-relaxed text-gray-200">
-                  Focus on <span className="font-semibold text-white">verified listings with strong trust signals</span>, then use Wallet Intelligence before connecting to anything new.
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function MeetAirdropGuardAI() {
+  const cards = [
+    {
+      icon: Bot,
+      title: 'Copilot Guidance',
+      body: 'Ask what to focus on now. Get ranked next steps, not hype.',
+      tone: 'border-cyan-300/25 bg-cyan-500/[0.08] text-cyan-100',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Human Verification',
+      body: 'Listings are reviewed before trust labels are surfaced.',
+      tone: 'border-emerald-300/25 bg-emerald-500/[0.08] text-emerald-100',
+    },
+    {
+      icon: Wallet,
+      title: 'Wallet Safety',
+      body: 'Read-only wallet intelligence. Never your seed phrase.',
+      tone: 'border-blue-300/25 bg-blue-500/[0.08] text-blue-100',
+    },
+  ];
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 pb-8 pt-2 sm:px-6 lg:px-8 lg:pb-12">
+      <div className="mb-4 sm:mb-6">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Meet AirdropGuard AI</div>
+        <h2 className="mt-2 text-2xl font-black text-white sm:text-4xl">Mission control for safer airdrop decisions</h2>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
+        {cards.map(item => {
+          const Icon = item.icon;
+          return (
+            <div key={item.title} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 backdrop-blur sm:p-5">
+              <div className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border ${item.tone}`}>
+                <Icon className="h-4 w-4" />
+              </div>
+              <h3 className="mt-4 text-lg font-black text-white">{item.title}</h3>
+              <p className="mt-2 text-xs leading-relaxed text-gray-300 sm:text-sm">{item.body}</p>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -389,48 +380,86 @@ function HowItWorksSection() {
   const steps = [
     {
       icon: Search,
-      title: 'Discover',
-      desc: 'Browse verified and under-review crypto airdrops.',
+      title: 'Scan',
+      desc: 'Browse live opportunities in one feed.',
     },
     {
       icon: Brain,
-      title: 'Analyse',
-      desc: 'AI + human intelligence evaluates risk, trust and opportunity.',
+      title: 'Rank',
+      desc: 'AI ranks risk, trust and effort in seconds.',
     },
     {
       icon: CheckSquare,
-      title: 'Farm Smarter',
-      desc: 'Complete the best opportunities with confidence.',
+      title: 'Verify',
+      desc: 'Human review confirms what deserves attention.',
+    },
+    {
+      icon: Target,
+      title: 'Execute',
+      desc: 'Focus only on airdrops worth your time.',
     },
   ];
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="mx-auto max-w-3xl text-center">
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">How it works</div>
-        <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">A clearer path from discovery to action</h2>
-        <p className="mt-4 text-sm leading-relaxed text-gray-400 sm:text-base">
-          First-time visitors should know exactly what to do: discover credible opportunities, understand the risk, then focus effort where it matters.
-        </p>
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">How it works in 4 steps</div>
+        <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">From signal to action in under a minute</h2>
       </div>
 
-      <div className="mt-10 grid gap-5 lg:grid-cols-3">
+      <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {steps.map((step, index) => {
           const Icon = step.icon;
           return (
-            <div key={step.title} className="relative rounded-[28px] border border-white/10 bg-white/[0.03] p-7 backdrop-blur">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-sky-400/25 bg-sky-500/10 text-sky-300">
+            <div key={step.title} className="relative rounded-[24px] border border-white/10 bg-white/[0.03] p-5 backdrop-blur">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-sky-400/25 bg-sky-500/10 text-sky-300">
                 <Icon className="h-5 w-5" />
               </div>
-              <div className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Step 0{index + 1}</div>
-              <h3 className="mt-2 text-xl font-black text-white">{step.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-gray-400">{step.desc}</p>
-              {index < steps.length - 1 && (
-                <div className="mt-6 hidden text-sky-300 lg:block">↓</div>
-              )}
+              <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">Step 0{index + 1}</div>
+              <h3 className="mt-1 text-lg font-black text-white">{step.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-gray-300">{step.desc}</p>
             </div>
           );
         })}
+      </div>
+    </section>
+  );
+}
+
+function TrendingTodaySection({ items }: { items: Airdrop[] }) {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Trending today</div>
+          <h2 className="mt-2 text-2xl font-black text-white sm:text-3xl">Live opportunities gaining momentum</h2>
+        </div>
+        <Link to="/?filter=trending" className="hidden rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/[0.08] sm:inline-flex">
+          View all trending
+        </Link>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {items.slice(0, 6).map(item => (
+          <Link key={item.id} to={`/airdrop/${item.slug}`} className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4 backdrop-blur transition-colors hover:bg-white/[0.06]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="truncate text-base font-black text-white">{item.name}</h3>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-gray-300">
+                  <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-1">Trust {item.trust_score ?? 'Unknown'}</span>
+                  <span className="rounded-full border border-white/10 bg-white/[0.05] px-2 py-1">{item.risk_level}</span>
+                </div>
+              </div>
+              <Flame className="h-4 w-4 shrink-0 text-orange-300" />
+            </div>
+            <div className="mt-3 text-xs text-gray-400">{item.estimated_reward || 'Reward data updating'}</div>
+          </Link>
+        ))}
+      </div>
+      <div className="mt-3 sm:hidden">
+        <Link to="/?filter=trending" className="inline-flex min-h-[46px] w-full items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white">
+          View all trending
+        </Link>
       </div>
     </section>
   );
@@ -693,13 +722,54 @@ function LivePlatformSection({ airdrops, verifiedCount }: { airdrops: Airdrop[];
 
 function TrustSection({ counters }: { counters: CounterItem[] }) {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="mx-auto max-w-3xl text-center">
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Trust</div>
-        <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">Built around evidence, safety and repeatable research</h2>
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Trust metrics</div>
+        <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">Evidence before hype</h2>
       </div>
-      <div className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {counters.map(item => <CounterCard key={item.label} item={item} />)}
+      </div>
+    </section>
+  );
+}
+
+function DeepDiveAccordions() {
+  const items = [
+    {
+      title: 'Why this is safer than random X threads',
+      body: 'AirdropGuard combines AI analysis with human verification, trust signals, and clear warnings before you leave for external links.',
+    },
+    {
+      title: 'How trust score and risk are used together',
+      body: 'Trust score measures project confidence signals; risk labels show potential downside. Use both together before taking action.',
+    },
+    {
+      title: 'What Copilot actually does',
+      body: 'Copilot summarizes platform context and recommends what to prioritize next based on trust, risk, reward and time required.',
+    },
+    {
+      title: 'Wallet safety approach',
+      body: 'Wallet intelligence stays read-only and educational. You should never share a seed phrase or private key with any service.',
+    },
+  ];
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mb-5">
+        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Need deeper explanation?</div>
+        <h2 className="mt-2 text-2xl font-black text-white sm:text-3xl">Open the details</h2>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-2">
+        {items.map(item => (
+          <details key={item.title} className="group rounded-[24px] border border-white/10 bg-white/[0.03] p-4 backdrop-blur">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white">
+              {item.title}
+              <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-180" />
+            </summary>
+            <p className="mt-3 text-sm leading-relaxed text-gray-300">{item.body}</p>
+          </details>
+        ))}
       </div>
     </section>
   );
@@ -1094,18 +1164,15 @@ export default function HomePage() {
       />
 
       <TodaysBestOpportunityCard airdrop={topVerified[0] ?? featured} />
+      <MeetAirdropGuardAI />
+      <HowItWorksSection />
+      <TrendingTodaySection items={topVerified.length > 0 ? topVerified : airdrops.filter(item => item.is_trending)} />
+      <TrustSection counters={trustCounters} />
+      <DeepDiveAccordions />
       <MobileActionCards />
-      <MobileInfoAccordions />
 
       <div className="hidden sm:block">
         <TrustStrip />
-      </div>
-      <div className="hidden md:block">
-        <HowItWorksSection />
-        <WhyAirdropGuardSection />
-        <LivePlatformSection airdrops={topVerified.slice(0, 6)} verifiedCount={verifiedProjects.length} />
-        <TrustSection counters={trustCounters} />
-        <AudienceSection />
       </div>
 
       <section id="airdrops" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-20">
