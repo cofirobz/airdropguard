@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { Fragment, useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -60,6 +60,37 @@ function StatCard({
         {sub && <p className="text-[10px] text-gray-600 mt-0.5">{sub}</p>}
       </div>
     </div>
+  );
+}
+
+function ActionCard({
+  title,
+  count,
+  status,
+  blurb,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  count: number;
+  status: string;
+  blurb: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <article className="glass-card p-4 border border-white/10 rounded-2xl">
+      <p className="text-lg font-bold text-white tabular-nums">{count}</p>
+      <p className="text-sm font-semibold text-gray-100 mt-1">{title}</p>
+      <p className="text-xs text-neon-blue mt-1">{status}</p>
+      <p className="text-xs text-gray-500 mt-2 min-h-[34px]">{blurb}</p>
+      <button
+        onClick={onAction}
+        className="mt-3 inline-flex items-center justify-center rounded-lg border border-white/15 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-white/[0.08] transition-colors"
+      >
+        {actionLabel}
+      </button>
+    </article>
   );
 }
 
@@ -149,6 +180,8 @@ type BannerPaymentState = 'Unpaid' | 'Pending' | 'Paid';
 interface BannerAd {
   id: string;
   advertiserName: string;
+  contactEmail: string;
+  websiteLink: string;
   bannerImageUrl: string;
   destinationUrl: string;
   altText: string;
@@ -176,6 +209,8 @@ const BANNER_STATUS_OPTIONS: BannerStatus[] = ['Enquiry', 'Awaiting Artwork', 'R
 
 const BLANK_BANNER_FORM: BannerFormData = {
   advertiserName: '',
+  contactEmail: '',
+  websiteLink: '',
   bannerImageUrl: '',
   destinationUrl: '',
   altText: '',
@@ -211,6 +246,14 @@ function getPaymentStateClass(state: BannerPaymentState): string {
   if (state === 'Paid') return 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10';
   if (state === 'Pending') return 'text-amber-300 border-amber-500/25 bg-amber-500/10';
   return 'text-gray-300 border-white/15 bg-white/[0.04]';
+}
+
+function getBannerNextAction(status: BannerStatus): string {
+  if (status === 'Enquiry') return 'Upload artwork';
+  if (status === 'Awaiting Artwork') return 'Check link';
+  if (status === 'Ready to Publish') return 'Set dates';
+  if (status === 'Live') return 'Expire banner';
+  return 'Create new banner';
 }
 
 function levelFromRep(rep: number) {
@@ -571,112 +614,149 @@ function BannerFormModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass}>Advertiser / Project Name *</label>
-            <input
-              value={form.advertiserName}
-              onChange={(e) => setForm((f) => ({ ...f, advertiserName: e.target.value }))}
-              placeholder="e.g. ZetaChain"
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Destination URL *</label>
-            <input
-              value={form.destinationUrl}
-              onChange={(e) => setForm((f) => ({ ...f, destinationUrl: e.target.value }))}
-              placeholder="https://project.example"
-              className={inputClass}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>Placement *</label>
-            <select
-              value={form.placement}
-              onChange={(e) => setForm((f) => ({ ...f, placement: e.target.value as BannerPlacement }))}
-              className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40"
-            >
-              {BANNER_PLACEMENT_OPTIONS.map((placement) => (
-                <option key={placement} value={placement} className="bg-dark-900">{placement}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className={labelClass}>Status</label>
-            <select
-              value={form.status}
-              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as BannerStatus }))}
-              className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40"
-            >
-              {BANNER_STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status} className="bg-dark-900">{status}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className={labelClass}>Start Date</label>
-            <input
-              type="date"
-              value={form.startDate}
-              onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
-              className={`${inputClass} [color-scheme:dark]`}
-            />
-          </div>
-
-          <div>
-            <label className={labelClass}>End Date</label>
-            <input
-              type="date"
-              value={form.endDate}
-              onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
-              className={`${inputClass} [color-scheme:dark]`}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass}>Banner Image Upload</label>
-            <div className="flex items-center gap-2">
-              <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-neon-blue/25 bg-neon-blue/10 text-neon-blue text-sm font-medium cursor-pointer hover:bg-neon-blue/20 transition-colors">
-                <ImagePlus className="w-4 h-4" />
-                Upload Image
-                <input type="file" accept="image/*" className="hidden" onChange={onImageFileSelected} />
-              </label>
-              <input
-                value={form.bannerImageUrl}
-                onChange={(e) => setForm((f) => ({ ...f, bannerImageUrl: e.target.value }))}
-                placeholder="or paste image URL"
-                className={inputClass}
-              />
+        <div className="space-y-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">1. Advertiser details</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className={labelClass}>Project name *</label>
+                <input
+                  value={form.advertiserName}
+                  onChange={(e) => setForm((f) => ({ ...f, advertiserName: e.target.value }))}
+                  placeholder="e.g. ZetaChain"
+                  className={inputClass}
+                />
+                <p className="text-[10px] text-gray-600 mt-1">Name shown on the live banner record.</p>
+              </div>
+              <div>
+                <label className={labelClass}>Contact email</label>
+                <input
+                  value={form.contactEmail}
+                  onChange={(e) => setForm((f) => ({ ...f, contactEmail: e.target.value }))}
+                  placeholder="ads@project.com"
+                  className={inputClass}
+                />
+                <p className="text-[10px] text-gray-600 mt-1">Where to request edits or approval.</p>
+              </div>
+              <div>
+                <label className={labelClass}>Website link</label>
+                <input
+                  value={form.websiteLink}
+                  onChange={(e) => setForm((f) => ({ ...f, websiteLink: e.target.value }))}
+                  placeholder="https://project.example"
+                  className={inputClass}
+                />
+                <p className="text-[10px] text-gray-600 mt-1">Reference site for manual checks.</p>
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className={labelClass}>Alt Text</label>
-            <input
-              value={form.altText}
-              onChange={(e) => setForm((f) => ({ ...f, altText: e.target.value }))}
-              placeholder="Short accessibility description"
-              className={inputClass}
-            />
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">2. Banner setup</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Placement *</label>
+                <select
+                  value={form.placement}
+                  onChange={(e) => setForm((f) => ({ ...f, placement: e.target.value as BannerPlacement }))}
+                  className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40"
+                >
+                  {BANNER_PLACEMENT_OPTIONS.map((placement) => (
+                    <option key={placement} value={placement} className="bg-dark-900">{placement}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-600 mt-1">Each placement is $149 and exclusive.</p>
+              </div>
+              <div>
+                <label className={labelClass}>Destination URL *</label>
+                <input
+                  value={form.destinationUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, destinationUrl: e.target.value }))}
+                  placeholder="https://project.example/campaign"
+                  className={inputClass}
+                />
+                <p className="text-[10px] text-gray-600 mt-1">Where users go when they click the ad.</p>
+              </div>
+              <div>
+                <label className={labelClass}>Banner image placeholder</label>
+                <div className="flex items-center gap-2">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-neon-blue/25 bg-neon-blue/10 text-neon-blue text-sm font-medium cursor-pointer hover:bg-neon-blue/20 transition-colors">
+                    <ImagePlus className="w-4 h-4" />
+                    Upload artwork
+                    <input type="file" accept="image/*" className="hidden" onChange={onImageFileSelected} />
+                  </label>
+                  <input
+                    value={form.bannerImageUrl}
+                    onChange={(e) => setForm((f) => ({ ...f, bannerImageUrl: e.target.value }))}
+                    placeholder="or paste image URL"
+                    className={inputClass}
+                  />
+                </div>
+                <p className="text-[10px] text-gray-600 mt-1">Use this to stage creative before publish.</p>
+              </div>
+              <div>
+                <label className={labelClass}>Alt text</label>
+                <input
+                  value={form.altText}
+                  onChange={(e) => setForm((f) => ({ ...f, altText: e.target.value }))}
+                  placeholder="Short accessibility description"
+                  className={inputClass}
+                />
+                <p className="text-[10px] text-gray-600 mt-1">Accessibility label for screen readers.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">3. Schedule</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className={labelClass}>Start date</label>
+                <input
+                  type="date"
+                  value={form.startDate}
+                  onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+                  className={`${inputClass} [color-scheme:dark]`}
+                />
+                <p className="text-[10px] text-gray-600 mt-1">Date the banner should first appear.</p>
+              </div>
+              <div>
+                <label className={labelClass}>End date</label>
+                <input
+                  type="date"
+                  value={form.endDate}
+                  onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
+                  className={`${inputClass} [color-scheme:dark]`}
+                />
+                <p className="text-[10px] text-gray-600 mt-1">Date the banner should expire.</p>
+              </div>
+              <div>
+                <label className={labelClass}>Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as BannerStatus }))}
+                  className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40"
+                >
+                  {BANNER_STATUS_OPTIONS.map((status) => (
+                    <option key={status} value={status} className="bg-dark-900">{status}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-600 mt-1">Move from enquiry to live in clear steps.</p>
+              </div>
+            </div>
           </div>
         </div>
 
         <div>
-          <label className={labelClass}>Internal Notes (admin only)</label>
+          <label className={labelClass}>4. Internal notes</label>
           <textarea
             value={form.notes}
             onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
             rows={3}
-            placeholder="Campaign notes, asset changes, launch details..."
+            placeholder="Admin notes only: approvals, artwork requests, launch notes."
             className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40 resize-none"
           />
+          <p className="text-[10px] text-gray-600 mt-1">Visible to admin team only.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/5">
@@ -796,6 +876,8 @@ export default function AdminPage() {
       {
         id: `banner_${today.getTime()}`,
         advertiserName: 'Example Campaign',
+        contactEmail: 'ads@example.com',
+        websiteLink: 'https://example.com',
         bannerImageUrl: '',
         destinationUrl: 'https://example.com',
         altText: 'Example campaign banner',
@@ -820,6 +902,39 @@ export default function AdminPage() {
     github_found: number; token_detected: number; investors_found: number;
   } | null>(null);
 
+  const pendingBannerEnquiries = useMemo(
+    () => banners.filter((b) => b.status === 'Enquiry' || b.status === 'Awaiting Artwork').length,
+    [banners]
+  );
+  const liveBannerAds = useMemo(
+    () => banners.filter((b) => deriveBannerStatus(b.status, b.startDate, b.endDate) === 'Live' && b.enabled).length,
+    [banners]
+  );
+  const expiringBannerAds = useMemo(() => {
+    const now = new Date().getTime();
+    const inSevenDays = now + 7 * 86_400_000;
+    return banners.filter((b) => {
+      if (!b.endDate) return false;
+      const endMs = new Date(b.endDate).getTime();
+      return Number.isFinite(endMs) && endMs >= now && endMs <= inSevenDays;
+    }).length;
+  }, [banners]);
+  const pendingScamReports = useMemo(
+    () => scamReports.filter((r) => r.status === 'pending').length,
+    [scamReports]
+  );
+  const siteHealthIssues = useMemo(() => {
+    const unpublished = (stats?.totalAirdrops ?? 0) - (stats?.publishedAirdrops ?? 0);
+    const unscored = (stats?.totalAirdrops ?? 0) - (stats?.scoredAirdrops ?? 0);
+    const unanalyzed = (stats?.totalAirdrops ?? 0) - (stats?.analyzedAirdrops ?? 0);
+    return Math.max(0, unpublished) + Math.max(0, unscored) + Math.max(0, unanalyzed);
+  }, [stats]);
+
+  const jumpToSection = (id: string) => {
+    const section = document.getElementById(id);
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const openAdd = () => { setForm(BLANK_FORM); setEditingId(null); setModalMode('add'); };
 
   const openAddBanner = () => {
@@ -831,6 +946,8 @@ export default function AdminPage() {
   const openEditBanner = (banner: BannerAd) => {
     setBannerForm({
       advertiserName: banner.advertiserName,
+      contactEmail: banner.contactEmail,
+      websiteLink: banner.websiteLink,
       bannerImageUrl: banner.bannerImageUrl,
       destinationUrl: banner.destinationUrl,
       altText: banner.altText,
@@ -1379,20 +1496,75 @@ export default function AdminPage() {
         </div>
       </div>
 
+      <section id="admin-banners">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">What Needs Action</h2>
+          {statsLoading && <Loader2 className="w-3 h-3 text-gray-600 animate-spin" />}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          <ActionCard
+            title="Pending Airdrop Reviews"
+            count={stats?.pendingSubmissions ?? 0}
+            status={`${stats?.pendingSubmissions ?? 0} waiting`}
+            blurb="Submitted projects waiting for manual review and decision."
+            actionLabel="Review Submissions"
+            onAction={() => jumpToSection('admin-submissions')}
+          />
+          <ActionCard
+            title="Banner Ad Enquiries"
+            count={pendingBannerEnquiries}
+            status="Waiting for artwork or approval"
+            blurb="New ad requests that still need setup before publishing."
+            actionLabel="Manage Banners"
+            onAction={() => jumpToSection('admin-banners')}
+          />
+          <ActionCard
+            title="Live Banner Ads"
+            count={liveBannerAds}
+            status="Currently visible"
+            blurb="Exclusive placements now active across the site."
+            actionLabel="View Live Ads"
+            onAction={() => jumpToSection('admin-banners')}
+          />
+          <ActionCard
+            title="Expiring Banner Ads"
+            count={expiringBannerAds}
+            status="Ending within 7 days"
+            blurb="Check replacements early so premium slots stay filled."
+            actionLabel="Set Dates"
+            onAction={() => jumpToSection('admin-banners')}
+          />
+          <ActionCard
+            title="User Reports / Scam Reports"
+            count={pendingScamReports}
+            status="Need review"
+            blurb="Review reports to protect users and update status."
+            actionLabel="Review Reports"
+            onAction={() => jumpToSection('admin-scam-reports')}
+          />
+          <ActionCard
+            title="Site Health"
+            count={siteHealthIssues}
+            status="Publish, scoring, and AI checks"
+            blurb="Tracks content that still needs publish or quality checks."
+            actionLabel="Open Airdrops"
+            onAction={() => jumpToSection('admin-airdrops')}
+          />
+        </div>
+      </section>
 
-      {/* Admin workflow tips */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="glass-card p-4 border border-emerald-500/10">
-          <p className="text-xs uppercase tracking-wider text-emerald-400 font-semibold">1. Verify</p>
-          <p className="text-sm text-gray-400 mt-1">Check official website, docs, socials, funding, investors and contract status before publishing.</p>
+        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.06] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-cyan-200">Admin Guidance</p>
+          <p className="text-xs text-gray-300 mt-2">Banner ads are manually managed for now. When a customer enquires, create a banner record, upload artwork, set dates, then mark it Live.</p>
         </div>
-        <div className="glass-card p-4 border border-violet-500/10">
-          <p className="text-xs uppercase tracking-wider text-violet-400 font-semibold">2. Add Tasks</p>
-          <p className="text-sm text-gray-400 mt-1">Add one task per line so the customer dashboard can show real progress instead of blank missions.</p>
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-amber-200">Placement Rule</p>
+          <p className="text-xs text-gray-300 mt-2">Each placement is exclusive. Only one banner should be Live per placement at a time.</p>
         </div>
-        <div className="glass-card p-4 border border-amber-500/10">
-          <p className="text-xs uppercase tracking-wider text-amber-400 font-semibold">3. Analyse</p>
-          <p className="text-sm text-gray-400 mt-1">Run AI analysis, review the result manually, then publish only when you are confident.</p>
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-200">Ad Trust Rule</p>
+          <p className="text-xs text-gray-300 mt-2">Always label ads as Sponsored or Advertisement. Never present ads as AI recommendations, human verification, Trust Scores, or Featured by AirdropGuard.</p>
         </div>
       </section>
 
@@ -1477,8 +1649,26 @@ export default function AdminPage() {
           </span>
         </div>
 
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 mb-3">
+          <p className="text-[11px] font-semibold text-gray-200 mb-2">Banner workflow</p>
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
+            {['1. Enquiry received', '2. Artwork received', '3. Ready to publish', '4. Live', '5. Expired'].map((step) => (
+              <div key={step} className="rounded-xl border border-white/10 bg-dark-900/40 px-2.5 py-2 text-gray-300">
+                {step}
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-gray-500">
+            <span className="rounded-full border border-white/10 px-2 py-0.5">Upload artwork</span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5">Check link</span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5">Set dates</span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5">Publish banner</span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5">Expire banner</span>
+          </div>
+        </div>
+
         <div className="glass-card overflow-x-auto">
-          <table className="w-full text-sm min-w-[960px]">
+          <table className="w-full text-sm min-w-[1080px]">
             <thead>
               <tr className="border-b border-white/5">
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Banner Preview</th>
@@ -1487,6 +1677,7 @@ export default function AdminPage() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Start Date</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">End Date</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Next Action</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Future Paid</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Toggle</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
@@ -1528,6 +1719,11 @@ export default function AdminPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-400">{banner.startDate || '—'}</td>
                     <td className="px-4 py-3 text-xs text-gray-400">{banner.endDate || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-[11px] px-2.5 py-1 rounded-full border border-white/15 bg-white/[0.04] text-gray-300">
+                        {getBannerNextAction(effectiveStatus)}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`text-[10px] font-semibold border rounded-full px-2.5 py-1 ${getPaymentStateClass(banner.paymentState)}`}>
                         {banner.paymentState}
@@ -1583,6 +1779,9 @@ export default function AdminPage() {
                 <div>
                   <p className="text-xs uppercase tracking-wider text-cyan-300 font-semibold">Preview Banner</p>
                   <p className="text-sm text-white font-semibold mt-1">{banner.advertiserName} · {banner.placement}</p>
+                  <span className="inline-flex mt-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                    Sponsored
+                  </span>
                 </div>
                 <button onClick={() => setPreviewBannerId(null)} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5">
                   <X className="w-4 h-4" />
@@ -1618,7 +1817,7 @@ export default function AdminPage() {
         })()}
       </section>
 
-      <div>
+      <section id="admin-airdrops">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Airdrops</h2>
         <div className="glass-card overflow-x-auto">
           <table className="w-full text-sm min-w-[680px]">
@@ -1715,10 +1914,10 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
       {/* ── Scam report review ─────────────────────────────────────────────── */}
-      <div>
+      <section id="admin-scam-reports">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -1766,8 +1965,8 @@ export default function AdminPage() {
                     : 'text-amber-400 bg-amber-500/10 border-amber-500/25';
 
                   return (
-                    <>
-                      <tr key={report.id} className="hover:bg-white/[0.02] transition-colors">
+                    <Fragment key={report.id}>
+                      <tr className="hover:bg-white/[0.02] transition-colors">
                         <td className="px-4 py-3">
                           <div className="font-medium text-white text-sm">{report.project_name || 'Unknown project'}</div>
                           {reportUrl && (
@@ -1844,7 +2043,7 @@ export default function AdminPage() {
                       </tr>
 
                       {isOpen && (
-                        <tr key={`${report.id}-detail`} className="bg-white/[0.015]">
+                        <tr className="bg-white/[0.015]">
                           <td colSpan={5} className="px-4 py-5">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs mb-4">
                               {([
@@ -1894,17 +2093,17 @@ export default function AdminPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>
             </table>
           </div>
         )}
-      </div>
+      </section>
 
       {/* ── Submissions table ──────────────────────────────────────────────── */}
-      <div>
+      <section id="admin-submissions">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
             <FileText className="w-3.5 h-3.5" />
@@ -1935,8 +2134,8 @@ export default function AdminPage() {
                     ? 'text-rose-400 bg-rose-500/10 border-rose-500/25'
                     : 'text-amber-400 bg-amber-500/10 border-amber-500/25';
                   return (
-                    <>
-                      <tr key={sub.id} className="hover:bg-white/[0.02] transition-colors">
+                    <Fragment key={sub.id}>
+                      <tr className="hover:bg-white/[0.02] transition-colors">
                         <td className="px-4 py-3">
                           <div className="font-medium text-white text-sm">{sub.project_name}</div>
                           {sub.website_url && (
@@ -2004,7 +2203,7 @@ export default function AdminPage() {
                         </td>
                       </tr>
                       {isOpen && (
-                        <tr key={`${sub.id}-detail`} className="bg-white/[0.015]">
+                        <tr className="bg-white/[0.015]">
                           <td colSpan={5} className="px-4 py-5">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs mb-4">
                               {([
@@ -2096,14 +2295,14 @@ export default function AdminPage() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>
             </table>
           </div>
         )}
-      </div>
+      </section>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
       {bannerModalMode && (
