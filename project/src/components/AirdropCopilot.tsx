@@ -13,6 +13,7 @@ const QUICK_PROMPTS = [
   'What should I focus on today?',
   "What's ending soon and what should I prioritize first?",
 ];
+const UNREADABLE_RESPONSE_MESSAGE = 'I received a response, but couldn\'t read the message. Please try again.';
 
 type ChatMessage = {
   id: string;
@@ -71,6 +72,12 @@ function getFunctionErrorMessage(payload: unknown, fallback: string): string {
   return value?.trim() || fallback;
 }
 
+function logCopilot(level: 'info' | 'error', message: string, details?: unknown) {
+  if (!import.meta.env.DEV) return;
+  const logger = level === 'error' ? console.error : console.info;
+  logger(`[AirdropCopilot] ${message}`, details);
+}
+
 function normalizeText(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -78,11 +85,30 @@ function normalizeText(value: unknown): string | null {
 }
 
 function extractTextFromObject(payload: Record<string, unknown>): string | null {
-  const directKeys = ['answer', 'message', 'content', 'text', 'response'];
+  const directKeys = ['answer', 'message', 'content', 'response', 'text', 'result'];
 
   for (const key of directKeys) {
     const direct = normalizeText(payload[key]);
     if (direct) return direct;
+  }
+
+  const data = payload.data;
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const nestedData = extractTextFromObject(data as Record<string, unknown>);
+    if (nestedData) return nestedData;
+  }
+
+  const errorLike = payload.error;
+  if (typeof errorLike === 'string' && errorLike.trim()) {
+    return `AirdropGuard Copilot ran into an error: ${errorLike.trim()}`;
+  }
+
+  if (errorLike && typeof errorLike === 'object' && !Array.isArray(errorLike)) {
+    const nestedErrorMessage = normalizeText((errorLike as Record<string, unknown>).message)
+      ?? normalizeText((errorLike as Record<string, unknown>).details);
+    if (nestedErrorMessage) {
+      return `AirdropGuard Copilot ran into an error: ${nestedErrorMessage}`;
+    }
   }
 
   for (const key of directKeys) {
@@ -287,7 +313,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
     const accessToken = sessionData.session?.access_token;
 
     if (sessionError || !accessToken) {
-      console.error('AirdropGuard Copilot session error', {
+      logCopilot('error', 'Session error', {
         functionName: FUNCTION_NAME,
         sessionError,
         hasUser: Boolean(user),
@@ -313,10 +339,10 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
-      console.info('AirdropGuard Copilot raw response', response.data);
+      logCopilot('info', 'Raw response', response.data);
 
       if (response.error) {
-        console.error('AirdropGuard Copilot invoke failed', {
+        logCopilot('error', 'Invoke failed', {
           functionName: FUNCTION_NAME,
           error: response.error,
         });
@@ -324,16 +350,16 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
       }
 
       const answer = extractAssistantText(response.data)
-        ?? 'I could not generate a useful answer from the current AirdropGuard data.';
+        ?? UNREADABLE_RESPONSE_MESSAGE;
 
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: answer,
+        content: String(answer),
       }]);
     } catch (invokeError) {
       const userMessage = await extractInvokeError(invokeError);
-      console.error('AirdropGuard Copilot response error', {
+      logCopilot('error', 'Response error', {
         functionName: FUNCTION_NAME,
         error: invokeError,
         userMessage,
@@ -342,7 +368,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: userMessage,
+        content: String(userMessage || UNREADABLE_RESPONSE_MESSAGE),
       }]);
     } finally {
       setLoading(false);

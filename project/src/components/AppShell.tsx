@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -73,6 +73,38 @@ type ContextualAiState = {
   copilotContext: string;
   tip: string;
 };
+
+type FloatingAiPosition = {
+  x: number;
+  y: number;
+};
+
+const FLOATING_AI_STORAGE_KEY = 'ag_desktop_ai_position_v1';
+const FLOATING_AI_WIDTH = 170;
+const FLOATING_AI_HEIGHT = 56;
+const FLOATING_AI_MARGIN = 32;
+
+function clampFloatingAiPosition(position: FloatingAiPosition) {
+  if (typeof window === 'undefined') return position;
+
+  return {
+    x: Math.min(
+      Math.max(FLOATING_AI_MARGIN, position.x),
+      Math.max(FLOATING_AI_MARGIN, window.innerWidth - FLOATING_AI_WIDTH - FLOATING_AI_MARGIN),
+    ),
+    y: Math.min(
+      Math.max(FLOATING_AI_MARGIN, position.y),
+      Math.max(FLOATING_AI_MARGIN, window.innerHeight - FLOATING_AI_HEIGHT - FLOATING_AI_MARGIN),
+    ),
+  };
+}
+
+function getDefaultFloatingAiPosition(): FloatingAiPosition {
+  return clampFloatingAiPosition({
+    x: window.innerWidth - FLOATING_AI_WIDTH - FLOATING_AI_MARGIN,
+    y: window.innerHeight - FLOATING_AI_HEIGHT - FLOATING_AI_MARGIN,
+  });
+}
 
 export function isAuthenticatedAppPath(pathname: string): boolean {
   return (
@@ -363,6 +395,30 @@ export default function AppShell({
   const [pageCopilotContext, setPageCopilotContext] = useState<string | null>(null);
   const [heroHints, setHeroHints] = useState<HeroHints>({});
   const [statusTick, setStatusTick] = useState(0);
+  const [desktopAiPosition, setDesktopAiPosition] = useState<FloatingAiPosition | null>(() => {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      const raw = window.localStorage.getItem(FLOATING_AI_STORAGE_KEY);
+      if (!raw) return getDefaultFloatingAiPosition();
+      const parsed = JSON.parse(raw) as FloatingAiPosition;
+      if (typeof parsed?.x !== 'number' || typeof parsed?.y !== 'number') {
+        return getDefaultFloatingAiPosition();
+      }
+      return clampFloatingAiPosition(parsed);
+    } catch {
+      return getDefaultFloatingAiPosition();
+    }
+  });
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    dragged: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
   const sidebarItems = buildSidebarItems(location.pathname, location.search);
   const mobileItems = buildMobileItems(location.pathname);
   const effectiveCopilotContext = pageCopilotContext ?? routeContext.copilotContext;
@@ -396,8 +452,79 @@ export default function AppShell({
     return () => window.clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    if (!desktopAiPosition) return;
+    window.localStorage.setItem(FLOATING_AI_STORAGE_KEY, JSON.stringify(desktopAiPosition));
+  }, [desktopAiPosition]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setDesktopAiPosition((prev) => (prev ? clampFloatingAiPosition(prev) : getDefaultFloatingAiPosition()));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const openCopilotWithContext = (context: string) => {
     window.dispatchEvent(new CustomEvent('ag:copilot-context', { detail: { context } }));
+    setAiDrawerOpen(true);
+  };
+
+  const handleDesktopAiPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === 'touch' || event.button !== 0 || !desktopAiPosition) return;
+
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: desktopAiPosition.x,
+      originY: desktopAiPosition.y,
+      dragged: false,
+    };
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleDesktopAiPointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - dragState.startX;
+    const deltaY = event.clientY - dragState.startY;
+
+    if (!dragState.dragged && (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4)) {
+      dragState.dragged = true;
+    }
+
+    if (!dragState.dragged) return;
+
+    setDesktopAiPosition(clampFloatingAiPosition({
+      x: dragState.originX + deltaX,
+      y: dragState.originY + deltaY,
+    }));
+  };
+
+  const handleDesktopAiPointerEnd = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (dragState.dragged) {
+      suppressClickRef.current = true;
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    }
+
+    dragStateRef.current = null;
+  };
+
+  const handleDesktopAiClick = () => {
+    if (suppressClickRef.current) return;
     setAiDrawerOpen(true);
   };
 
@@ -782,8 +909,13 @@ export default function AppShell({
 
       <button
         type="button"
-        onClick={() => setAiDrawerOpen(true)}
-        className="fixed bottom-8 right-8 z-[75] hidden min-h-[56px] items-center gap-2 rounded-full border border-sky-300/50 bg-gradient-to-r from-sky-500 via-cyan-500 to-violet-500 px-5 py-3 text-sm font-black text-white shadow-[0_0_0_6px_rgba(56,189,248,0.14),0_18px_40px_rgba(56,189,248,0.3)] transition-transform hover:-translate-y-0.5 hover:scale-[1.02] lg:inline-flex"
+        onClick={handleDesktopAiClick}
+        onPointerDown={handleDesktopAiPointerDown}
+        onPointerMove={handleDesktopAiPointerMove}
+        onPointerUp={handleDesktopAiPointerEnd}
+        onPointerCancel={handleDesktopAiPointerEnd}
+        style={desktopAiPosition ? { left: desktopAiPosition.x, top: desktopAiPosition.y, right: 'auto', bottom: 'auto' } : undefined}
+        className="fixed bottom-8 right-8 z-[75] hidden min-h-[56px] items-center gap-2 rounded-full border border-sky-300/50 bg-gradient-to-r from-sky-500 via-cyan-500 to-violet-500 px-5 py-3 text-sm font-black text-white shadow-[0_0_0_6px_rgba(56,189,248,0.14),0_18px_40px_rgba(56,189,248,0.3)] transition-transform hover:-translate-y-0.5 hover:scale-[1.02] lg:inline-flex cursor-grab active:cursor-grabbing select-none"
         aria-label="Open AirdropGuard Copilot"
       >
         <AiOrb className="h-4 w-4" />

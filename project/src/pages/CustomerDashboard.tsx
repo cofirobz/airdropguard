@@ -1204,13 +1204,70 @@ export default function CustomerDashboard() {
 
     {activeTab === 'overview' && (
       <div className="space-y-4 animate-in">
+        <section className="md:hidden rounded-[28px] border border-cyan-400/22 bg-[linear-gradient(145deg,rgba(8,20,42,0.96),rgba(6,14,32,0.94))] p-4 shadow-[0_18px_40px_rgba(3,8,24,0.45),0_0_24px_rgba(14,165,233,0.1)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">{greeting}, {firstName}</p>
+              <h2 className="mt-1 text-lg font-black text-white">Your AirdropGuard briefing</h2>
+              <p className="mt-1 text-xs text-sky-100/90">
+                {remainingCount} tasks left. {recentlyVerifiedCount} recently verified. {avgTrustScore}% average trust.
+              </p>
+            </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-500/10 shadow-[0_0_18px_rgba(34,211,238,0.12)]">
+              <AiOrb className="h-6 w-6" />
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]">
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
+              AI Online
+            </span>
+            <span className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1 text-gray-300">
+              Updated moments ago
+            </span>
+            <span className="inline-flex items-center rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">
+              Market Pulse Live
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={featuredMission ? undefined : openCopilot}
+            className="mt-3 w-full rounded-2xl border border-cyan-300/30 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(59,130,246,0.18))] px-3 py-3 text-left"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">Best next action</p>
+                <p className="mt-1 truncate text-sm font-bold text-white">
+                  {featuredMission ? `Start ${featuredMission.name}` : 'Ask AI what to do next'}
+                </p>
+              </div>
+              {featuredMission ? (
+                <Link
+                  to={`/airdrop/${featuredMission.slug}`}
+                  className="inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-xl border border-cyan-300/35 bg-cyan-500/20 px-3 py-2 text-[11px] font-bold text-cyan-100"
+                >
+                  Open
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              ) : (
+                <span className="inline-flex min-h-[38px] shrink-0 items-center gap-1 rounded-xl border border-cyan-300/35 bg-cyan-500/20 px-3 py-2 text-[11px] font-bold text-cyan-100">
+                  Ask AI
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </span>
+              )}
+            </div>
+          </button>
+        </section>
+
         <section className="relative overflow-hidden rounded-[30px] border border-cyan-400/30 bg-[linear-gradient(145deg,rgba(3,12,28,0.95),rgba(8,20,42,0.95)_48%,rgba(6,14,32,0.95))] p-4 shadow-[0_24px_60px_rgba(3,8,24,0.6),0_0_44px_rgba(14,165,233,0.12)] soft-flow sm:p-5">
           <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-400/20 blur-3xl" />
           <div className="pointer-events-none absolute -left-24 bottom-0 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl" />
 
           <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">{greeting}, {firstName} 👋</p>
+              <p className="hidden text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200 md:block">{greeting}, {firstName} 👋</p>
               <h2 className="mt-1 text-2xl font-black leading-tight text-white sm:text-3xl">Today&apos;s Mission</h2>
               <p className="mt-2 max-w-xl text-sm text-sky-100/95">Focus on your best opportunity, complete priority tasks, then ask AI what to do next.</p>
               <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-200/90">Check Before You Connect.</p>
