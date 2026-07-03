@@ -603,7 +603,7 @@ export default function Layout() {
                 </div>
               </div>
 
-              <div className="max-h-[calc(100dvh-8rem)] overflow-y-auto px-3 py-3">
+              <div className="max-h-[calc(100dvh-8rem)] overflow-y-auto px-3 py-3 pb-28">
                 <div className="space-y-4">
                   <div>
                     <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
@@ -627,6 +627,26 @@ export default function Layout() {
                       ))}
                     </div>
                   </div>
+
+                  {!user && (
+                    <div>
+                      <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        Account
+                      </p>
+                      <Link
+                        to="/auth"
+                        className="group flex min-h-[48px] items-center justify-between rounded-2xl border border-sky-400/25 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-sky-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
+                      >
+                        <span className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-400/25 bg-white/[0.04] text-sky-200">
+                            <LogIn className="h-4 w-4" />
+                          </span>
+                          Sign In / Create Account
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-gray-300" />
+                      </Link>
+                    </div>
+                  )}
 
                   <div>
                     <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
@@ -701,18 +721,7 @@ export default function Layout() {
                           Sign Out
                         </button>
                       </>
-                    ) : (
-                      <Link
-                        to="/auth"
-                        className="group flex min-h-[48px] items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
-                      >
-                        <span className="flex items-center gap-3">
-                          <LogIn className="h-4 w-4" />
-                          Sign In / Create Account
-                        </span>
-                        <ChevronRight className="h-4 w-4 text-gray-400" />
-                      </Link>
-                    )}
+                    ) : null}
 
                     <Link
                       to="/admin"

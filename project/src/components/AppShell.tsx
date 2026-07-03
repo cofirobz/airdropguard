@@ -9,11 +9,14 @@ import {
   Home,
   Key,
   LayoutDashboard,
+  ListChecks,
   LogOut,
   Shield,
   Sparkles,
+  Star,
   UserCircle2,
   Wallet,
+  X,
 } from 'lucide-react';
 import AirdropCopilot from './AirdropCopilot';
 
@@ -152,6 +155,7 @@ export default function AppShell({
 }: AppShellProps) {
   const location = useLocation();
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pageCopilotContext, setPageCopilotContext] = useState<string | null>(null);
   const sidebarItems = buildSidebarItems(location.pathname, location.search);
   const mobileItems = buildMobileItems(location.pathname);
@@ -160,7 +164,15 @@ export default function AppShell({
 
   useEffect(() => {
     setPageCopilotContext(null);
+    setMobileMenuOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     const handleContext = (event: Event) => {
@@ -299,21 +311,146 @@ export default function AppShell({
             <span className="mt-0.5 text-[10px] font-black uppercase tracking-[0.1em]">AI</span>
           </button>
 
-          {mobileItems.slice(2).map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.label}
-                to={item.to}
-                className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold ${item.active ? 'text-sky-300' : 'text-gray-500'}`}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
+          <Link
+            to="/scam-alerts"
+            className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold ${location.pathname === '/scam-alerts' ? 'text-sky-300' : 'text-gray-500'}`}
+          >
+            <AlertTriangle className="h-4 w-4" />
+            Alerts
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-gray-500"
+          >
+            <UserCircle2 className="h-4 w-4" />
+            More
+          </button>
         </div>
       </div>
+
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-[79] lg:hidden">
+          <button
+            type="button"
+            aria-label="Close app menu overlay"
+            onClick={() => setMobileMenuOpen(false)}
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          />
+
+          <aside className="absolute inset-x-3 top-16 bottom-16 overflow-hidden rounded-[28px] border border-white/10 bg-[#070b18]/98 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between border-b border-white/10 bg-[linear-gradient(135deg,rgba(14,165,233,0.12),rgba(15,23,42,0.95))] px-4 py-4">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">AirdropGuard App</div>
+                <div className="mt-1 text-sm font-black text-white">More</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-gray-200"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-full overflow-y-auto px-3 py-3 pb-28">
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Primary</p>
+                  <div className="grid gap-1">
+                    {[
+                      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+                      { to: '/', label: 'Browse Airdrops', icon: Home },
+                      { to: '/?filter=trending', label: 'Trending', icon: Flame },
+                      { to: '/wallet-checker', label: 'Wallet Check', icon: Wallet },
+                      { to: '/scam-alerts', label: 'Alerts', icon: AlertTriangle },
+                    ].map(item => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.label}
+                          to={item.to}
+                          className="group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100 transition-colors hover:bg-white/10"
+                        >
+                          <span className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-gray-300">
+                              <Icon className="h-4 w-4" />
+                            </span>
+                            {item.label}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Dashboard Views</p>
+                  <div className="grid gap-1">
+                    {[
+                      { to: '/dashboard?view=overview', label: 'Watchlist', icon: Star },
+                      { to: '/dashboard?view=tasks', label: 'Task Tracking', icon: ListChecks },
+                      { to: '/dashboard?view=profile', label: 'Profile', icon: UserCircle2 },
+                      { to: '/dashboard?view=api', label: 'API Access', icon: Key },
+                      { to: '/dashboard?view=profile', label: 'Settings', icon: Shield },
+                    ].map(item => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.label}
+                          to={item.to}
+                          className="group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100 transition-colors hover:bg-white/10"
+                        >
+                          <span className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-gray-300">
+                              <Icon className="h-4 w-4" />
+                            </span>
+                            {item.label}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-gray-400" />
+                        </Link>
+                      );
+                    })}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setAiDrawerOpen(true);
+                      }}
+                      className="group flex min-h-[48px] items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-gray-100 transition-colors hover:bg-white/10"
+                    >
+                      <span className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-500/10 text-cyan-200">
+                          <Sparkles className="h-4 w-4" />
+                        </span>
+                        AI Analyzer
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-2">
+                  <button
+                    type="button"
+                    onClick={() => void onSignOut()}
+                    className="flex min-h-[48px] w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-semibold text-rose-300 transition-colors hover:bg-rose-500/10 hover:text-white"
+                  >
+                    <span className="flex items-center gap-3">
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-rose-300" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
 
       <button
         type="button"

@@ -35,7 +35,7 @@ const bannerStyle: React.CSSProperties = {
   background: "#111827",
   color: "#E5E7EB",
   borderBottom: "1px solid #EF4444",
-  padding: "7px 14px",
+  padding: "7px 14px calc(7px + env(safe-area-inset-bottom, 0px)) 14px",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",

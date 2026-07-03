@@ -1,7 +1,7 @@
 import DashboardEngagementPanel from "../components/DashboardEngagementPanel";
 import AirdropGuardIntelligenceCentre from "../components/AirdropGuardIntelligenceCentre";
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   Loader2, Key, Copy, Check, RefreshCw,
   ExternalLink, ChevronDown, ChevronUp, CheckSquare, Square,
@@ -655,6 +655,7 @@ function ReputationCard({
 export default function CustomerDashboard() {
   const { user, loading: authLoading, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [airdrops, setAirdrops] = useState<AirdropWithTasks[]>([]);
   const [subscription, setSubscription] = useState<ApiSubscription | null>(null);
@@ -665,6 +666,7 @@ export default function CustomerDashboard() {
   const [reputation, setReputation] = useState<UserReputation | null>(null);
   const [unlocks, setUnlocks] = useState<UserUnlock[]>([]);
   const [dashboardSearch, setDashboardSearch] = useState('');
+  const requestedView = searchParams.get('view');
 
   useEffect(() => {
     if (authLoading) return;
@@ -900,6 +902,14 @@ export default function CustomerDashboard() {
   const openCopilot = useCallback(() => {
     window.dispatchEvent(new CustomEvent('ag:copilot-open'));
   }, []);
+
+  useEffect(() => {
+    if (requestedView === 'airdrops') setActiveTab('airdrops');
+    else if (requestedView === 'tasks') setActiveTab('tasks');
+    else if (requestedView === 'api') setActiveTab('api');
+    else if (requestedView === 'profile') setActiveTab('profile');
+    else if (requestedView === 'overview') setActiveTab('overview');
+  }, [requestedView]);
 
   const activityTimeline = [
     {
