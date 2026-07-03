@@ -491,6 +491,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
           <button
             type="button"
             onClick={startNewChat}
+            aria-label="Start new chat"
             className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center gap-1 rounded-xl border border-sky-400/30 bg-sky-500/10 px-3 text-xs font-semibold text-sky-100 transition-colors hover:bg-sky-500/20"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -500,6 +501,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
             <button
               type="button"
               onClick={onClose}
+              aria-label="Close copilot"
               className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-gray-200 transition-colors hover:bg-white/[0.08]"
             >
               <X className="h-3.5 w-3.5" />

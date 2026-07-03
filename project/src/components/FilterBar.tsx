@@ -61,6 +61,7 @@ export default function FilterBar({ filters, onChange }: Props) {
         <button
           type="button"
           onClick={() => setShowFilters((open) => !open)}
+          aria-label={showFilters ? 'Hide filters' : 'Show filters'}
           className={`relative flex min-h-[46px] shrink-0 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors ${
             showFilters || hasActiveFilters
               ? 'border-neon-purple/30 bg-neon-purple/15 text-neon-purple'

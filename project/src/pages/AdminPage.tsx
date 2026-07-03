@@ -33,7 +33,7 @@ function ToastBar({ toast, onDismiss }: { toast: Toast; onDismiss: () => void })
         ? <CheckCircle2 className="w-4 h-4 shrink-0" />
         : <AlertTriangle className="w-4 h-4 shrink-0" />}
       {toast.msg}
-      <button onClick={onDismiss} className="ml-1 opacity-60 hover:opacity-100 transition-opacity">
+      <button onClick={onDismiss} aria-label="Dismiss notification" className="ml-1 opacity-60 hover:opacity-100 transition-opacity">
         <X className="w-3.5 h-3.5" />
       </button>
     </div>
@@ -379,7 +379,7 @@ function AirdropFormModal({
       <div className="w-full max-w-2xl glass-card p-6 space-y-5 relative mb-12">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-bold text-white">{mode === 'add' ? 'Add New Airdrop' : 'Edit Airdrop'}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
+          <button onClick={onClose} aria-label="Close airdrop form" className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -645,7 +645,7 @@ function BannerFormModal({
             <h2 className="text-lg font-bold text-white">{mode === 'add' ? 'Create Banner' : 'Edit Banner'}</h2>
             <p className="text-xs text-gray-500 mt-1">Prepare enquiry workflow, upload artwork placeholders, and preview before going live.</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
+          <button onClick={onClose} aria-label="Close banner form" className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1675,6 +1675,7 @@ export default function AdminPage() {
             {refreshingAll ? 'Analyzing…' : 'Refresh All AI'}
           </button>
           <button onClick={() => { fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); }}
+            aria-label="Refresh admin data"
             className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
           </button>

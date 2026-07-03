@@ -756,6 +756,7 @@ export default function AppShell({
             <button
               type="button"
               onClick={() => void onSignOut()}
+              aria-label="Sign out"
               className="inline-flex min-h-[42px] min-w-[42px] items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-gray-300 transition-colors hover:border-white/25 hover:text-white"
             >
               <LogOut className="h-4 w-4" />

@@ -301,6 +301,7 @@ export default function AirdropGuardIntelligenceCentre() {
 
           <button
             onClick={loadBrief}
+            aria-label="Refresh intelligence"
             className="rounded-lg border border-white/10 bg-white/5 p-2 text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
             title="Refresh Intelligence"
           >
