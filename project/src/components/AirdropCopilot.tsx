@@ -61,6 +61,55 @@ function getFunctionErrorMessage(payload: unknown, fallback: string): string {
   return value?.trim() || fallback;
 }
 
+function normalizeText(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed && trimmed !== '[object Object]' ? trimmed : null;
+}
+
+function extractTextFromObject(payload: Record<string, unknown>): string | null {
+  const directKeys = ['answer', 'message', 'content', 'text', 'response'];
+
+  for (const key of directKeys) {
+    const direct = normalizeText(payload[key]);
+    if (direct) return direct;
+  }
+
+  for (const key of directKeys) {
+    const candidate = payload[key];
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      const nested = extractTextFromObject(candidate as Record<string, unknown>);
+      if (nested) return nested;
+    }
+  }
+
+  if (Array.isArray(payload.content)) {
+    const joined = payload.content
+      .map(item => {
+        if (typeof item === 'string') return item.trim();
+        if (item && typeof item === 'object') {
+          return normalizeText((item as Record<string, unknown>).text) ?? normalizeText((item as Record<string, unknown>).content) ?? '';
+        }
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+
+    if (joined && joined !== '[object Object]') return joined;
+  }
+
+  return null;
+}
+
+function extractAssistantText(payload: unknown): string | null {
+  const direct = normalizeText(payload);
+  if (direct) return direct;
+
+  if (!payload || typeof payload !== 'object') return null;
+  return extractTextFromObject(payload as Record<string, unknown>);
+}
+
 async function extractInvokeError(error: unknown): Promise<string> {
   const fallback = 'AirdropGuard Copilot is unavailable right now. Please try again in a moment.';
 
@@ -134,6 +183,8 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
+      console.info('AirdropGuard Copilot raw response', response.data);
+
       if (response.error) {
         console.error('AirdropGuard Copilot invoke failed', {
           functionName: FUNCTION_NAME,
@@ -142,9 +193,8 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
         throw response.error;
       }
 
-      const answer = typeof response.data?.answer === 'string' && response.data.answer.trim()
-        ? response.data.answer.trim()
-        : 'I could not generate a useful answer from the current AirdropGuard data.';
+      const answer = extractAssistantText(response.data)
+        ?? 'I could not generate a useful answer from the current AirdropGuard data.';
 
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),

@@ -168,11 +168,16 @@ export default function AppShell({
   }, [location.pathname, location.search]);
 
   useEffect(() => {
-    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
+    const shouldLockScroll = (mobileMenuOpen || aiDrawerOpen) && window.matchMedia('(max-width: 1023px)').matches;
+
+    document.body.style.overflow = shouldLockScroll ? 'hidden' : '';
+    document.documentElement.style.overflow = shouldLockScroll ? 'hidden' : '';
+
     return () => {
       document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
     };
-  }, [mobileMenuOpen]);
+  }, [aiDrawerOpen, mobileMenuOpen]);
 
   useEffect(() => {
     const handleContext = (event: Event) => {
@@ -462,7 +467,12 @@ export default function AppShell({
         Ask AI
       </button>
 
-      <div className={`fixed inset-0 z-[80] ${aiDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+      <div
+        className={`fixed inset-0 z-[80] ${
+          aiDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none hidden lg:block'
+        }`}
+        aria-hidden={aiDrawerOpen ? undefined : true}
+      >
         <div
           className={`absolute inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity duration-300 ${aiDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setAiDrawerOpen(false)}
