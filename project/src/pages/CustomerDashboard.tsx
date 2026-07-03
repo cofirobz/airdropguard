@@ -652,6 +652,35 @@ function ReputationCard({
   );
 }
 
+function formatSnapshotMetric(label: 'reward' | 'risk' | 'time', value: string) {
+  const trimmed = value.trim();
+
+  if (label === 'reward') {
+    const parenthetical = trimmed.match(/^(.*?)(\s*\([^)]*\))$/);
+    if (parenthetical) {
+      return {
+        primary: parenthetical[1].trim(),
+        secondary: parenthetical[2].trim(),
+      };
+    }
+  }
+
+  if (label === 'time') {
+    const timeMatch = trimmed.match(/^(.+?)\s+(minutes?|hours?)$/i);
+    if (timeMatch) {
+      return {
+        primary: timeMatch[1].trim(),
+        secondary: timeMatch[2].trim(),
+      };
+    }
+  }
+
+  return {
+    primary: trimmed,
+    secondary: null,
+  };
+}
+
 function AnimatedCounter({
   value,
   duration = 900,
@@ -942,6 +971,9 @@ export default function CustomerDashboard() {
   const missionReward = featuredMission?.estimated_reward || 'Reward window updating';
   const missionCountdownMs = useCountdown(featuredMission?.expiry_date ?? null);
   const missionCountdown = formatCountdown(missionCountdownMs);
+  const rewardMetric = formatSnapshotMetric('reward', missionReward);
+  const riskMetric = formatSnapshotMetric('risk', featuredMission?.risk_level || 'Risk unknown');
+  const timeMetric = formatSnapshotMetric('time', featuredMission?.time_required || 'Time window updating');
   const favoriteChain = (() => {
     const counts: Record<string, number> = {};
     safeAirdrops.forEach((item) => {
@@ -1283,19 +1315,20 @@ export default function CustomerDashboard() {
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                        <div className="flex min-h-[58px] flex-col justify-center rounded-2xl border border-cyan-300/35 bg-cyan-500/18 px-3 py-2">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/75">Reward</p>
-                          <p className="mt-1 text-[11px] font-semibold leading-tight text-cyan-100 break-words whitespace-normal">{missionReward}</p>
-                        </div>
-                        <div className="flex min-h-[58px] flex-col justify-center rounded-2xl border border-emerald-400/35 bg-emerald-500/16 px-3 py-2">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-100/75">Risk</p>
-                          <p className="mt-1 text-[11px] font-semibold leading-tight text-emerald-100 break-words whitespace-normal">{featuredMission.risk_level || 'Risk unknown'}</p>
-                        </div>
-                        <div className="flex min-h-[58px] flex-col justify-center rounded-2xl border border-white/20 bg-white/[0.1] px-3 py-2">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">Time</p>
-                          <p className="mt-1 text-[11px] font-semibold leading-tight text-white break-words whitespace-normal">{featuredMission.time_required || 'Time window updating'}</p>
-                        </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {[
+                          { label: 'Reward', tone: 'border-cyan-300/35 bg-cyan-500/18 text-cyan-100', value: rewardMetric },
+                          { label: 'Risk', tone: 'border-emerald-400/35 bg-emerald-500/16 text-emerald-100', value: riskMetric },
+                          { label: 'Time', tone: 'border-white/20 bg-white/[0.1] text-white', value: timeMetric },
+                        ].map((metric) => (
+                          <div key={metric.label} className={`flex min-h-[84px] flex-col items-center justify-center rounded-2xl border px-2.5 py-3 text-center sm:px-3 ${metric.tone}`}>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-75">{metric.label}</p>
+                            <p className="mt-1 text-[11px] font-bold leading-tight break-words whitespace-normal sm:text-xs">{metric.value.primary}</p>
+                            {metric.value.secondary && (
+                              <p className="mt-0.5 text-[10px] leading-tight opacity-85 break-words whitespace-normal">{metric.value.secondary}</p>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </>
                   ) : (

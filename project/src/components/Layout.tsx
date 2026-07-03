@@ -537,7 +537,7 @@ export default function Layout() {
         </AppShell>
       ) : (
         <>
-      <nav className={`fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-dark-950/98 supports-[backdrop-filter]:bg-dark-950/95 transition-transform duration-300 ease-out ${navHidden ? '-translate-y-full' : 'translate-y-0'}`}>
+      <nav className={`fixed inset-x-0 top-0 z-50 bg-dark-950/98 shadow-[0_14px_40px_rgba(2,6,23,0.18)] supports-[backdrop-filter]:bg-dark-950/95 transition-transform duration-300 ease-out ${navHidden ? '-translate-y-full' : 'translate-y-0'}`}>
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
           <div className="grid h-20 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 lg:grid-cols-[auto_minmax(0,1fr)_auto] xl:h-24">
             <Link
@@ -568,12 +568,7 @@ export default function Layout() {
               </div>
             </Link>
 
-            <div className="hidden min-w-0 lg:flex lg:flex-col lg:items-center lg:justify-center lg:gap-2 xl:px-4">
-              <div className="ag-route-context hidden max-w-[240px] rounded-2xl border border-cyan-400/15 bg-cyan-500/[0.05] px-4 py-2 text-center shadow-[0_0_24px_rgba(34,211,238,0.08)] xl:block">
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">{routeHeader.eyebrow}</p>
-                <p className="truncate text-sm font-semibold text-white">{routeHeader.title}</p>
-                <p className="truncate text-[11px] text-gray-400">{routeHeader.subtitle}</p>
-              </div>
+            <div className="hidden min-w-0 lg:flex lg:items-center lg:justify-center xl:px-4">
               <div className="ag-primary-nav-cluster flex items-center gap-1 rounded-3xl border border-white/10 bg-white/[0.035] p-1 shadow-sm shadow-black/10">
                 {primaryNavItems.map(({ to, label, icon: Icon }) => (
                   <NavLink
@@ -662,6 +657,14 @@ export default function Layout() {
                               </Link>
                             ),
                           )}
+                        </div>
+                      </div>
+
+                      <div className="ag-route-context hidden xl:block pb-4">
+                        <div className="mx-auto max-w-[420px] rounded-2xl border border-cyan-400/12 bg-cyan-500/[0.05] px-5 py-3 text-center shadow-[0_0_24px_rgba(34,211,238,0.06)]">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">{routeHeader.eyebrow}</p>
+                          <p className="mt-1 truncate text-sm font-semibold text-white">{routeHeader.title}</p>
+                          <p className="mt-1 truncate text-[11px] text-gray-400">{routeHeader.subtitle}</p>
                         </div>
                       </div>
                     </div>
@@ -845,7 +848,7 @@ export default function Layout() {
       </nav>
       
 
-      <main id="main-content" className="relative pt-20" tabIndex={-1}>
+      <main id="main-content" className="relative pt-20 xl:pt-32" tabIndex={-1}>
         <Outlet />
       </main>
 
