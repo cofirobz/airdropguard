@@ -891,6 +891,9 @@ export default function CustomerDashboard() {
     ? `Estimated potential from ${highPotentialCount} high-opportunity project${highPotentialCount !== 1 ? 's' : ''}`
     : 'Estimated potential varies';
   const copilotConfidencePct = Math.max(84, Math.min(99, 80 + Math.round(avgTrustScore / 4)));
+  const featuredMission = focusAirdrops[0] ?? priorityAirdrops[0] ?? null;
+  const missionTrust = Math.max(0, Math.min(100, featuredMission?.trust_score ?? avgTrustScore));
+  const missionReward = featuredMission?.estimated_reward || 'Reward window updating';
 
   const openProfileOverview = () => {
     setActiveTab('profile');
@@ -970,32 +973,45 @@ export default function CustomerDashboard() {
 
  return (
   <>
-          <div className="hidden rounded-3xl border border-white/10 bg-[#090d1d]/80 p-4 shadow-[0_0_40px_rgba(139,92,246,0.12)] md:block sm:p-5">
+          <div className="hidden rounded-3xl border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(4,10,24,0.96),rgba(5,13,32,0.96))] p-4 shadow-[0_18px_50px_rgba(3,8,24,0.65),0_0_42px_rgba(34,211,238,0.14)] md:block sm:p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-300">{greeting}, {firstName} 👋</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">{greeting}, {firstName} 👋</p>
                 <h1 className="mt-1 text-2xl font-black text-white sm:text-3xl">AirdropGuard Intelligence Dashboard</h1>
-                <p className="mt-1 text-sm text-gray-400">
-                  Here&apos;s what&apos;s happening with your airdrop opportunities today.
+                <p className="mt-1 text-sm text-gray-200">
+                  Mission control for your next best airdrop moves.
                 </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                    AI Online
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-semibold text-cyan-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 animate-pulse" />
+                    Market Pulse Live
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-200">
+                    Updated recently
+                  </span>
+                </div>
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative hidden sm:block">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     value={dashboardSearch}
                     onChange={(event) => setDashboardSearch(event.target.value)}
                     placeholder="Search dashboard"
-                    className="h-11 w-full rounded-2xl border border-white/10 bg-white/[0.03] pl-10 pr-3 text-sm text-white placeholder:text-gray-500 focus:border-sky-500/40 focus:outline-none sm:w-64"
+                    className="h-11 w-full rounded-2xl border border-cyan-500/20 bg-white/[0.04] pl-10 pr-3 text-sm text-white placeholder:text-gray-400 focus:border-cyan-400/50 focus:outline-none sm:w-64"
                   />
                 </div>
                 <button
                   type="button"
-                  className="hidden h-11 items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-300 lg:inline-flex"
+                  className="hidden h-11 items-center gap-2 rounded-2xl border border-cyan-500/35 bg-cyan-500/12 px-3 text-xs font-semibold text-cyan-200 lg:inline-flex"
                 >
-                  <Activity className="h-3.5 w-3.5" />
+                  <Activity className="h-3.5 w-3.5 animate-pulse" />
                   Market Pulse Live
                 </button>
                 <button
@@ -1005,13 +1021,13 @@ export default function CustomerDashboard() {
                 >
                   <Bell className="h-4 w-4" />
                 </button>
-                <div className="hidden h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-xs text-gray-300 lg:inline-flex">
-                  <UserCircle2 className="h-4 w-4 text-sky-300" />
+                <div className="hidden h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-3 text-xs text-gray-100 lg:inline-flex">
+                  <UserCircle2 className="h-4 w-4 text-cyan-200" />
                   <span className="max-w-[150px] truncate">{user.email}</span>
                 </div>
                 <button
                   onClick={fetchData}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-gray-300 hover:border-white/25 hover:text-white transition-colors"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-cyan-500/20 bg-white/[0.04] px-3 text-xs font-semibold text-gray-100 hover:border-cyan-400/45 hover:text-white transition-colors"
                   title="Refresh"
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -1027,151 +1043,185 @@ export default function CustomerDashboard() {
             </div>
           </div>
 
-          <div className="hidden grid-cols-2 gap-3 md:grid md:grid-cols-3 xl:grid-cols-5">
-            <StatCard
-              label="Total Airdrops" value={airdrops.length}
-              icon={Rocket} iconBg="bg-sky-500/15 border border-sky-500/30" iconClass="text-sky-300"
-            />
-            <StatCard
-              label="Watchlist" value={watchlistCount}
-              icon={Star} iconBg="bg-violet-500/15 border border-violet-500/30" iconClass="text-violet-300"
-            />
-            <StatCard
-              label="Tasks Completed" value={completedCount}
-              icon={CheckSquare} iconBg="bg-emerald-500/15 border border-emerald-500/30" iconClass="text-emerald-300"
-              sub={totalTasks > 0 ? `of ${totalTasks}` : undefined}
-            />
-            <StatCard
-              label="Average Trust Score" value={`${avgTrustScore}%`}
-              icon={Shield} iconBg="bg-cyan-500/15 border border-cyan-500/30" iconClass="text-cyan-300"
-            />
-            <StatCard
-              label="Copilot Insights" value={copilotInsights}
-              icon={Sparkles} iconBg="bg-neon-purple/15 border border-neon-purple/30" iconClass="text-neon-purple"
-              sub="Live intelligence signals"
-            />
-          </div>
-
     {activeTab === 'overview' && (
       <div className="space-y-4 animate-in">
-        <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
-          <div className="glass-card rounded-[28px] border border-sky-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-400/35">
-            <div className="mb-2 flex items-center gap-2">
-              <Zap className="h-4 w-4 text-amber-300" />
-              <h2 className="text-sm font-semibold text-white">Today&apos;s Focus</h2>
+        <section className="relative overflow-hidden rounded-[30px] border border-cyan-400/30 bg-[linear-gradient(145deg,rgba(3,12,28,0.95),rgba(8,20,42,0.95)_48%,rgba(6,14,32,0.95))] p-4 shadow-[0_24px_60px_rgba(3,8,24,0.6),0_0_44px_rgba(14,165,233,0.12)] soft-flow sm:p-5">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-400/20 blur-3xl" />
+          <div className="pointer-events-none absolute -left-24 bottom-0 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl" />
+
+          <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">{greeting}, {firstName} 👋</p>
+              <h2 className="mt-1 text-2xl font-black leading-tight text-white sm:text-3xl">Today&apos;s Mission</h2>
+              <p className="mt-2 max-w-xl text-sm text-sky-100/95">Focus on your best opportunity, complete priority tasks, then ask AI what to do next.</p>
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-200/90">Check Before You Connect.</p>
+
+              {featuredMission ? (
+                <div className="mt-4 rounded-2xl border border-cyan-400/25 bg-[#07162f]/85 p-3 backdrop-blur">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 overflow-hidden rounded-2xl border border-cyan-300/30 bg-[#0a1f3d]">
+                      {featuredMission.logo_url ? (
+                        <img
+                          src={featuredMission.logo_url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-100">{featuredMission.name[0]}</div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-base font-black text-white">{featuredMission.name}</p>
+                      <p className="mt-0.5 text-xs text-cyan-100">AI + human verified workflow ready</p>
+                    </div>
+                    <div className="rounded-xl border border-amber-400/35 bg-amber-500/12 px-2 py-1 text-[10px] font-semibold text-amber-100">
+                      <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> Reward</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-full border border-cyan-400/30 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-semibold text-cyan-100">{missionReward}</span>
+                    <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold text-emerald-100">{featuredMission.risk_level || 'Risk unknown'}</span>
+                    <span className="rounded-full border border-white/20 bg-white/[0.08] px-2.5 py-1 text-[10px] font-semibold text-white">{featuredMission.time_required || 'Time window updating'}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-white/15 bg-white/[0.05] px-3 py-3 text-xs text-gray-200">
+                  Mission is loading from your active airdrop queue.
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {featuredMission && (
+                  <Link
+                    to={`/airdrop/${featuredMission.slug}`}
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-cyan-300/40 bg-cyan-500/20 px-4 py-2 text-xs font-bold text-cyan-100 transition-colors hover:bg-cyan-500/30"
+                  >
+                    <Target className="h-3.5 w-3.5" />
+                    Open Mission
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={openCopilot}
+                  className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-blue-300/35 bg-blue-500/20 px-4 py-2 text-xs font-bold text-blue-100 transition-colors hover:bg-blue-500/30"
+                >
+                  <Bot className="h-3.5 w-3.5" />
+                  Ask AI
+                </button>
+              </div>
             </div>
-            {focusAirdrops[0] ? (
-              <div>
-                <p className="text-base font-bold text-white">{focusAirdrops[0].name}</p>
-                <p className="mt-1 text-[11px] text-gray-400">Complete the priority tasks first, then verify official links.</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link to={`/airdrop/${focusAirdrops[0].slug}`} className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-300 transition-colors hover:bg-sky-500/20 hover:text-white">Review Opportunity</Link>
-                  <button onClick={() => setActiveTab('tasks')} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-gray-300 transition-colors hover:bg-white/[0.07] hover:text-white">Go to Tasks</button>
+
+            <div className="grid shrink-0 grid-cols-2 gap-3 sm:w-[300px]">
+              <div className="rounded-2xl border border-cyan-400/28 bg-[#081c3b]/88 p-3 text-center">
+                <div className="mx-auto w-fit">
+                  <RingProgress pct={missionTrust} size={72} stroke={5} />
+                </div>
+                <p className="mt-1 text-xs font-bold text-white">Trust Score</p>
+                <p className="text-[11px] text-cyan-100">{missionTrust}% confidence</p>
+              </div>
+              <div className="rounded-2xl border border-blue-400/25 bg-[#0b1a37]/90 p-3">
+                <div className="mb-2 inline-flex rounded-lg border border-amber-400/30 bg-amber-500/12 p-1.5">
+                  <Award className="h-4 w-4 text-amber-200" />
+                </div>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-blue-200">Reward Forecast</p>
+                <p className="mt-1 text-sm font-bold text-white">{missionReward}</p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-amber-300 via-cyan-300 to-blue-400" />
                 </div>
               </div>
-            ) : (
-              <p className="text-xs text-gray-500">No urgent opportunities right now. Check Browse for newly published listings.</p>
-            )}
-          </div>
-
-          <div className="glass-card rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(155deg,rgba(6,182,212,0.1),rgba(17,24,39,0.96))] p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300/35">
-            <div className="mb-2 flex items-center gap-2">
-              <Bot className="h-4 w-4 text-cyan-300" />
-              <h2 className="text-sm font-semibold text-white">Ask AI</h2>
+              <div className="col-span-2 rounded-2xl border border-emerald-400/25 bg-[#071a2e]/88 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-bold text-emerald-100">Market Pulse Live</p>
+                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-200"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" /> updated recently</span>
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-xl border border-white/15 bg-white/[0.06] p-2">
+                    <p className="text-base font-black text-emerald-300">{marketPulse.momentum}%</p>
+                    <p className="text-[10px] text-gray-300">Momentum</p>
+                  </div>
+                  <div className="rounded-xl border border-white/15 bg-white/[0.06] p-2">
+                    <p className="text-base font-black text-amber-300">{marketPulse.reviewed}</p>
+                    <p className="text-[10px] text-gray-300">Review</p>
+                  </div>
+                  <div className="rounded-xl border border-white/15 bg-white/[0.06] p-2">
+                    <p className="text-base font-black text-rose-300">{marketPulse.riskSignals}</p>
+                    <p className="text-[10px] text-gray-300">Risk</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p className="text-[11px] text-gray-300">Get a quick recommendation before you browse deeper.</p>
+          </div>
+        </section>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="glass-card rounded-[26px] border border-cyan-400/28 bg-[linear-gradient(145deg,rgba(8,145,178,0.2),rgba(8,20,42,0.94))] p-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-white">Ask AI</h3>
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-200"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />Online</span>
+            </div>
+            <p className="text-xs text-cyan-100">Safer airdrops, smarter decisions.</p>
             <button
               type="button"
               onClick={openCopilot}
-              className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-sky-500 px-4 py-2.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-xs font-black text-white shadow-[0_12px_28px_rgba(14,165,233,0.34)]"
             >
               <Sparkles className="h-4 w-4" />
-              Open Copilot
+              Ask what to do next
             </button>
           </div>
-        </div>
 
-        <div className="glass-card overflow-hidden rounded-[28px] border border-sky-500/10 transition-all duration-200 hover:-translate-y-0.5">
-          <div className="p-4 flex items-center justify-between gap-3 border-b border-white/5">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
-                <ListChecks className="w-4 h-4 text-sky-400" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-white">Continue Your Tasks</h2>
-                <p className="text-[10px] text-gray-600">{completedCount} done · {remainingCount} left</p>
-              </div>
+          <div className="glass-card rounded-[26px] border border-blue-400/28 bg-[linear-gradient(145deg,rgba(37,99,235,0.22),rgba(8,20,42,0.94))] p-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-white">Continue Tasks</h3>
+              <div className="rounded-full border border-white/20 bg-white/[0.08] px-2 py-0.5 text-[10px] font-bold text-white">{overallPct}%</div>
+            </div>
+            <div className="flex items-center gap-3">
+              <RingProgress pct={overallPct} size={58} stroke={5} />
+              <p className="text-xs text-blue-100">{completedCount} complete • {remainingCount} remaining</p>
             </div>
             <button
               type="button"
               onClick={() => setActiveTab('tasks')}
-              className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
+              className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-2xl border border-blue-300/40 bg-blue-500/20 px-4 py-2 text-xs font-bold text-blue-100"
             >
-              View all →
+              Resume checklist
+              <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          {taskAirdrops.length === 0 ? (
-            <div className="p-6 text-center">
-              <Rocket className="w-7 h-7 text-gray-700 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No task checklists are attached to current airdrops yet.</p>
-              <p className="text-xs text-gray-700 mt-1">Airdrops still appear in the Airdrops tab.</p>
-            </div>
-          ) : (
-            taskAirdrops.slice(0, 3).map(a => (
-              <AirdropRow key={a.id} airdrop={a} completedIds={completedIds} onToggle={handleToggle} />
-            ))
-          )}
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-2">
-          <div className="glass-card rounded-[28px] p-4 border border-violet-500/20 transition-all duration-200 hover:-translate-y-0.5">
-            <div className="mb-3 flex items-center gap-2">
-              <Star className="h-4 w-4 text-violet-300" />
-              <h3 className="text-sm font-semibold text-white">Your Watchlist</h3>
+          <div className="glass-card rounded-[26px] border border-violet-400/22 bg-[linear-gradient(145deg,rgba(79,70,229,0.12),rgba(8,20,42,0.94))] p-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-white">Watchlist Preview</h3>
+              <span className="text-[10px] text-violet-100">{watchlistAirdrops.length}</span>
             </div>
             {watchlistAirdrops.length === 0 ? (
-              <p className="text-xs text-gray-500">No bookmarked airdrops yet. Use bookmarks in Browse to build your watchlist.</p>
+              <p className="text-xs text-gray-200">No bookmarks yet. Save projects to build your mission queue.</p>
             ) : (
               <div className="space-y-2">
-                {watchlistAirdrops.slice(0, 4).map(item => (
-                  <Link key={item.id} to={`/airdrop/${item.slug}`} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-gray-200 hover:border-sky-500/30">
-                    <span className="truncate pr-2">{item.name}</span>
-                    <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-200">{item.trust_score ?? 0}</span>
+                {watchlistAirdrops.slice(0, 3).map(item => (
+                  <Link key={item.id} to={`/airdrop/${item.slug}`} className="flex items-center justify-between gap-2 rounded-xl border border-white/15 bg-white/[0.07] px-2.5 py-2 text-xs text-white hover:border-cyan-400/30">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="h-7 w-7 shrink-0 overflow-hidden rounded-lg border border-white/15 bg-[#0b1e3a]">
+                        {item.logo_url ? (
+                          <img
+                            src={item.logo_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-cyan-100">{item.name[0]}</span>
+                        )}
+                      </span>
+                      <span className="truncate">{item.name}</span>
+                    </span>
+                    <span className="rounded-full border border-cyan-400/30 bg-cyan-500/15 px-2 py-0.5 text-[10px] font-bold text-cyan-100">{item.trust_score ?? 0}</span>
                   </Link>
                 ))}
-                {watchlistAirdrops.length > 4 && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('profile')}
-                    className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-sky-300 transition-colors hover:text-sky-200"
-                  >
-                    View full watchlist
-                  </button>
-                )}
               </div>
             )}
-          </div>
-
-          <div className="hidden border border-emerald-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5 lg:block glass-card">
-            <div className="mb-3 flex items-center gap-2">
-              <Activity className="h-4 w-4 text-emerald-300" />
-              <h3 className="text-sm font-semibold text-white">Market Pulse</h3>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                <div className="text-sm font-black text-emerald-300">{marketPulse.momentum}%</div>
-                <div className="text-[10px] text-gray-500">Momentum</div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                <div className="text-sm font-black text-amber-300">{marketPulse.reviewed}</div>
-                <div className="text-[10px] text-gray-500">Review</div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-                <div className="text-sm font-black text-rose-300">{marketPulse.riskSignals}</div>
-                <div className="text-[10px] text-gray-500">Risk</div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1256,18 +1306,6 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
-        <div className="hidden lg:block">
-          <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
-        </div>
-        <div className="hidden lg:block">
-          <ReputationRulesNotice />
-        </div>
-        <div className="hidden lg:block">
-          <DashboardEngagementPanel />
-        </div>
-        <div className="hidden lg:block">
-          <AirdropGuardIntelligenceCentre />
-        </div>
       </div>
     )}
 

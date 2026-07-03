@@ -200,8 +200,8 @@ export default function AppShell({
   }, []);
 
   return (
-    <div className="relative min-h-screen overflow-x-clip bg-[#050711] text-white">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(56,189,248,0.16),transparent_32%),radial-gradient(circle_at_88%_12%,rgba(139,92,246,0.18),transparent_30%),radial-gradient(circle_at_55%_110%,rgba(30,64,175,0.16),transparent_40%)]" />
+    <div className="relative min-h-screen overflow-x-clip bg-[#030815] text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_8%,rgba(56,189,248,0.2),transparent_34%),radial-gradient(circle_at_90%_8%,rgba(37,99,235,0.2),transparent_30%),radial-gradient(circle_at_50%_110%,rgba(15,23,42,0.2),transparent_46%)]" />
 
       <aside className="fixed left-0 top-0 hidden h-screen w-[260px] flex-col border-r border-white/10 bg-[#070b18]/95 px-3 py-4 shadow-[0_0_60px_rgba(31,41,55,0.35)] backdrop-blur-xl lg:flex">
         <Link to="/dashboard" className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
@@ -284,13 +284,13 @@ export default function AppShell({
         </div>
       </header>
 
-      <main id="main-content" className="relative pb-28 pt-20 lg:ml-[260px] lg:pb-10 lg:pt-24" tabIndex={-1}>
+      <main id="main-content" className="relative pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-20 lg:ml-[260px] lg:pb-10 lg:pt-24" tabIndex={-1}>
         <div key={`${location.pathname}${location.search}`} className={`animate-in px-4 pb-6 pt-4 duration-300 sm:px-6 lg:px-8 ${contentClasses}`}>
           {children}
         </div>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-[#070b18]/95 px-3 py-2 backdrop-blur-xl lg:hidden">
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-cyan-400/20 bg-[linear-gradient(180deg,rgba(3,10,24,0.95),rgba(2,8,18,0.98))] px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
           {mobileItems.slice(0, 2).map((item) => {
             const Icon = item.icon;
@@ -298,7 +298,7 @@ export default function AppShell({
               <Link
                 key={item.label}
                 to={item.to}
-                className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold ${item.active ? 'text-sky-300' : 'text-gray-500'}`}
+                className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-[10px] font-semibold transition-colors ${item.active ? 'border-cyan-400/35 bg-cyan-500/15 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.2)]' : 'border-transparent text-gray-400'}`}
               >
                 <Icon className="h-4 w-4" />
                 {item.label}
@@ -309,16 +309,16 @@ export default function AppShell({
           <button
             type="button"
             onClick={() => setAiDrawerOpen(true)}
-            className="-mt-8 inline-flex h-[76px] w-[76px] flex-col items-center justify-center self-center rounded-full border border-cyan-300/70 bg-[radial-gradient(circle_at_30%_30%,#67e8f9,transparent_42%),linear-gradient(145deg,#0ea5e9,#2563eb_55%,#7c3aed)] text-white shadow-[0_0_0_8px_rgba(34,211,238,0.14),0_18px_36px_rgba(14,165,233,0.34)] transition-all duration-200 hover:scale-105"
+            className="-mt-8 inline-flex h-[76px] w-[76px] flex-col items-center justify-center self-center rounded-full border border-cyan-200/85 bg-[radial-gradient(circle_at_30%_30%,#67e8f9,transparent_42%),linear-gradient(145deg,#06b6d4,#2563eb_55%,#0b1225)] text-white shadow-[0_0_0_10px_rgba(34,211,238,0.2),0_22px_40px_rgba(14,165,233,0.45),0_0_30px_rgba(6,182,212,0.22)] transition-all duration-200 hover:scale-105"
             aria-label="Open AI Copilot"
           >
-            <Bot className="h-5 w-5" />
-            <span className="mt-0.5 text-[10px] font-black uppercase tracking-[0.1em]">AI</span>
+            <Bot className="h-5 w-5 animate-pulse" />
+            <span className="mt-0.5 text-[9px] font-black uppercase tracking-[0.08em]">Ask AI</span>
           </button>
 
           <Link
             to="/scam-alerts"
-            className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold ${location.pathname === '/scam-alerts' ? 'text-sky-300' : 'text-gray-500'}`}
+            className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-[10px] font-semibold transition-colors ${location.pathname === '/scam-alerts' ? 'border-cyan-400/35 bg-cyan-500/15 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.2)]' : 'border-transparent text-gray-400'}`}
           >
             <AlertTriangle className="h-4 w-4" />
             Alerts
@@ -327,7 +327,7 @@ export default function AppShell({
           <button
             type="button"
             onClick={() => setMobileMenuOpen(true)}
-            className="flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-gray-500"
+            className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-[10px] font-semibold transition-colors ${mobileMenuOpen ? 'border-cyan-400/35 bg-cyan-500/15 text-cyan-100' : 'border-transparent text-gray-400'}`}
           >
             <UserCircle2 className="h-4 w-4" />
             More

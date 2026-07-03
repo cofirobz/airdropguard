@@ -43,7 +43,7 @@ const bannerStyle: React.CSSProperties = {
   fontSize: "12px",
   lineHeight: 1.35,
   boxSizing: "border-box",
-  zIndex: 999999,
+  zIndex: 25,
 };
 
 const textStyle: React.CSSProperties = {
