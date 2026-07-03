@@ -8,7 +8,7 @@ import {
   Rocket, ListChecks, Target, TrendingUp, Clock, AlertTriangle,
   Zap, Calendar, Star, Shield, Award, Flame, Wallet, Bell, ShieldAlert,
   BarChart3, Trophy, Sparkles, Crown, Palette, Lock, Unlock, ShieldCheck,
-  Search, UserCircle2, Bot, ChevronRight, LayoutDashboard,
+  Search, UserCircle2, ChevronRight, LayoutDashboard,
   Home, Activity, CreditCard, LogOut, Settings,
 } from 'lucide-react';
 import AiOrb from '../components/AiOrb';
@@ -1082,7 +1082,7 @@ export default function CustomerDashboard() {
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="rounded-full border border-cyan-400/30 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-semibold text-cyan-100">{missionReward}</span>
+                    <span className="max-w-full truncate rounded-full border border-cyan-400/30 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-semibold text-cyan-100">{missionReward}</span>
                     <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-semibold text-emerald-100">{featuredMission.risk_level || 'Risk unknown'}</span>
                     <span className="rounded-full border border-white/20 bg-white/[0.08] px-2.5 py-1 text-[10px] font-semibold text-white">{featuredMission.time_required || 'Time window updating'}</span>
                   </div>
@@ -1108,7 +1108,7 @@ export default function CustomerDashboard() {
                   onClick={openCopilot}
                   className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-blue-300/35 bg-blue-500/20 px-4 py-2 text-xs font-bold text-blue-100 transition-colors hover:bg-blue-500/30"
                 >
-                  <Bot className="h-3.5 w-3.5" />
+                  <AiOrb className="h-3.5 w-3.5" />
                   Ask AI
                 </button>
               </div>
@@ -1127,7 +1127,7 @@ export default function CustomerDashboard() {
                   <Award className="h-4 w-4 text-amber-200" />
                 </div>
                 <p className="text-[11px] uppercase tracking-[0.14em] text-blue-200">Reward Forecast</p>
-                <p className="mt-1 text-sm font-bold text-white">{missionReward}</p>
+                <p className="mt-1 line-clamp-2 text-sm font-bold text-white">{missionReward}</p>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                   <div className="h-full w-3/4 rounded-full bg-gradient-to-r from-amber-300 via-cyan-300 to-blue-400" />
                 </div>

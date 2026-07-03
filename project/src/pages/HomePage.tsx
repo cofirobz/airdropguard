@@ -86,42 +86,49 @@ function parseRewardScore(value: string | null | undefined): number {
   return Math.max(...scores, 0);
 }
 
-function TrustRing({ score }: { score: number | null }) {
+function TrustRing({ score, label = 'confidence' }: { score: number | null; label?: string }) {
   const pct = Math.max(0, Math.min(100, score ?? 0));
-  const size = 74;
-  const stroke = 6;
+  const size = 86;
+  const stroke = 8;
   const radius = (size - stroke * 2) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - pct / 100);
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
-      <defs>
-        <linearGradient id="trust-ring-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#22D3EE" />
-          <stop offset="100%" stopColor="#3B82F6" />
-        </linearGradient>
-      </defs>
-      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
-      {pct > 0 && (
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="url(#trust-ring-gradient)"
-          strokeWidth={stroke}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          style={{ transform: 'rotate(-90deg)', transformOrigin: 'center', transition: 'stroke-dashoffset 0.8s ease' }}
-        />
-      )}
-      <circle cx={size / 2} cy={size / 2} r={16} fill="rgba(5,8,22,0.92)" stroke="rgba(255,255,255,0.12)" />
-      <text x="50%" y="52%" textAnchor="middle" className="fill-white text-[14px] font-black" dominantBaseline="middle">
-        {pct > 0 ? pct : '—'}
-      </text>
-    </svg>
+    <div className="flex w-[94px] shrink-0 flex-col items-center text-center">
+      <div className="relative flex h-[86px] w-[86px] items-center justify-center">
+        <div className="absolute inset-0 rounded-full bg-cyan-400/18 blur-md animate-pulse" />
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="relative z-10">
+          <defs>
+            <linearGradient id="trust-ring-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#22D3EE" />
+              <stop offset="55%" stopColor="#3B82F6" />
+              <stop offset="100%" stopColor="#8B5CF6" />
+            </linearGradient>
+          </defs>
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth={stroke} />
+          {pct > 0 && (
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke="url(#trust-ring-gradient)"
+              strokeWidth={stroke}
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+              style={{ transform: 'rotate(-90deg)', transformOrigin: 'center', transition: 'stroke-dashoffset 0.95s cubic-bezier(0.22, 1, 0.36, 1)' }}
+            />
+          )}
+          <circle cx={size / 2} cy={size / 2} r={20} fill="rgba(5,8,22,0.92)" stroke="rgba(255,255,255,0.14)" />
+          <text x="50%" y="53%" textAnchor="middle" className="fill-white text-[17px] font-black" dominantBaseline="middle">
+            {pct > 0 ? pct : '—'}
+          </text>
+        </svg>
+      </div>
+      <span className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100">{label}</span>
+    </div>
   );
 }
 
@@ -183,6 +190,8 @@ function OpportunityCard({ item, title, label, tone, detail }: LeadOpportunity) 
 }
 
 function HeroMockup({ item }: { item: Airdrop | null }) {
+  const primaryChain = item?.blockchain?.[0] ?? 'Chain';
+
   return (
     <div className="relative overflow-hidden rounded-[34px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(8,20,42,0.96),rgba(5,10,24,0.98))] p-4 shadow-[0_24px_60px_rgba(3,8,24,0.55),0_0_40px_rgba(34,211,238,0.12)] sm:p-5">
       <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-cyan-400/15 blur-3xl" />
@@ -212,7 +221,7 @@ function HeroMockup({ item }: { item: Airdrop | null }) {
           <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] text-gray-300">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2">
               <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Reward</div>
-              <div className="mt-1 text-sm font-black text-emerald-300">{item?.estimated_reward ?? 'TBA'}</div>
+              <div className="mt-1 truncate text-sm font-black text-emerald-300">{item?.estimated_reward ?? 'TBA'}</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2">
               <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Risk</div>
@@ -227,14 +236,36 @@ function HeroMockup({ item }: { item: Airdrop | null }) {
 
         <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(15,23,42,0.75),rgba(8,14,28,0.95))] p-4">
           <div className="flex items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Featured opportunity</div>
-              <div className="mt-1 text-xl font-black text-white">{item?.name ?? 'Trending opportunities loading'}</div>
+              <div className="mt-1 truncate text-xl font-black text-white">{item?.name ?? 'Trending opportunities loading'}</div>
               <div className="mt-1 text-sm text-gray-300">AI analysis, human verification and wallet safety in one view.</div>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-500/10">
               <AiOrb className="h-7 w-7" />
             </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-[#0b1e3a]">
+              {item?.logo_url ? (
+                <img src={item.logo_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-100">{item?.name?.[0] ?? 'A'}</span>
+              )}
+            </div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-blue-300/25 bg-blue-500/10 px-2.5 py-1 text-[10px] font-semibold text-blue-100">
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/20 bg-white/[0.08] text-[9px] font-black text-white">
+                {primaryChain[0]}
+              </span>
+              {primaryChain}
+            </span>
+            <span className="ml-auto rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-100">Verified</span>
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
+            <span className="rounded-full border border-cyan-300/25 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-100">AI Analysed</span>
+            <span className="rounded-full border border-blue-300/25 bg-blue-500/10 px-2.5 py-1 font-semibold text-blue-100">Human Reviewed</span>
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] text-gray-300">
@@ -244,7 +275,7 @@ function HeroMockup({ item }: { item: Airdrop | null }) {
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
               <div className="text-gray-500">Estimated reward</div>
-              <div className="mt-1 font-semibold text-emerald-300">{item?.estimated_reward ?? 'Forecasting daily'}</div>
+              <div className="mt-1 line-clamp-2 font-semibold text-emerald-300">{item?.estimated_reward ?? 'Forecasting daily'}</div>
             </div>
           </div>
 
