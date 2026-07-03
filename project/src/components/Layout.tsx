@@ -400,7 +400,6 @@ export default function Layout() {
                   width={44}
                   height={44}
                   loading="eager"
-                  fetchPriority="high"
                   decoding="async"
                   className="h-11 w-11 shrink-0 rounded-2xl object-cover shadow-sm shadow-neon-purple/20 transition-shadow group-hover:shadow-neon-purple/45"
                 />

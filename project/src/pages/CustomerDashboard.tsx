@@ -762,16 +762,6 @@ export default function CustomerDashboard() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (authLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-neon-purple animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) return null;
-
   // ── Derived stats ─────────────────────────────────────────────────────────
   const safeAirdrops = airdrops ?? [];
   const safeBookmarks = getBookmarks() ?? [];
@@ -886,7 +876,7 @@ export default function CustomerDashboard() {
     if (hour < 18) return 'Good afternoon';
     return 'Good evening';
   })();
-  const firstName = user.email?.split('@')[0] || 'Explorer';
+  const firstName = user?.email?.split('@')[0] || 'Explorer';
   const expiresTodayCount = safeAirdrops.filter(item => {
     if (!item.expiry_date) return false;
     const left = msUntil(item.expiry_date);
@@ -957,6 +947,16 @@ export default function CustomerDashboard() {
 
     window.dispatchEvent(new CustomEvent('ag:copilot-context', { detail: { context } }));
   }, [activeTab, dashboardSearch, focusAirdrops, level, remainingCount, taskAirdrops.length, watchlistCount]);
+
+  if (authLoading || loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-neon-purple" />
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
  return (
   <div className="relative min-h-screen overflow-x-clip bg-[#050711]">

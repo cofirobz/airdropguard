@@ -1773,7 +1773,7 @@ export default function AirdropDetailPage() {
           {/* Logo */}
           <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-neon-purple/20 to-neon-blue/20 flex items-center justify-center sm:h-24 sm:w-24">
             {airdrop.logo_url ? (
-              <img src={airdrop.logo_url} alt={`${airdrop.name} logo`} width={96} height={96} loading="eager" fetchPriority="high" decoding="async" className="h-full w-full rounded-2xl object-cover" />
+              <img src={airdrop.logo_url} alt={`${airdrop.name} logo`} width={96} height={96} loading="eager" decoding="async" className="h-full w-full rounded-2xl object-cover" />
             ) : (
               <span className="text-4xl font-bold gradient-text">{airdrop.name.charAt(0)}</span>
             )}
