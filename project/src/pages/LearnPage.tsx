@@ -350,7 +350,7 @@ function ArticleCard({ guide }: { guide: Guide }) {
 
   return (
     <div
-      className={`glass-card p-5 cursor-pointer select-none transition-all duration-200 ${open ? 'border-neon-purple/20' : ''}`}
+      className={`glass-card cursor-pointer select-none p-4 transition-all duration-200 sm:p-5 ${open ? 'border-neon-purple/20' : ''}`}
       onClick={() => setOpen(o => !o)}
     >
       <div className="flex items-start gap-3">
@@ -362,14 +362,14 @@ function ArticleCard({ guide }: { guide: Guide }) {
             <h3 className="text-sm font-semibold text-white leading-snug">{guide.title}</h3>
             <ChevronDown className={`w-4 h-4 text-gray-500 shrink-0 mt-0.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">{guide.summary}</p>
+          <p className="mt-0.5 text-xs text-gray-500">{guide.summary}</p>
         </div>
       </div>
 
       {open && (
         <div className="mt-4 pt-4 border-t border-white/5 space-y-3" onClick={e => e.stopPropagation()}>
           {guide.paras.map((p, i) => (
-            <p key={i} className="text-sm text-gray-400 leading-relaxed">{p}</p>
+            <p key={i} className="text-sm leading-relaxed text-gray-400">{p}</p>
           ))}
           {guide.bullets && (
             <ul className="space-y-2 pl-1 pt-1">
@@ -418,8 +418,9 @@ export default function LearnPage() {
         </div>
         <h1 className="text-3xl font-bold text-white mb-3">Learn & Guides</h1>
         <p className="text-gray-400 leading-relaxed max-w-2xl mb-5">
-          Beginner-friendly guides to crypto airdrops, wallet safety, DeFi basics, and building with the AirdropGuard API.
-          Click any card to read the full guide.
+          <span className="sm:hidden">Short guides for airdrops, wallet safety and the API. Tap a card to expand.</span>
+          <span className="hidden sm:inline">Beginner-friendly guides to crypto airdrops, wallet safety, DeFi basics, and building with the AirdropGuard API.
+          Click any card to read the full guide.</span>
         </p>
         <Link to="/api-docs" className="inline-flex items-center gap-2 text-sm text-neon-purple hover:text-neon-purple/80 transition-colors">
           <Key className="w-4 h-4" />
@@ -429,15 +430,19 @@ export default function LearnPage() {
       </div>
 
       {/* Category tabs */}
-      <div className="flex items-center gap-1 mb-8 border-b border-white/5 pb-1">
+      <div className="sticky top-20 z-20 -mx-4 mb-8 border-b border-white/5 bg-dark-950/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0">
+        <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-500 sm:hidden">
+          Table of contents
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-1 sm:pb-1">
         {(['all', 'Crypto Basics', 'Developer & API'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-t-lg text-sm font-medium transition-colors capitalize ${
+            className={`px-3 py-2 rounded-2xl text-sm font-medium transition-colors capitalize sm:rounded-t-lg ${
               tab === t
-                ? 'text-white bg-white/5 border-b-2 border-neon-purple'
-                : 'text-gray-500 hover:text-gray-300'
+                ? 'text-white bg-white/5 border border-neon-purple/30 sm:border-b-2 sm:border-x-0 sm:border-t-0'
+                : 'border border-white/10 text-gray-500 hover:text-gray-300 sm:border-0'
             }`}
           >
             {t === 'all' ? 'All Guides' : t}
@@ -446,6 +451,7 @@ export default function LearnPage() {
             </span>
           </button>
         ))}
+        </div>
       </div>
 
       {/* Crypto Basics section */}

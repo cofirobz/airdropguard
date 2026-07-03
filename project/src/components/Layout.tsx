@@ -22,6 +22,7 @@ import {
   ChevronDown,
   AlertTriangle,
 } from "lucide-react";
+import AirdropCopilot from "./AirdropCopilot";
 import { useAuth } from "../contexts/AuthContext";
 
 declare function gtag(...args: unknown[]): void;
@@ -44,6 +45,33 @@ function isActivePath(currentPath: string, currentSearch: string, to: string) {
   if (to.startsWith("/?"))
     return currentPath === "/" && currentSearch === to.replace("/", "");
   return currentPath.startsWith(to.split("?")[0]);
+}
+
+function buildCopilotRouteContext(pathname: string, search: string) {
+  const searchParams = new URLSearchParams(search);
+
+  if (pathname === "/") {
+    const tab = searchParams.get("filter") ?? "all";
+    return `Airdrop listings page. Active collection: ${tab}. Search filters may be active.`;
+  }
+
+  if (pathname.startsWith("/airdrop/")) {
+    return "Airdrop detail page. Use the current project details, trust signals and task checklist when answering.";
+  }
+
+  if (pathname === "/wallet-checker") {
+    return "Wallet Intelligence page. Help interpret wallet safety, readiness and next-step guidance.";
+  }
+
+  if (pathname.startsWith("/dashboard")) {
+    return "Dashboard page. Prioritize today’s focus, tasks, watchlist changes and account activity.";
+  }
+
+  if (pathname === "/api-docs" || pathname === "/pricing" || pathname === "/api-pricing") {
+    return "API access page. Help with plans, API access and integration questions.";
+  }
+
+  return null;
 }
 
 const primaryNavItems = [
@@ -297,9 +325,16 @@ function NavLink({
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+  const [pageCopilotContext, setPageCopilotContext] = useState<string | null>(null);
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
   const { user, signOut } = useAuth();
+  const isDashboardRoute = Boolean(user) && location.pathname.startsWith("/dashboard");
+  const canShowCopilot = Boolean(user) && location.pathname !== "/auth" && !isAdmin;
+  const routeCopilotContext = buildCopilotRouteContext(location.pathname, location.search);
+  const effectiveCopilotContext = pageCopilotContext ?? routeCopilotContext ?? undefined;
+  const mobileLauncherBottom = location.pathname === "/wallet-checker" ? "bottom-24" : "bottom-4";
 
   usePageTracking();
 
@@ -309,11 +344,35 @@ export default function Layout() {
   }, [location.pathname, location.search]);
 
   useEffect(() => {
+    setPageCopilotContext(null);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
   }, [mobileOpen]);
+
+  useEffect(() => {
+    const handleContext = (event: Event) => {
+      const detail = (event as CustomEvent<{ context?: string | null }>).detail;
+      setPageCopilotContext(detail?.context ?? null);
+    };
+
+    const handleOpen = () => setAiDrawerOpen(true);
+    const handleClose = () => setAiDrawerOpen(false);
+
+    window.addEventListener("ag:copilot-context", handleContext as EventListener);
+    window.addEventListener("ag:copilot-open", handleOpen);
+    window.addEventListener("ag:copilot-close", handleClose);
+
+    return () => {
+      window.removeEventListener("ag:copilot-context", handleContext as EventListener);
+      window.removeEventListener("ag:copilot-open", handleOpen);
+      window.removeEventListener("ag:copilot-close", handleClose);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-dark-950 text-white">
@@ -324,6 +383,7 @@ export default function Layout() {
         Skip to main content
       </a>
 
+      {!isDashboardRoute && (
       <nav className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-dark-950/98 supports-[backdrop-filter]:bg-dark-950/95">
         <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
           <div className="flex h-20 items-center justify-between gap-4">
@@ -667,12 +727,54 @@ export default function Layout() {
           </>
         )}
       </nav>
+      )}
 
-      <main id="main-content" className="relative pt-20" tabIndex={-1}>
+      <main id="main-content" className={`relative ${isDashboardRoute ? "" : "pt-20"}`} tabIndex={-1}>
         <Outlet />
       </main>
 
-      <Footer />
+      {canShowCopilot && (
+        <>
+          {!isDashboardRoute && (
+            <button
+              type="button"
+              onClick={() => setAiDrawerOpen(true)}
+              className={`fixed ${mobileLauncherBottom} right-4 z-[75] inline-flex min-h-[52px] items-center gap-2 rounded-full border border-sky-300/40 bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-3 text-sm font-bold text-white shadow-[0_12px_32px_rgba(56,189,248,0.32)] transition-transform hover:scale-[1.02] lg:hidden`}
+              aria-label="Open AirdropGuard Copilot"
+            >
+              <Bot className="h-4 w-4" />
+              Ask AI
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setAiDrawerOpen(true)}
+            className="fixed bottom-8 right-8 z-[75] hidden min-h-[56px] items-center gap-2 rounded-full border border-sky-300/50 bg-gradient-to-r from-sky-500 via-cyan-500 to-violet-500 px-5 py-3 text-sm font-black text-white shadow-[0_0_0_6px_rgba(56,189,248,0.14),0_18px_40px_rgba(56,189,248,0.3)] transition-transform hover:-translate-y-0.5 hover:scale-[1.02] lg:inline-flex"
+            aria-label="Open AirdropGuard Copilot"
+          >
+            <Bot className="h-4 w-4" />
+            Ask AI
+          </button>
+
+          <div className={`fixed inset-0 z-[80] ${aiDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+            <div
+              className={`absolute inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity duration-300 ${aiDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
+              onClick={() => setAiDrawerOpen(false)}
+            />
+            <aside className={`absolute inset-0 h-[100dvh] w-full max-w-full overflow-hidden rounded-none border border-white/10 bg-[#060a18]/95 p-0 shadow-[0_0_70px_rgba(56,189,248,0.2)] transition-transform duration-300 lg:inset-auto lg:bottom-3 lg:right-0 lg:top-3 lg:h-auto lg:w-[min(420px,100vw)] lg:max-w-[420px] lg:rounded-l-[32px] lg:rounded-tr-none lg:rounded-br-none lg:border-l lg:border-t lg:border-b lg:border-r-0 ${aiDrawerOpen ? 'translate-y-0 lg:translate-x-0' : 'translate-y-full lg:translate-y-0 lg:translate-x-full'}`}>
+              <AirdropCopilot
+                onClose={() => setAiDrawerOpen(false)}
+                className="h-full"
+                pageContext={effectiveCopilotContext}
+                summary={{ userName: user?.email?.split('@')[0] || 'Explorer' }}
+              />
+            </aside>
+          </div>
+        </>
+      )}
+
+      {!isDashboardRoute && <Footer />}
     </div>
   );
 }

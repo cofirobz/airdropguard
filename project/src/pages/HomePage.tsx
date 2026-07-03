@@ -9,6 +9,7 @@ import {
   Bot,
   Brain,
   CheckCircle2,
+  ChevronDown,
   CheckSquare,
   Clock,
   Flame,
@@ -97,6 +98,67 @@ function CounterCard({ item }: { item: CounterItem }) {
   );
 }
 
+function MobileActionCards() {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-5 md:hidden">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link to="/auth" className="rounded-3xl border border-violet-500/20 bg-violet-500/[0.06] p-4">
+          <div className="flex items-center gap-2 text-sm font-bold text-white">
+            <Bot className="h-4 w-4 text-violet-300" />
+            Ask Copilot
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-gray-300">Get quick help choosing safer airdrops and your next best move.</p>
+        </Link>
+
+        <Link to="/wallet-checker" className="rounded-3xl border border-sky-500/20 bg-sky-500/[0.06] p-4">
+          <div className="flex items-center gap-2 text-sm font-bold text-white">
+            <Wallet className="h-4 w-4 text-sky-300" />
+            Wallet Intelligence
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-gray-300">Check wallet safety and readiness without connecting or signing.</p>
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function MobileInfoAccordions() {
+  const items = [
+    {
+      title: 'What is AirdropGuard?',
+      body: 'AirdropGuard helps you spot verified airdrops, review risk and decide faster without digging through scattered threads and docs.',
+    },
+    {
+      title: 'How it works',
+      body: 'Browse live listings, filter what fits your risk level, open a project, then use trust signals, tasks and AI guidance before acting.',
+    },
+    {
+      title: 'Why trust it?',
+      body: 'Listings combine AI research, human review, trust scoring and safer wallet workflows so important signals appear before hype.',
+    },
+    {
+      title: 'Is it safe?',
+      body: 'AirdropGuard never asks for your seed phrase. Wallet Intelligence is read-only and the platform surfaces risk warnings before you connect elsewhere.',
+    },
+  ];
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 pb-4 md:hidden">
+      <div className="space-y-3">
+        {items.map(item => (
+          <details key={item.title} className="group rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white">
+              {item.title}
+              <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-180" />
+            </summary>
+            <p className="mt-3 text-xs leading-relaxed text-gray-400">{item.body}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function HeroSection({
   loading,
   stats,
@@ -126,19 +188,21 @@ function HeroSection({
         ))}
       </div>
 
-      <div className="mx-auto grid max-w-7xl gap-10 px-4 pb-16 pt-12 sm:px-6 sm:pb-20 sm:pt-16 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:px-8 lg:pb-24 lg:pt-20">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-10 pt-10 sm:px-6 sm:pb-20 sm:pt-16 lg:grid-cols-[1.02fr_0.98fr] lg:items-center lg:px-8 lg:pb-24 lg:pt-20">
         <div className="relative z-10">
           <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/25 bg-sky-500/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200 sm:text-xs">
             <Sparkles className="h-3.5 w-3.5 text-sky-300" />
             Premium AI-powered Web3 intelligence
           </div>
 
-          <h1 className="mt-6 max-w-4xl text-4xl font-black leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
-            The AI-Powered Platform for Smarter Crypto Airdrops
+          <h1 className="mt-5 max-w-4xl text-3xl font-black leading-[1.04] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-6xl">
+            <span className="sm:hidden">Smarter crypto airdrops</span>
+            <span className="hidden sm:inline">The AI-Powered Platform for Smarter Crypto Airdrops</span>
           </h1>
 
-          <p className="mt-5 max-w-2xl text-base leading-relaxed text-gray-300 sm:text-lg">
-            Discover verified opportunities, analyse risks with AI, check your wallet safely and focus on the projects that deserve your time.
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-300 sm:mt-5 sm:text-lg">
+            <span className="sm:hidden">Find safer airdrops, check risk fast and focus on what deserves your time.</span>
+            <span className="hidden sm:inline">Discover verified opportunities, analyse risks with AI, check your wallet safely and focus on the projects that deserve your time.</span>
           </p>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
@@ -157,7 +221,15 @@ function HeroSection({
             </a>
           </div>
 
-          <div className="mt-7 flex flex-wrap gap-2.5 text-xs font-semibold text-gray-300">
+          <div className="mt-6 grid grid-cols-2 gap-2 text-[11px] font-semibold text-gray-300 sm:hidden">
+            {['AI scored', 'Human reviewed', 'Read-only checks', 'No seed phrases'].map(item => (
+              <span key={item} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-center">
+                {item}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-7 hidden flex-wrap gap-2.5 text-xs font-semibold text-gray-300 sm:flex">
             {['Dashboard', 'Airdrops', 'Wallet Intelligence', 'Copilot', 'Pricing'].map(item => (
               <span key={item} className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
                 {item}
@@ -165,7 +237,7 @@ function HeroSection({
             ))}
           </div>
 
-          <div className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-3">
+          <div className="mt-8 hidden max-w-2xl gap-3 sm:grid sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur">
               <div className="text-2xl font-black text-white">{stats.analysed}</div>
               <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-gray-500">Projects analysed</div>
@@ -181,7 +253,7 @@ function HeroSection({
           </div>
         </div>
 
-        <div className="relative z-10">
+        <div className="relative z-10 hidden lg:block">
           <div className="absolute -inset-6 rounded-[36px] bg-sky-500/10 blur-3xl" />
           <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(160deg,rgba(7,11,24,0.96)_8%,rgba(8,14,34,0.96)_50%,rgba(12,9,35,0.96)_100%)] p-5 shadow-[0_0_40px_rgba(56,189,248,0.15),0_0_90px_rgba(99,102,241,0.1)] backdrop-blur-xl sm:p-6">
             <div className="mb-5 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
@@ -781,6 +853,18 @@ export default function HomePage() {
   }, [tab, filters]);
 
   useEffect(() => {
+    const activeFilters = [filters.blockchain, filters.category, filters.reward, filters.risk, filters.difficulty]
+      .filter(Boolean)
+      .join(', ') || 'none';
+
+    window.dispatchEvent(new CustomEvent('ag:copilot-context', {
+      detail: {
+        context: `Airdrop listings page. Tab ${tab}. Search: ${filters.search || 'none'}. Filters: ${activeFilters}.`,
+      },
+    }));
+  }, [filters, tab]);
+
+  useEffect(() => {
     async function load() {
       setLoading(true);
       setError(null);
@@ -958,19 +1042,29 @@ export default function HomePage() {
         topVerified={topVerified}
       />
 
-      <TrustStrip />
-      <HowItWorksSection />
-      <WhyAirdropGuardSection />
-      <LivePlatformSection airdrops={topVerified.slice(0, 6)} verifiedCount={verifiedProjects.length} />
-      <TrustSection counters={trustCounters} />
-      <AudienceSection />
+      <MobileActionCards />
+      <MobileInfoAccordions />
+
+      <div className="hidden sm:block">
+        <TrustStrip />
+      </div>
+      <div className="hidden md:block">
+        <HowItWorksSection />
+        <WhyAirdropGuardSection />
+        <LivePlatformSection airdrops={topVerified.slice(0, 6)} verifiedCount={verifiedProjects.length} />
+        <TrustSection counters={trustCounters} />
+        <AudienceSection />
+      </div>
 
       <section id="airdrops" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Explore Airdrops</div>
-            <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">Find the opportunities that deserve your time</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400 sm:text-base">
+            <h2 className="mt-3 text-2xl font-black text-white sm:text-4xl">
+              <span className="sm:hidden">Top airdrops right now</span>
+              <span className="hidden sm:inline">Find the opportunities that deserve your time</span>
+            </h2>
+            <p className="mt-3 max-w-2xl text-xs leading-relaxed text-gray-400 sm:text-base">
               Browse live opportunities, filter by chain and risk, then open the full research page for trust signals, rewards, tasks and supporting evidence.
             </p>
           </div>
@@ -985,13 +1079,13 @@ export default function HomePage() {
         </div>
 
         {featured && tab === 'all' && !filters.search ? (
-          <div className="mb-6">
+          <div className="mb-6 hidden sm:block">
             <FeaturedSpotlight airdrop={featured} />
             <SponsoredTransparencyNote />
           </div>
         ) : null}
 
-        <div className="-mx-4 mb-6 flex items-center gap-1 overflow-x-auto border-b border-white/5 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:mb-6 sm:flex sm:flex-wrap sm:items-center sm:gap-1 sm:border-b sm:border-white/5 sm:pb-1">
           {tabs.map(item => (
             <button
               key={item.key}
@@ -999,21 +1093,21 @@ export default function HomePage() {
                 if (item.key === 'all') setSearchParams({});
                 else setSearchParams({ filter: item.key });
               }}
-              className={`flex min-h-[42px] shrink-0 items-center gap-1.5 rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${tab === item.key
-                ? 'border-b-2 border-sky-400 bg-white/5 text-white'
-                : 'text-gray-500 hover:text-gray-300'
+              className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-medium transition-colors sm:rounded-t-lg ${tab === item.key
+                ? 'border border-sky-400/25 bg-white/5 text-white sm:border-b-2 sm:border-x-0 sm:border-t-0 sm:border-sky-400'
+                : 'border border-white/10 text-gray-500 hover:text-gray-300 sm:border-0'
               }`}
             >
               {item.icon}
               {item.label}
             </button>
           ))}
-          <div className="ml-auto hidden text-xs text-gray-600 sm:block">
+          <div className="hidden text-xs text-gray-600 sm:ml-auto sm:block">
             {!loading && <span>{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>}
           </div>
         </div>
 
-        <div className="mb-8">
+        <div className="sticky top-20 z-20 -mx-4 mb-6 bg-[#050b18]/95 px-4 py-3 backdrop-blur sm:static sm:m-0 sm:mb-8 sm:bg-transparent sm:px-0 sm:py-0">
           <FilterBar filters={filters} onChange={setFilters} />
         </div>
 
@@ -1043,9 +1137,15 @@ export default function HomePage() {
         ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-              {visibleAirdrops.map(airdrop => (
-                <AirdropCard key={airdrop.id} airdrop={airdrop} />
-              ))}
+              {visibleAirdrops.map((airdrop, index) => {
+                const desktopOnlyInitially = visibleCount === INITIAL_VISIBLE_AIRDROPS && index >= 3 && index < INITIAL_VISIBLE_AIRDROPS;
+
+                return (
+                  <div key={airdrop.id} className={desktopOnlyInitially ? 'hidden sm:block' : ''}>
+                    <AirdropCard airdrop={airdrop} />
+                  </div>
+                );
+              })}
             </div>
 
             {hasMoreAirdrops && (
@@ -1055,7 +1155,7 @@ export default function HomePage() {
                   onClick={() => setVisibleCount(count => count + LOAD_MORE_AIRDROPS)}
                   className="min-h-[46px] rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-3 text-sm font-bold text-gray-200 transition-colors hover:bg-white/[0.08] hover:text-white"
                 >
-                  Load More Airdrops
+                  {visibleCount === INITIAL_VISIBLE_AIRDROPS ? 'View All Airdrops' : 'Load More Airdrops'}
                   <span className="ml-2 text-xs font-normal text-gray-500">
                     {Math.min(filtered.length - visibleCount, LOAD_MORE_AIRDROPS)} more
                   </span>
@@ -1066,9 +1166,13 @@ export default function HomePage() {
         )}
       </section>
 
-      <SocialProofSection featured={featured ?? topVerified[0] ?? null} latestVerified={topVerified} />
+      <div className="hidden md:block">
+        <SocialProofSection featured={featured ?? topVerified[0] ?? null} latestVerified={topVerified} />
+      </div>
       <FinalCtaSection />
-      <NewsletterSection />
+      <div className="hidden md:block">
+        <NewsletterSection />
+      </div>
     </>
   );
 }

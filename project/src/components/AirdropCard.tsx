@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import type { MouseEvent } from 'react';
-import { Clock, Zap, ShieldAlert, Bookmark, BookmarkCheck, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Clock, Zap, ShieldAlert, Bookmark, BookmarkCheck, AlertTriangle, ShieldCheck, ChevronDown } from 'lucide-react';
 import type { Airdrop } from '../lib/types';
 import {
   cn,
@@ -95,7 +95,7 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="hidden flex-wrap items-center gap-1.5 sm:flex">
             <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', getStatusColor(airdrop.status))}>
               {airdrop.status}
             </span>
@@ -140,7 +140,7 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
         </div>
       )}
 
-      <p className="mb-4 line-clamp-3 flex-1 text-xs leading-relaxed text-gray-500 sm:line-clamp-2">
+      <p className="mb-3 line-clamp-2 flex-1 text-[11px] leading-relaxed text-gray-500 sm:mb-4 sm:line-clamp-2 sm:text-xs">
         {airdrop.ai_summary || 'Airdrop intelligence report available. Open this listing to review trust, reward, risk and task details.'}
       </p>
 
@@ -148,10 +148,10 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
         <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
           <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
             <Zap className="h-3 w-3" />
-            Reward
+            Reward estimate
           </div>
-          <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium', getRewardColor(airdrop.reward_potential))}>
-            {airdrop.reward_potential}
+          <span className="inline-flex text-[11px] font-semibold text-neon-green">
+            {airdrop.estimated_reward || airdrop.reward_potential}
           </span>
         </div>
 
@@ -164,9 +164,29 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
             {airdrop.risk_level}
           </span>
         </div>
+
+        <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
+            <Clock className="h-3 w-3" />
+            Time required
+          </div>
+          <span className="inline-flex text-[11px] font-semibold text-white">
+            {airdrop.time_required || 'TBA'}
+          </span>
+        </div>
+
+        <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
+            <ShieldCheck className="h-3 w-3" />
+            Trust score
+          </div>
+          <div>
+            <LightweightTrustScoreBadge score={airdrop.trust_score ?? null} />
+          </div>
+        </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-4 hidden flex-wrap items-center gap-2 sm:flex">
         <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', getDifficultyColor(airdrop.difficulty))}>
           {airdrop.difficulty}
         </span>
@@ -174,7 +194,50 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
         <LightweightTrustScoreBadge score={airdrop.trust_score ?? null} />
       </div>
 
-      <div className="mb-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-3">
+      <details className="mb-4 rounded-xl border border-white/5 bg-white/[0.03] sm:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-3 text-[11px] font-semibold text-gray-300">
+          More details
+          <ChevronDown className="h-4 w-4 text-gray-500" />
+        </summary>
+        <div className="space-y-3 border-t border-white/5 px-3 py-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', getStatusColor(airdrop.status))}>
+              {airdrop.status}
+            </span>
+            <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', getDifficultyColor(airdrop.difficulty))}>
+              {airdrop.difficulty}
+            </span>
+            <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold', recMeta.cls)}>
+              <span className={cn('inline-block h-1.5 w-1.5 rounded-full', recMeta.dot)} />
+              {recMeta.label}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {airdrop.blockchain.map((chain) => (
+              <span key={chain} className="rounded-full border border-white/10 bg-dark-600/60 px-2 py-0.5 text-[10px] text-gray-500">
+                {chain}
+              </span>
+            ))}
+          </div>
+          <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="text-[10px] uppercase tracking-wider text-gray-600">Opportunity</span>
+              <span className={cn('text-sm font-black tabular-nums', oppScore >= 68 ? 'text-emerald-400' : oppScore >= 45 ? 'text-amber-400' : 'text-rose-400')}>
+                {oppScore}
+                <span className="text-[10px] font-normal text-gray-600">/100</span>
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-dark-700">
+              <div
+                className={cn('h-full rounded-full', oppScore >= 68 ? 'bg-emerald-500' : oppScore >= 45 ? 'bg-amber-500' : 'bg-rose-500')}
+                style={{ width: `${Math.max(0, Math.min(100, oppScore))}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <div className="mb-3 hidden rounded-xl border border-white/5 bg-white/[0.03] px-3 py-3 sm:block">
         <div className="mb-2 flex items-center justify-between gap-3">
           <span className="text-[10px] uppercase tracking-wider text-gray-600">
             Opportunity
@@ -203,15 +266,9 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
 
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-white/5 pt-3">
         <div className="min-w-0">
-          {airdrop.estimated_reward ? (
-            <span className="block truncate text-xs font-semibold text-neon-green">
-              {airdrop.estimated_reward}
-            </span>
-          ) : (
-            <span className="block text-[10px] text-gray-700">
-              Reward TBA
-            </span>
-          )}
+          <span className="inline-flex rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-200">
+            Open report
+          </span>
         </div>
 
         {days !== null && days > 0 ? (

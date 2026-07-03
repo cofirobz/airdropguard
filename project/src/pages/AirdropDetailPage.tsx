@@ -1623,6 +1623,16 @@ export default function AirdropDetailPage() {
     load();
   }, [slug]);
 
+  useEffect(() => {
+    if (!airdrop) return;
+
+    window.dispatchEvent(new CustomEvent('ag:copilot-context', {
+      detail: {
+        context: `Airdrop detail page for ${airdrop.name}. Use its trust score, risk level, reward estimate and checklist tasks when answering.`,
+      },
+    }));
+  }, [airdrop]);
+
   function handleBookmark() {
     if (!airdrop) return;
     toggleBookmark(airdrop.id);

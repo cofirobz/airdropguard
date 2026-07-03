@@ -35,12 +35,15 @@ type AirdropCopilotProps = {
   onClose?: () => void;
   summary?: CopilotSummary;
   className?: string;
+  pageContext?: string;
 };
 
-const createWelcomeMessage = (): ChatMessage => ({
+const createWelcomeMessage = (pageContext?: string): ChatMessage => ({
   id: crypto.randomUUID(),
   role: 'assistant',
-  content: WELCOME_MESSAGE,
+  content: pageContext
+    ? `${WELCOME_MESSAGE}\n\nCurrent context: ${pageContext}`
+    : WELCOME_MESSAGE,
 });
 
 function getFunctionErrorMessage(payload: unknown, fallback: string): string {
@@ -80,11 +83,11 @@ async function extractInvokeError(error: unknown): Promise<string> {
   }
 }
 
-export default function AirdropCopilot({ onClose, summary: _summary, className }: AirdropCopilotProps) {
+export default function AirdropCopilot({ onClose, summary: _summary, className, pageContext }: AirdropCopilotProps) {
   const { user } = useAuth();
   const endRef = useRef<HTMLDivElement | null>(null);
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [createWelcomeMessage()]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [createWelcomeMessage(pageContext)]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +130,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className }
 
     try {
       const response = await supabase.functions.invoke(FUNCTION_NAME, {
-        body: { message: content },
+        body: { message: content, context: pageContext },
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
@@ -167,7 +170,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className }
   };
 
   const startNewChat = () => {
-    setMessages([createWelcomeMessage()]);
+    setMessages([createWelcomeMessage(pageContext)]);
     setDraft('');
     setError(null);
     setLoading(false);
@@ -188,6 +191,11 @@ export default function AirdropCopilot({ onClose, summary: _summary, className }
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
             Online
           </div>
+          {pageContext && (
+            <p className="mt-2 max-w-md text-[11px] leading-relaxed text-gray-400">
+              Context-aware guidance is enabled for this page.
+            </p>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">

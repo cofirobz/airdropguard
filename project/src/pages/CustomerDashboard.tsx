@@ -1,6 +1,5 @@
 import DashboardEngagementPanel from "../components/DashboardEngagementPanel";
 import AirdropGuardIntelligenceCentre from "../components/AirdropGuardIntelligenceCentre";
-import AirdropCopilot from "../components/AirdropCopilot";
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -9,7 +8,7 @@ import {
   Rocket, ListChecks, Target, TrendingUp, Clock, AlertTriangle,
   Zap, Calendar, Star, Shield, Award, Flame, Wallet, Bell, ShieldAlert,
   BarChart3, Trophy, Sparkles, Crown, Palette, Lock, Unlock, ShieldCheck,
-  Search, UserCircle2, Bot, ChevronRight, Menu, X, LayoutDashboard,
+  Search, UserCircle2, Bot, ChevronRight, LayoutDashboard,
   Home, Activity, CreditCard, LogOut, Settings,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -662,12 +661,10 @@ export default function CustomerDashboard() {
   const [loading, setLoading] = useState(true);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'airdrops' | 'tasks' | 'api'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'airdrops' | 'tasks' | 'api' | 'profile'>('overview');
   const [reputation, setReputation] = useState<UserReputation | null>(null);
   const [unlocks, setUnlocks] = useState<UserUnlock[]>([]);
   const [dashboardSearch, setDashboardSearch] = useState('');
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -904,11 +901,15 @@ export default function CustomerDashboard() {
   const copilotConfidencePct = Math.max(84, Math.min(99, 80 + Math.round(avgTrustScore / 4)));
 
   const openProfileOverview = () => {
-    setActiveTab('overview');
+    setActiveTab('profile');
     requestAnimationFrame(() => {
       document.getElementById('profile-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   };
+
+  const openCopilot = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('ag:copilot-open'));
+  }, []);
 
   const activityTimeline = [
     {
@@ -933,11 +934,35 @@ export default function CustomerDashboard() {
     },
   ];
 
+  useEffect(() => {
+    const context = (() => {
+      if (activeTab === 'airdrops') {
+        return `Dashboard airdrops tab. Search term: ${dashboardSearch || 'none'}. Prioritize trust score, urgency and progress.`;
+      }
+
+      if (activeTab === 'tasks') {
+        return `Task tracking tab. ${remainingCount} tasks remain across ${taskAirdrops.length} airdrops.`;
+      }
+
+      if (activeTab === 'api') {
+        return 'API access tab. Help with subscription status, API access and next setup steps.';
+      }
+
+      if (activeTab === 'profile') {
+        return `Profile tab. Reputation level ${level}, ${watchlistCount} watchlist items and account activity are in focus.`;
+      }
+
+      return `Dashboard overview. Today's focus is ${focusAirdrops[0]?.name ?? 'not set yet'}, with ${watchlistCount} watchlist items and ${remainingCount} tasks remaining.`;
+    })();
+
+    window.dispatchEvent(new CustomEvent('ag:copilot-context', { detail: { context } }));
+  }, [activeTab, dashboardSearch, focusAirdrops, level, remainingCount, taskAirdrops.length, watchlistCount]);
+
  return (
   <div className="relative min-h-screen overflow-x-clip bg-[#050711]">
     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(56,189,248,0.16),transparent_32%),radial-gradient(circle_at_88%_12%,rgba(139,92,246,0.18),transparent_30%),radial-gradient(circle_at_55%_110%,rgba(30,64,175,0.16),transparent_40%)]" />
 
-    <aside className="fixed left-0 top-20 hidden h-[calc(100vh-5rem)] w-[260px] flex-col border-r border-white/10 bg-[#070b18]/95 px-3 py-4 shadow-[0_0_60px_rgba(31,41,55,0.35)] backdrop-blur-xl lg:flex">
+    <aside className="fixed left-0 top-0 hidden h-screen w-[260px] flex-col border-r border-white/10 bg-[#070b18]/95 px-3 py-4 shadow-[0_0_60px_rgba(31,41,55,0.35)] backdrop-blur-xl lg:flex">
       <Link to="/dashboard" className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
         <div className="text-base font-black gradient-text">AirdropGuard</div>
         <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">Check Before You Connect</div>
@@ -952,12 +977,11 @@ export default function CustomerDashboard() {
           { kind: 'tab' as const, label: 'Watchlist', icon: Star, tab: 'overview' as const },
           { kind: 'tab' as const, label: 'Task Tracking', icon: ListChecks, tab: 'tasks' as const },
           { kind: 'route' as const, label: 'Alerts', icon: AlertTriangle, to: '/scam-alerts' },
-          { kind: 'tab' as const, label: 'Community Results', icon: Activity, tab: 'overview' as const },
+          { kind: 'tab' as const, label: 'Profile', icon: UserCircle2, tab: 'profile' as const },
           { kind: 'tab' as const, label: 'API Access', icon: Key, tab: 'api' as const },
           { kind: 'route' as const, label: 'Wallet Intelligence', icon: Shield, to: '/wallet-checker' },
-          { kind: 'tab' as const, label: 'AI Analyzer', icon: Sparkles, tab: 'overview' as const },
-          { kind: 'tab' as const, label: 'Profile', icon: UserCircle2, tab: 'overview' as const },
-          { kind: 'tab' as const, label: 'Settings', icon: Settings, tab: 'overview' as const },
+          { kind: 'action' as const, label: 'AI Analyzer', icon: Sparkles },
+          { kind: 'tab' as const, label: 'Settings', icon: Settings, tab: 'profile' as const },
           { kind: 'route' as const, label: 'Billing / API Plans', icon: CreditCard, to: '/pricing' },
         ].map((item) => {
           const Icon = item.icon;
@@ -974,6 +998,23 @@ export default function CustomerDashboard() {
                 </span>
                 <ChevronRight className="h-3.5 w-3.5" />
               </Link>
+            );
+          }
+
+          if (item.kind === 'action') {
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={openCopilot}
+                className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-xs font-semibold text-gray-300 transition-colors hover:border-sky-500/35 hover:text-white"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             );
           }
 
@@ -1024,53 +1065,13 @@ export default function CustomerDashboard() {
             </div>
             <button
               type="button"
-              onClick={() => setMobileNavOpen(true)}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300"
-              aria-label="Open dashboard menu"
+              onClick={openProfileOverview}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-gray-200"
             >
-              <Menu className="h-5 w-5" />
+              <UserCircle2 className="h-4 w-4 text-sky-300" />
+              Profile
             </button>
           </div>
-
-          {mobileNavOpen && (
-            <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm lg:hidden">
-              <div className="absolute right-0 top-0 h-full w-[84%] max-w-sm overflow-y-auto border-l border-white/10 bg-[#070b18] p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="text-sm font-black text-white">Dashboard Menu</div>
-                  <button type="button" onClick={() => setMobileNavOpen(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-gray-300">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    { label: 'Overview', action: () => setActiveTab('overview'), icon: LayoutDashboard },
-                    { label: 'Airdrops', action: () => setActiveTab('airdrops'), icon: Rocket },
-                    { label: 'Tasks', action: () => setActiveTab('tasks'), icon: ListChecks },
-                    { label: 'API', action: () => setActiveTab('api'), icon: Key },
-                  ].map(item => {
-                    const Icon = item.icon;
-                    return (
-                      <button
-                        key={item.label}
-                        type="button"
-                        onClick={() => { item.action(); setMobileNavOpen(false); }}
-                        className="flex w-full items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3 text-sm font-semibold text-gray-200"
-                      >
-                        <Icon className="h-4 w-4" />
-                        {item.label}
-                      </button>
-                    );
-                  })}
-                  <Link to="/wallet-checker" onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3 text-sm font-semibold text-gray-200">
-                    <Wallet className="h-4 w-4" /> Wallet Check
-                  </Link>
-                  <Link to="/pricing" onClick={() => setMobileNavOpen(false)} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3 text-sm font-semibold text-gray-200">
-                    <CreditCard className="h-4 w-4" /> Billing / API Plans
-                  </Link>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="rounded-3xl border border-white/10 bg-[#090d1d]/80 p-4 shadow-[0_0_40px_rgba(139,92,246,0.12)] sm:p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -1083,7 +1084,7 @@ export default function CustomerDashboard() {
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="relative">
+                <div className="relative hidden sm:block">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                   <input
                     type="text"
@@ -1095,19 +1096,19 @@ export default function CustomerDashboard() {
                 </div>
                 <button
                   type="button"
-                  className="hidden h-11 items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-300 sm:inline-flex"
+                  className="hidden h-11 items-center gap-2 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-300 lg:inline-flex"
                 >
                   <Activity className="h-3.5 w-3.5" />
                   Market Pulse Live
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 hover:border-sky-500/30 hover:text-white transition-colors"
+                  className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-gray-300 transition-colors hover:border-sky-500/30 hover:text-white sm:inline-flex"
                   aria-label="Notifications"
                 >
                   <Bell className="h-4 w-4" />
                 </button>
-                <div className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-xs text-gray-300">
+                <div className="hidden h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-xs text-gray-300 lg:inline-flex">
                   <UserCircle2 className="h-4 w-4 text-sky-300" />
                   <span className="max-w-[150px] truncate">{user.email}</span>
                 </div>
@@ -1129,7 +1130,7 @@ export default function CustomerDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          <div className="hidden grid-cols-2 gap-3 md:grid md:grid-cols-3 xl:grid-cols-5">
             <StatCard
               label="Total Airdrops" value={airdrops.length}
               icon={Rocket} iconBg="bg-sky-500/15 border border-sky-500/30" iconClass="text-sky-300"
@@ -1170,11 +1171,11 @@ export default function CustomerDashboard() {
                 className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold ${activeTab === 'airdrops' ? 'text-sky-300' : 'text-gray-500'}`}
               >
                 <Rocket className="h-4 w-4" />
-                Browse
+                Airdrops
               </button>
               <button
                 type="button"
-                onClick={() => setAiDrawerOpen(true)}
+                onClick={openCopilot}
                 className="-mt-7 inline-flex h-[72px] w-[72px] flex-col items-center justify-center self-center rounded-full border border-sky-300/55 bg-gradient-to-br from-sky-500 to-violet-500 text-white shadow-[0_0_0_6px_rgba(56,189,248,0.16),0_14px_34px_rgba(56,189,248,0.34)] transition-all duration-200 hover:scale-105"
                 aria-label="Open AI Copilot"
               >
@@ -1192,7 +1193,7 @@ export default function CustomerDashboard() {
               <button
                 type="button"
                 onClick={openProfileOverview}
-                className="flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold text-gray-500"
+                className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-semibold ${(activeTab === 'profile' || activeTab === 'api') ? 'text-sky-300' : 'text-gray-500'}`}
               >
                 <UserCircle2 className="h-4 w-4" />
                 Profile
@@ -1206,7 +1207,7 @@ export default function CustomerDashboard() {
           <div className="glass-card border border-sky-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-400/35">
             <div className="mb-2 flex items-center gap-2">
               <Zap className="h-4 w-4 text-amber-300" />
-              <h2 className="text-sm font-semibold text-white">Today&apos;s Best Opportunity</h2>
+              <h2 className="text-sm font-semibold text-white">Today&apos;s Focus</h2>
             </div>
             {focusAirdrops[0] ? (
               <div>
@@ -1230,7 +1231,7 @@ export default function CustomerDashboard() {
             <p className="text-xs text-gray-400">Live AI guidance for your next move, risk balance, and high-signal opportunities.</p>
             <button
               type="button"
-              onClick={() => setAiDrawerOpen(true)}
+              onClick={openCopilot}
               className="mt-3 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-neon-purple px-4 py-2.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
             >
               <Sparkles className="h-4 w-4" />
@@ -1282,17 +1283,26 @@ export default function CustomerDashboard() {
               <p className="text-xs text-gray-500">No bookmarked airdrops yet. Use bookmarks in Browse to build your watchlist.</p>
             ) : (
               <div className="space-y-2">
-                {watchlistAirdrops.map(item => (
+                {watchlistAirdrops.slice(0, 4).map(item => (
                   <Link key={item.id} to={`/airdrop/${item.slug}`} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-gray-200 hover:border-sky-500/30">
                     <span className="truncate pr-2">{item.name}</span>
                     <span className="rounded-full border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-200">{item.trust_score ?? 0}</span>
                   </Link>
                 ))}
+                {watchlistAirdrops.length > 4 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('profile')}
+                    className="text-xs font-semibold text-sky-300 transition-colors hover:text-sky-200"
+                  >
+                    View full watchlist
+                  </button>
+                )}
               </div>
             )}
           </div>
 
-          <div className="glass-card p-4 border border-emerald-500/20 transition-all duration-200 hover:-translate-y-0.5">
+          <div className="hidden border border-emerald-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5 lg:block glass-card">
             <div className="mb-3 flex items-center gap-2">
               <Activity className="h-4 w-4 text-emerald-300" />
               <h3 className="text-sm font-semibold text-white">Market Pulse</h3>
@@ -1314,7 +1324,7 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2" id="profile-section">
+        <div className="hidden gap-4 lg:grid lg:grid-cols-2" id="profile-section">
           <div className="glass-card p-4 border border-sky-500/20 transition-all duration-200 hover:-translate-y-0.5">
             <div className="mb-3 flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-sky-300" />
@@ -1364,7 +1374,7 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="hidden gap-4 lg:grid lg:grid-cols-2">
           <div className="glass-card p-4 border border-white/10 transition-all duration-200 hover:-translate-y-0.5">
             <div className="mb-3 flex items-center gap-2">
               <Trophy className="h-4 w-4 text-amber-300" />
@@ -1395,10 +1405,18 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
-        <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
-        <ReputationRulesNotice />
-        <DashboardEngagementPanel />
-        <AirdropGuardIntelligenceCentre />
+        <div className="hidden lg:block">
+          <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
+        </div>
+        <div className="hidden lg:block">
+          <ReputationRulesNotice />
+        </div>
+        <div className="hidden lg:block">
+          <DashboardEngagementPanel />
+        </div>
+        <div className="hidden lg:block">
+          <AirdropGuardIntelligenceCentre />
+        </div>
       </div>
     )}
 
@@ -1584,39 +1602,69 @@ export default function CustomerDashboard() {
       </div>
     )}
 
-          <button
-            type="button"
-            onClick={() => setAiDrawerOpen(true)}
-            className="group fixed bottom-8 right-8 z-[75] hidden h-[88px] w-[88px] flex-col items-center justify-center rounded-full border border-sky-300/60 bg-gradient-to-br from-sky-500 via-cyan-500 to-violet-500 text-white shadow-[0_0_0_7px_rgba(56,189,248,0.16),0_18px_40px_rgba(56,189,248,0.34)] transition-all duration-300 hover:-translate-y-1 hover:scale-[1.04] lg:inline-flex"
-          >
-            <span className="pointer-events-none absolute inset-0 rounded-full border border-sky-300/60 animate-ping opacity-30" />
-            <Sparkles className="relative h-5 w-5" />
-            <span className="relative mt-1 text-xs font-black uppercase tracking-[0.12em]">Ask AI</span>
-          </button>
-
-          <div className={`fixed inset-0 z-[80] ${aiDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
-            <div
-              className={`absolute inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity duration-300 ${aiDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
-              onClick={() => setAiDrawerOpen(false)}
-            />
-            <aside className={`absolute inset-0 h-[100dvh] w-full max-w-full overflow-hidden rounded-none border border-white/10 bg-[#060a18]/95 p-0 shadow-[0_0_70px_rgba(56,189,248,0.2)] transition-transform duration-300 lg:inset-auto lg:bottom-3 lg:right-0 lg:top-3 lg:h-auto lg:w-[min(420px,100vw)] lg:max-w-[420px] lg:rounded-l-[32px] lg:rounded-tr-none lg:rounded-br-none lg:border-l lg:border-t lg:border-b lg:border-r-0 ${aiDrawerOpen ? 'translate-y-0 lg:translate-x-0' : 'translate-y-full lg:translate-y-0 lg:translate-x-full'}`}>
-              <AirdropCopilot
-                onClose={() => setAiDrawerOpen(false)}
-                summary={{
-                  userName: firstName,
-                  totalAirdrops: safeAirdrops.length,
-                  verifiedCount: verifiedProjectsCount,
-                  expiresToday: expiresTodayCount,
-                  momentumLabel: marketPulse.momentum >= 20 ? 'Market momentum is increasing' : 'Market momentum is mixed today',
-                  estimatedRewards: estimatedRewardsText,
-                  confidence: copilotConfidencePct,
-                  dataSources: safeAirdrops.length + Math.max(1, watchlistCount),
-                  lastUpdated: '1 min ago',
-                }}
-                className="h-full"
-              />
-            </aside>
+    {activeTab === 'profile' && (
+      <div className="space-y-4" id="profile-section">
+        <div className="glass-card border border-white/10 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-white">Profile & Access</h2>
+              <p className="mt-1 text-xs text-gray-500">Reputation, activity, intelligence and API access in one place.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('api')}
+              className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-200"
+            >
+              API Access
+            </button>
           </div>
+        </div>
+
+        <div className="glass-card border border-emerald-500/20 p-4 transition-all duration-200 hover:-translate-y-0.5">
+          <div className="mb-3 flex items-center gap-2">
+            <Activity className="h-4 w-4 text-emerald-300" />
+            <h3 className="text-sm font-semibold text-white">Market Pulse</h3>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+              <div className="text-sm font-black text-emerald-300">{marketPulse.momentum}%</div>
+              <div className="text-[10px] text-gray-500">Momentum</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+              <div className="text-sm font-black text-amber-300">{marketPulse.reviewed}</div>
+              <div className="text-[10px] text-gray-500">Review</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+              <div className="text-sm font-black text-rose-300">{marketPulse.riskSignals}</div>
+              <div className="text-[10px] text-gray-500">Risk</div>
+            </div>
+          </div>
+        </div>
+
+        <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
+        <ReputationRulesNotice />
+
+        <div className="glass-card p-4 border border-white/10 transition-all duration-200 hover:-translate-y-0.5">
+          <div className="mb-3 flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-amber-300" />
+            <h2 className="text-sm font-semibold text-white">Your Activity</h2>
+          </div>
+          <div className="space-y-3">
+            {activityTimeline.map((entry, idx) => (
+              <div key={entry.id} className="relative pl-5">
+                <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-sky-400" />
+                {idx < activityTimeline.length - 1 && <span className="absolute left-[4px] top-4 h-[calc(100%-8px)] w-px bg-white/10" />}
+                <p className="text-xs font-semibold text-white">{entry.title}</p>
+                <p className="text-[11px] text-gray-500">{entry.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <DashboardEngagementPanel />
+        <AirdropGuardIntelligenceCentre />
+      </div>
+    )}
         </main>
     </div>
   </div>
