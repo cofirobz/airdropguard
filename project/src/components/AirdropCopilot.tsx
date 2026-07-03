@@ -239,6 +239,24 @@ async function extractInvokeError(error: unknown): Promise<string> {
   }
 }
 
+async function isUnauthorizedInvokeError(error: unknown): Promise<boolean> {
+  if (!(error instanceof Error)) return false;
+
+  const response = 'context' in error ? (error as Error & { context?: unknown }).context : undefined;
+  if (response instanceof Response) {
+    if (response.status === 401 || response.status === 403) return true;
+
+    try {
+      const rawText = await response.clone().text();
+      if (/unauthori[sz]ed/i.test(rawText)) return true;
+    } catch {
+      // Ignore parse failures and continue with message checks.
+    }
+  }
+
+  return /unauthori[sz]ed|jwt|session/i.test(error.message);
+}
+
 export default function AirdropCopilot({ onClose, summary: _summary, className, pageContext }: AirdropCopilotProps) {
   const { user } = useAuth();
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -405,10 +423,32 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
 
     try {
       const combinedContext = buildMemoryContext();
-      const response = await supabase.functions.invoke(FUNCTION_NAME, {
+      const invokeCopilot = async (token: string) => supabase.functions.invoke(FUNCTION_NAME, {
         body: { message: content, context: combinedContext },
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
+
+      let response = await invokeCopilot(accessToken);
+
+      if (response.error && await isUnauthorizedInvokeError(response.error)) {
+        logCopilot('info', 'Unauthorized response, refreshing session and retrying', {
+          functionName: FUNCTION_NAME,
+        });
+
+        const { data: refreshedSession, error: refreshError } = await supabase.auth.refreshSession();
+        const refreshedToken = refreshedSession.session?.access_token;
+
+        if (refreshError || !refreshedToken) {
+          logCopilot('error', 'Session refresh failed', {
+            functionName: FUNCTION_NAME,
+            refreshError,
+          });
+          setError('Your session has expired. Please sign in again and retry.');
+          return;
+        }
+
+        response = await invokeCopilot(refreshedToken);
+      }
 
       logCopilot('info', 'Raw response', response.data);
 
