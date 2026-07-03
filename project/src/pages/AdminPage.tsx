@@ -142,8 +142,8 @@ const BLANK_FORM: AirdropFormData = {
 
 const SCAM_REPORT_REP = 50;
 
-type BannerPlacement = 'Homepage Hero' | 'Homepage Mid-Page' | 'Dashboard' | 'Airdrop Detail Pages';
-type BannerStatus = 'Draft' | 'Scheduled' | 'Live' | 'Expired';
+type BannerPlacement = 'Homepage Hero Banner' | 'Homepage Mid-Page Banner' | 'Airdrop Detail Banner' | 'Dashboard Banner';
+type BannerStatus = 'Enquiry' | 'Awaiting Artwork' | 'Ready to Publish' | 'Live' | 'Expired';
 type BannerPaymentState = 'Unpaid' | 'Pending' | 'Paid';
 
 interface BannerAd {
@@ -166,44 +166,43 @@ interface BannerAd {
 type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt'>;
 
 const BANNER_PLACEMENT_OPTIONS: BannerPlacement[] = [
-  'Homepage Hero',
-  'Homepage Mid-Page',
-  'Dashboard',
-  'Airdrop Detail Pages',
+  'Homepage Hero Banner',
+  'Homepage Mid-Page Banner',
+  'Airdrop Detail Banner',
+  'Dashboard Banner',
 ];
 
-const BANNER_STATUS_OPTIONS: BannerStatus[] = ['Draft', 'Scheduled', 'Live', 'Expired'];
+const BANNER_STATUS_OPTIONS: BannerStatus[] = ['Enquiry', 'Awaiting Artwork', 'Ready to Publish', 'Live', 'Expired'];
 
 const BLANK_BANNER_FORM: BannerFormData = {
   advertiserName: '',
   bannerImageUrl: '',
   destinationUrl: '',
   altText: '',
-  placement: 'Homepage Hero',
+  placement: 'Homepage Hero Banner',
   startDate: '',
   endDate: '',
-  status: 'Draft',
+  status: 'Enquiry',
   enabled: false,
-  exclusivePlacement: false,
+  exclusivePlacement: true,
   notes: '',
   paymentState: 'Unpaid',
 };
 
 function deriveBannerStatus(status: BannerStatus, startDate: string, endDate: string): BannerStatus {
-  if (status === 'Draft') return 'Draft';
+  if (status === 'Expired') return 'Expired';
   const now = new Date().getTime();
-  const startMs = startDate ? new Date(startDate).getTime() : Number.NaN;
   const endMs = endDate ? new Date(endDate).getTime() : Number.NaN;
 
   if (Number.isFinite(endMs) && endMs < now) return 'Expired';
-  if (Number.isFinite(startMs) && startMs > now) return 'Scheduled';
-  if (status === 'Scheduled' || status === 'Live') return 'Live';
   return status;
 }
 
 function getBannerStatusClass(status: BannerStatus): string {
   if (status === 'Live') return 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10';
-  if (status === 'Scheduled') return 'text-sky-300 border-sky-500/25 bg-sky-500/10';
+  if (status === 'Ready to Publish') return 'text-sky-300 border-sky-500/25 bg-sky-500/10';
+  if (status === 'Awaiting Artwork') return 'text-amber-300 border-amber-500/25 bg-amber-500/10';
+  if (status === 'Enquiry') return 'text-violet-300 border-violet-500/25 bg-violet-500/10';
   if (status === 'Expired') return 'text-rose-300 border-rose-500/25 bg-rose-500/10';
   return 'text-gray-300 border-white/15 bg-white/[0.04]';
 }
@@ -565,7 +564,7 @@ function BannerFormModal({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-white">{mode === 'add' ? 'Create Banner' : 'Edit Banner'}</h2>
-            <p className="text-xs text-gray-500 mt-1">Manage placements, schedule windows and preview creative before publish.</p>
+            <p className="text-xs text-gray-500 mt-1">Prepare enquiry workflow, upload artwork placeholders, and preview before going live.</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
             <X className="w-5 h-5" />
@@ -698,7 +697,7 @@ function BannerFormModal({
           </label>
 
           <div>
-            <label className={labelClass}>Payment State (future Stripe hook)</label>
+            <label className={labelClass}>Future Paid Status Placeholder</label>
             <select
               value={form.paymentState}
               onChange={(e) => setForm((f) => ({ ...f, paymentState: e.target.value as BannerPaymentState }))}
@@ -800,12 +799,12 @@ export default function AdminPage() {
         bannerImageUrl: '',
         destinationUrl: 'https://example.com',
         altText: 'Example campaign banner',
-        placement: 'Homepage Hero',
+        placement: 'Homepage Hero Banner',
         startDate: today.toISOString().split('T')[0],
         endDate: end.toISOString().split('T')[0],
-        status: 'Scheduled',
+        status: 'Enquiry',
         enabled: true,
-        exclusivePlacement: false,
+        exclusivePlacement: true,
         notes: 'Placeholder banner to seed admin workflow.',
         paymentState: 'Pending',
         updatedAt: new Date().toISOString(),
@@ -1451,9 +1450,9 @@ export default function AdminPage() {
           <div>
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
               <Monitor className="w-3.5 h-3.5" />
-              Banner Management
+              Banner Advertisement Management
             </h2>
-            <p className="text-[11px] text-gray-500 mt-1">Frontend management layer only. Payment state is future-ready for Stripe auto-updates.</p>
+            <p className="text-[11px] text-gray-500 mt-1">Admin preparation flow only using frontend state. No payment handling or backend persistence in this section.</p>
           </div>
           <button
             onClick={openAddBanner}
@@ -1467,14 +1466,14 @@ export default function AdminPage() {
         <div className="rounded-2xl border border-cyan-500/15 bg-cyan-500/[0.04] p-3 mb-3 flex flex-wrap items-center gap-2 text-xs">
           <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">
             <CalendarClock className="w-3.5 h-3.5" />
-            Scheduled placements
+            Enquiry to live workflow
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-amber-200">
             <BadgeCheck className="w-3.5 h-3.5" />
             Exclusive placement badge supported
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-gray-300">
-            Stripe can later auto-mark payment status
+            Future paid status placeholder included
           </span>
         </div>
 
@@ -1488,7 +1487,7 @@ export default function AdminPage() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Start Date</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">End Date</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Billing</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Future Paid</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Toggle</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
