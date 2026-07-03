@@ -120,6 +120,19 @@
 				"build"
 			],
 			"isBackground": false
+		},
+		{
+			"label": "build-project-cmd-desktop-fix",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }

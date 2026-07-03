@@ -1275,7 +1275,7 @@ export default function CustomerDashboard() {
               </div>
 
               <div className="grid gap-3 md:grid-cols-[1.1fr_0.9fr]">
-                <div className="rounded-2xl border border-cyan-300/25 bg-[#07182f]/85 p-4 backdrop-blur">
+                <div className="min-w-0 rounded-2xl border border-cyan-300/25 bg-[#07182f]/85 p-4 backdrop-blur">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100/85">Featured Opportunity</p>
                   {featuredMission ? (
                     <>
@@ -1315,17 +1315,17 @@ export default function CustomerDashboard() {
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-3 gap-2">
+                      <div className="mt-3 grid min-w-0 grid-cols-3 gap-2 lg:[grid-template-columns:repeat(3,minmax(0,1fr))]">
                         {[
                           { label: 'Reward', tone: 'border-cyan-300/35 bg-cyan-500/18 text-cyan-100', value: rewardMetric },
                           { label: 'Risk', tone: 'border-emerald-400/35 bg-emerald-500/16 text-emerald-100', value: riskMetric },
                           { label: 'Time', tone: 'border-white/20 bg-white/[0.1] text-white', value: timeMetric },
                         ].map((metric) => (
-                          <div key={metric.label} className={`flex min-h-[84px] flex-col items-center justify-center rounded-2xl border px-2.5 py-3 text-center sm:px-3 ${metric.tone}`}>
+                          <div key={metric.label} className={`flex min-h-[84px] min-w-0 flex-col items-center justify-center rounded-2xl border px-2.5 py-3 text-center sm:px-3 ${metric.tone}`}>
                             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-75">{metric.label}</p>
-                            <p className="mt-1 text-[11px] font-bold leading-tight break-words whitespace-normal sm:text-xs">{metric.value.primary}</p>
+                            <p className="mt-1 text-[11px] font-bold leading-tight text-center whitespace-normal break-words [overflow-wrap:anywhere] sm:text-xs lg:text-[11px]">{metric.value.primary}</p>
                             {metric.value.secondary && (
-                              <p className="mt-0.5 text-[10px] leading-tight opacity-85 break-words whitespace-normal">{metric.value.secondary}</p>
+                              <p className="mt-0.5 text-[10px] leading-tight text-center opacity-85 whitespace-normal break-words [overflow-wrap:anywhere] lg:text-[10px]">{metric.value.secondary}</p>
                             )}
                           </div>
                         ))}
