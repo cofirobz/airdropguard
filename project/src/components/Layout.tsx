@@ -4,6 +4,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import {
   Menu,
   X,
+  Bot,
   Shield,
   BadgeDollarSign,
   Key,
