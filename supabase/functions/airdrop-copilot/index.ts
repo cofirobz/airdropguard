@@ -22,6 +22,7 @@ type UserPreferences = {
 
 type ChatRequest = {
   message?: string;
+  context?: string;
 };
 
 type CompactAirdrop = {
@@ -47,7 +48,7 @@ type CompactAirdrop = {
   tasks: string[];
 };
 
-type CopilotIntent = "general" | "today" | "safety" | "compare";
+type CopilotIntent = "api_docs" | "top_airdrops" | "airdrop" | "safety" | "dashboard" | "compare" | "unknown";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -56,9 +57,25 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function errorToMessage(error: unknown): string {
+  if (error instanceof Error) return safeString(error.message) || "Unexpected error";
+
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    return (
+      safeString(record.message)
+      || safeString(record.details)
+      || safeString(record.hint)
+      || safeString(record.code)
+      || "Unexpected error"
+    );
+  }
+
+  return safeString(error) || "Unexpected error";
+}
+
 function errorResponse(error: unknown) {
-  const rawMessage = error instanceof Error ? error.message : String(error);
-  const message = safeString(rawMessage);
+  const message = errorToMessage(error);
 
   console.error("airdrop-copilot failed", {
     message,
@@ -85,6 +102,47 @@ function errorResponse(error: unknown) {
   }, 500);
 }
 
+async function fetchAirdropsForCopilot(supabase: ReturnType<typeof createClient>) {
+  const fullFields = "name, slug, category, blockchain, trust_score, opportunity_score, risk_level, difficulty, time_required, estimated_reward, funding_info, investors, team_info, docs_url, github_url, expiry_date, status, ai_summary, listing_state, airdrop_tasks(title, sort_order)";
+  const noOpportunityFields = "name, slug, category, blockchain, trust_score, risk_level, difficulty, time_required, estimated_reward, funding_info, investors, team_info, docs_url, github_url, expiry_date, status, ai_summary, listing_state, airdrop_tasks(title, sort_order)";
+
+  const runQuery = async (fields: string, withReviewFilter: boolean) => {
+    let query = supabase
+      .from("airdrops")
+      .select(fields)
+      .eq("published", true)
+      .eq("is_demo", false)
+      .order("sort_order", { ascending: true });
+
+    if (withReviewFilter) {
+      query = query.not("review_status", "eq", "replaced_demo");
+    }
+
+    return await query;
+  };
+
+  const attempts: Array<{ fields: string; withReviewFilter: boolean }> = [
+    { fields: fullFields, withReviewFilter: true },
+    { fields: fullFields, withReviewFilter: false },
+    { fields: noOpportunityFields, withReviewFilter: true },
+    { fields: noOpportunityFields, withReviewFilter: false },
+  ];
+
+  let lastResult = await runQuery(attempts[0].fields, attempts[0].withReviewFilter);
+  if (!lastResult.error) return lastResult;
+
+  for (const attempt of attempts.slice(1)) {
+    const message = lastResult.error.message.toLowerCase();
+    const schemaMismatch = message.includes("column") || message.includes("review_status") || message.includes("opportunity_score");
+    if (!schemaMismatch) return lastResult;
+
+    lastResult = await runQuery(attempt.fields, attempt.withReviewFilter);
+    if (!lastResult.error) return lastResult;
+  }
+
+  return lastResult;
+}
+
 function safeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -92,6 +150,10 @@ function safeString(value: unknown): string {
 function compactText(value: string, limit = 180): string {
   const next = safeString(value).replace(/\s+/g, " ");
   return next.length > limit ? `${next.slice(0, limit - 1)}…` : next;
+}
+
+function containsAny(text: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(text));
 }
 
 function detectRelevantAirdrops(message: string, airdrops: { name: string; slug: string }[]): Set<string> {
@@ -121,12 +183,41 @@ function listingPriority(listingState: string | null): number {
   return 1;
 }
 
-function detectIntent(message: string, relevantSlugs: Set<string>): CopilotIntent {
+function detectIntent(message: string, pageContext: string, relevantSlugs: Set<string>): CopilotIntent {
   const lower = message.toLowerCase();
-  if (/\b(compare|comparison|versus|vs\.?|better than)\b/.test(lower) || relevantSlugs.size >= 2) return "compare";
-  if (/\b(today|right now|today's|todays|best opportunities|top opportunities|focus on today|ending soon)\b/.test(lower)) return "today";
-  if (/\b(safe|safety|risky|risk|scam|legit|trustworthy|security)\b/.test(lower)) return "safety";
-  return "general";
+
+  if (containsAny(lower, [/\b(compare|comparison|versus|vs\.?|better than)\b/]) || relevantSlugs.size >= 2) {
+    return "compare";
+  }
+
+  if (containsAny(lower, [
+    /\b(api|endpoint|endpoints|docs|documentation|auth header|api key|rate limit|postman|curl)\b/,
+  ])) {
+    return "api_docs";
+  }
+
+  if (containsAny(lower, [/\b(safe|safety|risky|risk|scam|phishing|rug|security|legit|trustworthy)\b/])) {
+    return "safety";
+  }
+
+  const asksForRanking = containsAny(lower, [/\b(top|best|current|right now|highest|rank|ranked)\b/]);
+  const mentionsAirdrops = containsAny(lower, [/\b(airdrop|airdrops|opportunit(y|ies))\b/]);
+  if (asksForRanking && mentionsAirdrops) {
+    return "top_airdrops";
+  }
+
+  if (
+    containsAny(lower, [/\b(this page|here|dashboard|what do i do|next step|where should i click|how do i use)\b/])
+    || (pageContext.length > 0 && containsAny(lower, [/\b(page|screen|section|panel|action)\b/]))
+  ) {
+    return "dashboard";
+  }
+
+  if (containsAny(lower, [/\b(airdrop|airdrops|project|projects|reward|rewards|task|tasks|expiry|ending soon)\b/]) || relevantSlugs.size > 0) {
+    return "airdrop";
+  }
+
+  return "unknown";
 }
 
 function compactValue(value: string | number | null | undefined): string {
@@ -214,6 +305,7 @@ function buildRiskFactorsBrief(): string {
 function buildInstructionBlock(intent: CopilotIntent): string {
   const base = [
     "You are AirdropGuard Copilot, a premium crypto intelligence assistant focused on airdrop research.",
+    "Answer the user question directly. Do not default to a generic top-airdrop list.",
     "Use AirdropGuard data first for every answer. Do not answer like a generic chatbot.",
     "Prefer verified opportunities first, then under_review, then anything else only if necessary.",
     "Never fabricate rewards, funding, investors, GitHub activity, docs quality, or team strength.",
@@ -222,25 +314,136 @@ function buildInstructionBlock(intent: CopilotIntent): string {
     "Explain why recommendations are made, referencing available signals.",
     "Recommend concrete next actions.",
     "Reference Trust Score, AI Confidence, Risk Level, Estimated Reward, and Time Required whenever those fields are available.",
-    "Use markdown formatting with short headings, bullet lists, and tables where helpful.",
+    "Use clean markdown formatting with short headings and concise bullets.",
     "Highlight the primary recommendation using bold markdown.",
-    "If comparing projects, include a markdown table.",
-    "End the response with this exact sentence: Would you like me to compare another project or recommend your next task?",
+    "Only use markdown tables for compare or explicit top-airdrop requests.",
+    "If the question is not about top or best opportunities, do not output a top opportunities section.",
+    "Keep answers concise and readable: 120-220 words unless user asks for depth.",
+    "Avoid long walls of text and avoid repeated sections.",
+    "End with one concrete suggested next action.",
   ];
 
-  if (intent === "today") {
-    base.push("The user is asking about today's opportunities. Rank the top opportunities from current AirdropGuard data before any other commentary.");
+  if (intent === "top_airdrops") {
+    base.push("The user explicitly asked for top/best/current opportunities. Start with ranked top opportunities.");
+    base.push("Format for top_airdrops: short heading, 3-item table max, then 2 short bullets for next action.");
   }
 
   if (intent === "safety") {
     base.push("The user is asking about safety. Explain the risk factors AirdropGuard AI is using before giving recommendations.");
+    base.push("Format for safety: 3-5 bullets and one short caution line. No large table.");
   }
 
   if (intent === "compare") {
     base.push("The user is asking for a comparison. Start with a markdown comparison table using only available AirdropGuard fields.");
+    base.push("Format for compare: one compact table plus a 2-bullet verdict.");
+  }
+
+  if (intent === "api_docs") {
+    base.push("The user is asking about API/docs. Explain docs route, endpoints, and auth in plain language.");
+    base.push("Format for api_docs: short sections with simple bullets only.");
+  }
+
+  if (intent === "dashboard") {
+    base.push("The user is asking page/dashboard guidance. Use page context to explain what to do next on this page.");
+    base.push("Format for dashboard: one short action plan with 3 steps max.");
   }
 
   return base.join("\n");
+}
+
+function cleanAssistantAnswer(answer: string): string {
+  const normalized = answer
+    .replace(/\r\n/g, "\n")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (!normalized) return "I can help with that. Please share one more detail so I can give a precise answer.";
+
+  return normalized;
+}
+
+function buildApiDocsAnswer(): string {
+  return [
+    "AirdropGuard API docs are available at /api-docs.",
+    "",
+    "Public API endpoints:",
+    "- GET /functions/v1/api-v1/airdrops",
+    "- GET /functions/v1/api-v1/airdrops/:slug",
+    "",
+    "Authentication:",
+    "- Send Authorization: Bearer YOUR_API_KEY",
+    "",
+    "Protected/internal endpoints (not public API contract):",
+    "- /functions/v1/airdrop-copilot",
+    "- /functions/v1/manage-api-key",
+    "- /functions/v1/stripe-checkout",
+    "- /functions/v1/stripe-portal",
+    "",
+    "Next step: open /api-docs to see request and response examples.",
+  ].join("\n");
+}
+
+function buildContextualFallback(message: string, intent: CopilotIntent, pageContext: string, rows: CompactAirdrop[]): string {
+  if (intent === "api_docs") {
+    return buildApiDocsAnswer();
+  }
+
+  if (intent === "dashboard") {
+    return [
+      "Here is the best next action for this page:",
+      "",
+      `Question: ${message}`,
+      pageContext ? `Page context: ${pageContext}` : "Page context: Dashboard guidance is active.",
+      "",
+      "Suggested next action: start with your highest-trust unfinished mission, then ask me to break it into a 3-step checklist.",
+    ].join("\n");
+  }
+
+  if (intent === "safety") {
+    return [
+      "Safety quick guidance:",
+      "- Prioritize verified listings and review risk level before any wallet action.",
+      "- Avoid unknown claim links and never share seed phrases/private keys.",
+      "- If trust or data is missing, treat it as higher risk until verified.",
+      "",
+      "Next step: share the exact project name and I will run a focused safety check.",
+    ].join("\n");
+  }
+
+  if (intent === "top_airdrops") {
+    const ranked = rankAirdrops(rows).slice(0, 3);
+    const list = ranked.length > 0
+      ? ranked.map((item, index) => `${index + 1}. ${item.name} (Trust: ${compactValue(item.trust_score)}, Risk: ${compactValue(item.risk_level)}, Time: ${compactValue(item.time_required)})`).join("\n")
+      : "1. No published airdrops are currently available in this dataset.";
+
+    return [
+      "Live AI generation is temporarily unavailable, but here are current top opportunities from available data:",
+      list,
+      "",
+      "Next step: tell me which one to break down into tasks and safety checks.",
+    ].join("\n");
+  }
+
+  if (intent === "airdrop" || intent === "compare") {
+    return [
+      "I can still help using current AirdropGuard data while live AI generation is unavailable.",
+      `Question: ${message}`,
+      "",
+      "Next step: include one or two project names (or slugs) and I will give a focused comparison with trust, risk, reward, and effort.",
+    ].join("\n");
+  }
+
+  return [
+    "I can help with API docs, project comparisons, safety checks, and dashboard next actions.",
+    `Your question: ${message}`,
+    "",
+    "Try one of these:",
+    "- Where are the API endpoints?",
+    "- Compare project A vs project B",
+    "- Is this project safe?",
+    "- What should I do on this page right now?",
+  ].join("\n");
 }
 
 function compactAirdrop(row: Record<string, unknown>): CompactAirdrop {
@@ -307,6 +510,11 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  let fallbackMessage = "your latest request";
+  let fallbackContext = "";
+  let fallbackIntent: CopilotIntent = "unknown";
+  let fallbackRows: CompactAirdrop[] = [];
+
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -315,6 +523,10 @@ Deno.serve(async (req: Request) => {
     const body = await req.json() as ChatRequest;
     const message = safeString(body.message);
     if (!message) return json({ error: "Message is required" }, 400);
+    const pageContext = safeString(body.context);
+
+    fallbackMessage = message;
+    fallbackContext = pageContext;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -327,13 +539,7 @@ Deno.serve(async (req: Request) => {
     const userId = authData.user.id;
 
     const [airdropsRes, preferencesRes] = await Promise.all([
-      supabase
-        .from("airdrops")
-        .select("name, slug, category, blockchain, trust_score, opportunity_score, risk_level, difficulty, time_required, estimated_reward, funding_info, investors, team_info, docs_url, github_url, expiry_date, status, ai_summary, listing_state, airdrop_tasks(title, sort_order)")
-        .eq("published", true)
-        .eq("is_demo", false)
-        .not("review_status", "eq", "replaced_demo")
-        .order("sort_order", { ascending: true }),
+      fetchAirdropsForCopilot(supabase),
       supabase
         .from("user_preferences")
         .select("user_id, experience_level, daily_time_available, preferred_chains, risk_tolerance")
@@ -341,8 +547,10 @@ Deno.serve(async (req: Request) => {
         .maybeSingle(),
     ]);
 
-    if (airdropsRes.error) throw airdropsRes.error;
-    if (preferencesRes.error) throw preferencesRes.error;
+    if (airdropsRes.error) throw new Error(errorToMessage(airdropsRes.error));
+    if (preferencesRes.error) {
+      console.warn("airdrop-copilot user_preferences query failed; continuing without preferences", preferencesRes.error);
+    }
 
     const allAirdrops = (airdropsRes.data ?? []) as Record<string, unknown>[];
     const relevantSlugs = detectRelevantAirdrops(message, allAirdrops.map(row => ({
@@ -355,13 +563,43 @@ Deno.serve(async (req: Request) => {
       .filter((row, index) => index < MAX_AIRDROPS || relevantSlugs.has(safeString(row.slug)));
 
     const compactRows = selected.map(compactAirdrop);
-    const preferences = (preferencesRes.data ?? null) as UserPreferences | null;
-    const intent = detectIntent(message, relevantSlugs);
+    fallbackRows = compactRows;
+    const preferences = preferencesRes.error
+      ? null
+      : (preferencesRes.data ?? null) as UserPreferences | null;
+    const intent = detectIntent(message, pageContext, relevantSlugs);
+    fallbackIntent = intent;
+
+    if (intent === "api_docs") {
+      return json({
+        answer: buildApiDocsAnswer(),
+        used_preferences: Boolean(preferences),
+        airdrop_count: compactRows.length,
+      });
+    }
+
+    if (intent === "dashboard") {
+      return json({
+        answer: buildContextualFallback(message, intent, pageContext, compactRows),
+        used_preferences: Boolean(preferences),
+        airdrop_count: compactRows.length,
+      });
+    }
+
+    if (intent === "unknown") {
+      return json({
+        answer: buildContextualFallback(message, intent, pageContext, compactRows),
+        used_preferences: Boolean(preferences),
+        airdrop_count: compactRows.length,
+        degraded: true,
+      });
+    }
+
     const topOpportunitiesBrief = buildTopOpportunities(compactRows);
     const comparisonBrief = buildComparisonBrief(compactRows, relevantSlugs);
     const riskFactorsBrief = buildRiskFactorsBrief();
 
-    const prompt = [
+    const promptSections: string[] = [
       buildInstructionBlock(intent),
       "",
       `DETECTED INTENT: ${intent}`,
@@ -374,28 +612,61 @@ Deno.serve(async (req: Request) => {
         preferred_chains: preferences?.preferred_chains ?? [],
         risk_tolerance: preferences?.risk_tolerance ?? null,
       })}`,
-      "",
-      "TOP OPPORTUNITIES FROM CURRENT AIRDROPGUARD DATA:",
-      topOpportunitiesBrief,
-      "",
-      "COMPARISON CANDIDATES:",
-      comparisonBrief,
-      "",
-      "RISK FACTORS USED BY AIRDROPGUARD AI:",
-      riskFactorsBrief,
-      "",
-      `AIRDROPGUARD DATA (${compactRows.length} rows):`,
-      JSON.stringify(compactRows),
-    ].join("\n");
+    ];
 
-    const answer = await callOpenAI(prompt);
+    if (pageContext) {
+      promptSections.push("", `PAGE CONTEXT: ${pageContext}`);
+    }
+
+    if (intent === "top_airdrops") {
+      promptSections.push("", "TOP OPPORTUNITIES FROM CURRENT AIRDROPGUARD DATA:", topOpportunitiesBrief);
+    }
+
+    if (intent === "compare") {
+      promptSections.push("", "COMPARISON CANDIDATES:", comparisonBrief);
+    }
+
+    if (intent === "safety") {
+      promptSections.push("", "RISK FACTORS USED BY AIRDROPGUARD AI:", riskFactorsBrief);
+    }
+
+    if (intent === "airdrop" || intent === "compare" || intent === "safety" || intent === "top_airdrops") {
+      promptSections.push("", `AIRDROPGUARD DATA (${compactRows.length} rows):`, JSON.stringify(compactRows));
+    }
+
+    const prompt = promptSections.join("\n");
+
+    let answer = "";
+    let degraded = false;
+
+    try {
+      answer = await callOpenAI(prompt);
+      if (!answer) {
+        degraded = true;
+        answer = buildContextualFallback(message, intent, pageContext, compactRows);
+      }
+    } catch (openAiError) {
+      console.warn("airdrop-copilot OpenAI call failed; using contextual fallback", openAiError);
+      degraded = true;
+      answer = buildContextualFallback(message, intent, pageContext, compactRows);
+    }
+
+    answer = cleanAssistantAnswer(answer);
 
     return json({
       answer,
       used_preferences: Boolean(preferences),
       airdrop_count: compactRows.length,
+      degraded,
     });
   } catch (error) {
-    return errorResponse(error);
+    console.error("airdrop-copilot unexpected failure", error);
+    return json({
+      answer: buildContextualFallback(fallbackMessage, fallbackIntent, fallbackContext, fallbackRows),
+      used_preferences: false,
+      airdrop_count: fallbackRows.length,
+      degraded: true,
+      error: errorToMessage(error),
+    });
   }
 });

@@ -118,6 +118,30 @@ function safeString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function errorToMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return safeString(error.message) || "Unexpected error";
+  }
+
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const message = safeString(record.message);
+    const details = safeString(record.details);
+    const hint = safeString(record.hint);
+    const code = safeString(record.code);
+
+    return (
+      message
+      || details
+      || hint
+      || code
+      || "Unexpected error"
+    );
+  }
+
+  return safeString(error) || "Unexpected error";
+}
+
 function compactText(value: string, limit = 180): string {
   const next = safeString(value).replace(/\s+/g, " ");
   return next.length > limit ? `${next.slice(0, limit - 1)}…` : next;
@@ -208,6 +232,8 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  let userMessageForFallback = "your latest request";
+
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
     const jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -216,6 +242,7 @@ Deno.serve(async (req: Request) => {
     const body = await req.json() as ChatRequest;
     const message = safeString(body.message);
     if (!message) return json({ error: "Message is required" }, 400);
+    userMessageForFallback = message;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -236,8 +263,10 @@ Deno.serve(async (req: Request) => {
         .maybeSingle(),
     ]);
 
-    if (airdropsRes.error) throw airdropsRes.error;
-    if (preferencesRes.error) throw preferencesRes.error;
+    if (airdropsRes.error) throw new Error(errorToMessage(airdropsRes.error));
+    if (preferencesRes.error) {
+      console.warn("[airdrop-copilot] user_preferences query failed, continuing without preferences", preferencesRes.error);
+    }
 
     const allAirdrops = (airdropsRes.data ?? []) as AirdropRow[];
     const relevantSlugs = detectRelevantAirdrops(message, allAirdrops.map(row => ({
@@ -250,7 +279,9 @@ Deno.serve(async (req: Request) => {
       .filter((row, index) => index < MAX_AIRDROPS || relevantSlugs.has(safeString(row.slug)));
 
     const compactRows = selected.map(compactAirdrop);
-    const preferences = (preferencesRes.data ?? null) as UserPreferences | null;
+    const preferences = preferencesRes.error
+      ? null
+      : (preferencesRes.data ?? null) as UserPreferences | null;
 
     const prompt = [
       "You are AirdropGuard AI Copilot, a practical airdrop research assistant.",
@@ -295,6 +326,15 @@ Deno.serve(async (req: Request) => {
       degraded,
     });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    const message = errorToMessage(error);
+    console.error("[airdrop-copilot] Unexpected failure", error);
+
+    return json({
+      answer: buildFallbackAnswer(userMessageForFallback, []),
+      degraded: true,
+      error: message,
+      used_preferences: false,
+      airdrop_count: 0,
+    });
   }
 });
