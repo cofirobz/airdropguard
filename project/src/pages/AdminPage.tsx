@@ -9,6 +9,7 @@ import {
   Database, Shield, Activity, Mail, Users, Key, Zap, RefreshCw, Download,
   Inbox, CheckCheck, XCircle, ChevronDown, ChevronUp, ExternalLink,
   FileText, Plus, X, Pencil, Trash2, AlertTriangle, LogOut, ShieldCheck, Gift,
+  ImagePlus, Monitor, CalendarClock, BadgeCheck,
 } from 'lucide-react';
 import type { Airdrop, Blockchain, Category } from '../lib/types';
 import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
@@ -140,6 +141,78 @@ const BLANK_FORM: AirdropFormData = {
 };
 
 const SCAM_REPORT_REP = 50;
+
+type BannerPlacement = 'Homepage Hero' | 'Homepage Mid-Page' | 'Dashboard' | 'Airdrop Detail Pages';
+type BannerStatus = 'Draft' | 'Scheduled' | 'Live' | 'Expired';
+type BannerPaymentState = 'Unpaid' | 'Pending' | 'Paid';
+
+interface BannerAd {
+  id: string;
+  advertiserName: string;
+  bannerImageUrl: string;
+  destinationUrl: string;
+  altText: string;
+  placement: BannerPlacement;
+  startDate: string;
+  endDate: string;
+  status: BannerStatus;
+  enabled: boolean;
+  exclusivePlacement: boolean;
+  notes: string;
+  paymentState: BannerPaymentState;
+  updatedAt: string;
+}
+
+type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt'>;
+
+const BANNER_PLACEMENT_OPTIONS: BannerPlacement[] = [
+  'Homepage Hero',
+  'Homepage Mid-Page',
+  'Dashboard',
+  'Airdrop Detail Pages',
+];
+
+const BANNER_STATUS_OPTIONS: BannerStatus[] = ['Draft', 'Scheduled', 'Live', 'Expired'];
+
+const BLANK_BANNER_FORM: BannerFormData = {
+  advertiserName: '',
+  bannerImageUrl: '',
+  destinationUrl: '',
+  altText: '',
+  placement: 'Homepage Hero',
+  startDate: '',
+  endDate: '',
+  status: 'Draft',
+  enabled: false,
+  exclusivePlacement: false,
+  notes: '',
+  paymentState: 'Unpaid',
+};
+
+function deriveBannerStatus(status: BannerStatus, startDate: string, endDate: string): BannerStatus {
+  if (status === 'Draft') return 'Draft';
+  const now = new Date().getTime();
+  const startMs = startDate ? new Date(startDate).getTime() : Number.NaN;
+  const endMs = endDate ? new Date(endDate).getTime() : Number.NaN;
+
+  if (Number.isFinite(endMs) && endMs < now) return 'Expired';
+  if (Number.isFinite(startMs) && startMs > now) return 'Scheduled';
+  if (status === 'Scheduled' || status === 'Live') return 'Live';
+  return status;
+}
+
+function getBannerStatusClass(status: BannerStatus): string {
+  if (status === 'Live') return 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10';
+  if (status === 'Scheduled') return 'text-sky-300 border-sky-500/25 bg-sky-500/10';
+  if (status === 'Expired') return 'text-rose-300 border-rose-500/25 bg-rose-500/10';
+  return 'text-gray-300 border-white/15 bg-white/[0.04]';
+}
+
+function getPaymentStateClass(state: BannerPaymentState): string {
+  if (state === 'Paid') return 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10';
+  if (state === 'Pending') return 'text-amber-300 border-amber-500/25 bg-amber-500/10';
+  return 'text-gray-300 border-white/15 bg-white/[0.04]';
+}
 
 function levelFromRep(rep: number) {
   return Math.max(1, Math.floor(rep / 250) + 1);
@@ -463,6 +536,220 @@ function DeleteModal({
   );
 }
 
+function BannerFormModal({
+  mode,
+  form,
+  setForm,
+  onClose,
+  onSave,
+}: {
+  mode: 'add' | 'edit';
+  form: BannerFormData;
+  setForm: React.Dispatch<React.SetStateAction<BannerFormData>>;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const inputClass = 'w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40';
+  const labelClass = 'block text-[10px] text-gray-500 uppercase tracking-wider mb-1';
+
+  const onImageFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    setForm((prev) => ({ ...prev, bannerImageUrl: objectUrl }));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 bg-black/70 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-3xl glass-card p-6 space-y-5 relative mb-12">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-white">{mode === 'add' ? 'Create Banner' : 'Edit Banner'}</h2>
+            <p className="text-xs text-gray-500 mt-1">Manage placements, schedule windows and preview creative before publish.</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass}>Advertiser / Project Name *</label>
+            <input
+              value={form.advertiserName}
+              onChange={(e) => setForm((f) => ({ ...f, advertiserName: e.target.value }))}
+              placeholder="e.g. ZetaChain"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className={labelClass}>Destination URL *</label>
+            <input
+              value={form.destinationUrl}
+              onChange={(e) => setForm((f) => ({ ...f, destinationUrl: e.target.value }))}
+              placeholder="https://project.example"
+              className={inputClass}
+            />
+          </div>
+
+          <div>
+            <label className={labelClass}>Placement *</label>
+            <select
+              value={form.placement}
+              onChange={(e) => setForm((f) => ({ ...f, placement: e.target.value as BannerPlacement }))}
+              className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40"
+            >
+              {BANNER_PLACEMENT_OPTIONS.map((placement) => (
+                <option key={placement} value={placement} className="bg-dark-900">{placement}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Status</label>
+            <select
+              value={form.status}
+              onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as BannerStatus }))}
+              className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40"
+            >
+              {BANNER_STATUS_OPTIONS.map((status) => (
+                <option key={status} value={status} className="bg-dark-900">{status}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Start Date</label>
+            <input
+              type="date"
+              value={form.startDate}
+              onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+              className={`${inputClass} [color-scheme:dark]`}
+            />
+          </div>
+
+          <div>
+            <label className={labelClass}>End Date</label>
+            <input
+              type="date"
+              value={form.endDate}
+              onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
+              className={`${inputClass} [color-scheme:dark]`}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className={labelClass}>Banner Image Upload</label>
+            <div className="flex items-center gap-2">
+              <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-neon-blue/25 bg-neon-blue/10 text-neon-blue text-sm font-medium cursor-pointer hover:bg-neon-blue/20 transition-colors">
+                <ImagePlus className="w-4 h-4" />
+                Upload Image
+                <input type="file" accept="image/*" className="hidden" onChange={onImageFileSelected} />
+              </label>
+              <input
+                value={form.bannerImageUrl}
+                onChange={(e) => setForm((f) => ({ ...f, bannerImageUrl: e.target.value }))}
+                placeholder="or paste image URL"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Alt Text</label>
+            <input
+              value={form.altText}
+              onChange={(e) => setForm((f) => ({ ...f, altText: e.target.value }))}
+              placeholder="Short accessibility description"
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className={labelClass}>Internal Notes (admin only)</label>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+            rows={3}
+            placeholder="Campaign notes, asset changes, launch details..."
+            className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40 resize-none"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-white/5">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <div className={`w-9 h-5 rounded-full transition-colors relative ${form.enabled ? 'bg-emerald-500' : 'bg-dark-600 border border-white/10'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </div>
+            <span className="text-xs text-gray-400">Banner enabled</span>
+            <input type="checkbox" checked={form.enabled} onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))} className="hidden" />
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <div className={`w-9 h-5 rounded-full transition-colors relative ${form.exclusivePlacement ? 'bg-amber-500' : 'bg-dark-600 border border-white/10'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${form.exclusivePlacement ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </div>
+            <span className="text-xs text-gray-400">Exclusive placement badge</span>
+            <input type="checkbox" checked={form.exclusivePlacement} onChange={(e) => setForm((f) => ({ ...f, exclusivePlacement: e.target.checked }))} className="hidden" />
+          </label>
+
+          <div>
+            <label className={labelClass}>Payment State (future Stripe hook)</label>
+            <select
+              value={form.paymentState}
+              onChange={(e) => setForm((f) => ({ ...f, paymentState: e.target.value as BannerPaymentState }))}
+              className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40"
+            >
+              <option value="Unpaid" className="bg-dark-900">Unpaid</option>
+              <option value="Pending" className="bg-dark-900">Pending</option>
+              <option value="Paid" className="bg-dark-900">Paid</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-3">
+          <p className="text-[10px] uppercase tracking-wider text-cyan-300 font-semibold mb-2">Banner Preview</p>
+          <div className="rounded-xl border border-white/10 bg-dark-900/40 p-3 flex items-center gap-3">
+            <div className="w-24 h-14 rounded-lg border border-white/10 bg-white/[0.03] overflow-hidden flex items-center justify-center">
+              {form.bannerImageUrl ? (
+                <img src={form.bannerImageUrl} alt={form.altText || 'Banner preview'} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[10px] text-gray-500">No image</span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white truncate">{form.advertiserName || 'Advertiser name'}</p>
+              <p className="text-[11px] text-gray-400 truncate">{form.destinationUrl || 'Destination URL'}</p>
+              <div className="flex items-center gap-2 mt-1.5 text-[10px]">
+                <span className="px-2 py-0.5 rounded-full border border-white/15 bg-white/[0.04] text-gray-300">{form.placement}</span>
+                {form.exclusivePlacement && <span className="px-2 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-300">Exclusive</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-white border border-white/10 hover:border-white/20 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={onSave}
+            disabled={!form.advertiserName.trim() || !form.destinationUrl.trim()}
+            className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-medium bg-neon-purple/15 border border-neon-purple/30 text-neon-purple hover:bg-neon-purple/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {mode === 'add' ? <Plus className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+            {mode === 'add' ? 'Create Banner' : 'Save Banner'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -502,12 +789,106 @@ export default function AdminPage() {
   const [deletingAirdrop, setDeletingAirdrop] = useState<Airdrop | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [refreshingAll, setRefreshingAll] = useState(false);
+
+  const [banners, setBanners] = useState<BannerAd[]>(() => {
+    const today = new Date();
+    const end = new Date(today.getTime() + 7 * 86_400_000);
+    return [
+      {
+        id: `banner_${today.getTime()}`,
+        advertiserName: 'Example Campaign',
+        bannerImageUrl: '',
+        destinationUrl: 'https://example.com',
+        altText: 'Example campaign banner',
+        placement: 'Homepage Hero',
+        startDate: today.toISOString().split('T')[0],
+        endDate: end.toISOString().split('T')[0],
+        status: 'Scheduled',
+        enabled: true,
+        exclusivePlacement: false,
+        notes: 'Placeholder banner to seed admin workflow.',
+        paymentState: 'Pending',
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+  });
+  const [bannerModalMode, setBannerModalMode] = useState<'add' | 'edit' | null>(null);
+  const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
+  const [bannerForm, setBannerForm] = useState<BannerFormData>(BLANK_BANNER_FORM);
+  const [previewBannerId, setPreviewBannerId] = useState<string | null>(null);
   const [lastEnrichmentStats, setLastEnrichmentStats] = useState<{
     websites_analyzed: number; docs_found: number; funding_found: number;
     github_found: number; token_detected: number; investors_found: number;
   } | null>(null);
 
   const openAdd = () => { setForm(BLANK_FORM); setEditingId(null); setModalMode('add'); };
+
+  const openAddBanner = () => {
+    setBannerForm(BLANK_BANNER_FORM);
+    setEditingBannerId(null);
+    setBannerModalMode('add');
+  };
+
+  const openEditBanner = (banner: BannerAd) => {
+    setBannerForm({
+      advertiserName: banner.advertiserName,
+      bannerImageUrl: banner.bannerImageUrl,
+      destinationUrl: banner.destinationUrl,
+      altText: banner.altText,
+      placement: banner.placement,
+      startDate: banner.startDate,
+      endDate: banner.endDate,
+      status: banner.status,
+      enabled: banner.enabled,
+      exclusivePlacement: banner.exclusivePlacement,
+      notes: banner.notes,
+      paymentState: banner.paymentState,
+    });
+    setEditingBannerId(banner.id);
+    setBannerModalMode('edit');
+  };
+
+  const saveBannerForm = () => {
+    const resolvedStatus = deriveBannerStatus(bannerForm.status, bannerForm.startDate, bannerForm.endDate);
+
+    if (bannerModalMode === 'add') {
+      const nextBanner: BannerAd = {
+        id: `banner_${Date.now()}`,
+        ...bannerForm,
+        status: resolvedStatus,
+        updatedAt: new Date().toISOString(),
+      };
+      setBanners((prev) => [nextBanner, ...prev]);
+      showToast('Banner created');
+    } else {
+      setBanners((prev) => prev.map((banner) => {
+        if (banner.id !== editingBannerId) return banner;
+        return {
+          ...banner,
+          ...bannerForm,
+          status: resolvedStatus,
+          updatedAt: new Date().toISOString(),
+        };
+      }));
+      showToast('Banner updated');
+    }
+
+    setBannerModalMode(null);
+    setEditingBannerId(null);
+  };
+
+  const toggleBannerEnabled = (id: string) => {
+    setBanners((prev) => prev.map((banner) => {
+      if (banner.id !== id) return banner;
+      return { ...banner, enabled: !banner.enabled, updatedAt: new Date().toISOString() };
+    }));
+  };
+
+  const deleteBanner = (id: string) => {
+    setBanners((prev) => prev.filter((banner) => banner.id !== id));
+    if (previewBannerId === id) setPreviewBannerId(null);
+    showToast('Banner deleted');
+  };
 
   const openEdit = async (a: Airdrop) => {
     let tasksText = '';
@@ -1065,6 +1446,179 @@ export default function AdminPage() {
       </section>
 
       {/* ── Airdrop table ──────────────────────────────────────────────────── */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              <Monitor className="w-3.5 h-3.5" />
+              Banner Management
+            </h2>
+            <p className="text-[11px] text-gray-500 mt-1">Frontend management layer only. Payment state is future-ready for Stripe auto-updates.</p>
+          </div>
+          <button
+            onClick={openAddBanner}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neon-blue/10 border border-neon-blue/25 text-neon-blue hover:bg-neon-blue/20 transition-colors text-sm font-medium"
+          >
+            <Plus className="w-4 h-4" />
+            Create Banner
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-cyan-500/15 bg-cyan-500/[0.04] p-3 mb-3 flex flex-wrap items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">
+            <CalendarClock className="w-3.5 h-3.5" />
+            Scheduled placements
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-amber-200">
+            <BadgeCheck className="w-3.5 h-3.5" />
+            Exclusive placement badge supported
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-gray-300">
+            Stripe can later auto-mark payment status
+          </span>
+        </div>
+
+        <div className="glass-card overflow-x-auto">
+          <table className="w-full text-sm min-w-[960px]">
+            <thead>
+              <tr className="border-b border-white/5">
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Banner Preview</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Advertiser</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Placement</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Start Date</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">End Date</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Billing</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Toggle</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {banners.map((banner) => {
+                const effectiveStatus = deriveBannerStatus(banner.status, banner.startDate, banner.endDate);
+                return (
+                  <tr key={banner.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="w-28 h-14 rounded-lg border border-white/10 bg-white/[0.03] overflow-hidden flex items-center justify-center">
+                        {banner.bannerImageUrl ? (
+                          <img src={banner.bannerImageUrl} alt={banner.altText || 'Banner'} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[10px] text-gray-500">No image</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-semibold text-white">{banner.advertiserName}</div>
+                      <a href={banner.destinationUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-gray-500 hover:text-neon-blue inline-flex items-center gap-1 mt-0.5">
+                        {banner.destinationUrl.replace(/^https?:\/\//, '')}
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] px-2.5 py-1 rounded-full border border-white/15 bg-white/[0.04] text-gray-300">{banner.placement}</span>
+                        {banner.exclusivePlacement && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-300">Exclusive</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[10px] font-semibold border rounded-full px-2.5 py-1 ${getBannerStatusClass(effectiveStatus)}`}>
+                        {effectiveStatus}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-400">{banner.startDate || '—'}</td>
+                    <td className="px-4 py-3 text-xs text-gray-400">{banner.endDate || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[10px] font-semibold border rounded-full px-2.5 py-1 ${getPaymentStateClass(banner.paymentState)}`}>
+                        {banner.paymentState}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => toggleBannerEnabled(banner.id)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-semibold transition-colors ${banner.enabled ? 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10' : 'text-gray-400 border-white/15 bg-white/[0.04]'}`}
+                        title={banner.enabled ? 'Disable banner' : 'Enable banner'}
+                      >
+                        {banner.enabled ? 'Enabled' : 'Disabled'}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setPreviewBannerId(previewBannerId === banner.id ? null : banner.id)}
+                          title="Preview banner"
+                          className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openEditBanner(banner)}
+                          title="Edit banner"
+                          className="p-1.5 rounded-lg hover:bg-sky-500/10 text-gray-500 hover:text-sky-400 transition-colors"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteBanner(banner.id)}
+                          title="Delete banner"
+                          className="p-1.5 rounded-lg hover:bg-rose-500/10 text-gray-500 hover:text-rose-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {previewBannerId && (() => {
+          const banner = banners.find((row) => row.id === previewBannerId);
+          if (!banner) return null;
+          return (
+            <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-cyan-300 font-semibold">Preview Banner</p>
+                  <p className="text-sm text-white font-semibold mt-1">{banner.advertiserName} · {banner.placement}</p>
+                </div>
+                <button onClick={() => setPreviewBannerId(null)} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <a
+                href={banner.destinationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block rounded-xl border border-cyan-500/20 bg-[linear-gradient(145deg,rgba(8,145,178,0.14),rgba(8,20,42,0.94))] p-3 hover:bg-[linear-gradient(145deg,rgba(8,145,178,0.2),rgba(8,20,42,0.98))] transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-36 h-16 rounded-lg overflow-hidden border border-white/10 bg-white/[0.03] flex items-center justify-center shrink-0">
+                    {banner.bannerImageUrl ? (
+                      <img src={banner.bannerImageUrl} alt={banner.altText || 'Banner preview'} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[10px] text-gray-500">Image placeholder</span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-white truncate">{banner.altText || banner.advertiserName}</p>
+                    <p className="text-xs text-gray-300 mt-1 truncate">{banner.destinationUrl}</p>
+                    <div className="mt-2 flex items-center gap-2 text-[10px]">
+                      <span className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-gray-300">{banner.placement}</span>
+                      <span className={`rounded-full border px-2.5 py-1 ${getBannerStatusClass(deriveBannerStatus(banner.status, banner.startDate, banner.endDate))}`}>{deriveBannerStatus(banner.status, banner.startDate, banner.endDate)}</span>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            </div>
+          );
+        })()}
+      </section>
+
       <div>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Airdrops</h2>
         <div className="glass-card overflow-x-auto">
@@ -1553,6 +2107,16 @@ export default function AdminPage() {
       </div>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
+      {bannerModalMode && (
+        <BannerFormModal
+          mode={bannerModalMode}
+          form={bannerForm}
+          setForm={setBannerForm}
+          onClose={() => setBannerModalMode(null)}
+          onSave={saveBannerForm}
+        />
+      )}
+
       {modalMode && (
         <AirdropFormModal
           mode={modalMode}
