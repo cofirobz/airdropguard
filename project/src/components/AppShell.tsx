@@ -222,7 +222,7 @@ function buildSidebarItems(pathname: string, search: string): NavItem[] {
   return [
     {
       to: '/dashboard',
-      label: 'Dashboard',
+      label: 'Mission Control',
       icon: LayoutDashboard,
       active: pathname.startsWith('/dashboard'),
     },
@@ -263,7 +263,7 @@ function buildMobileItems(pathname: string): NavItem[] {
   return [
     {
       to: '/dashboard',
-      label: 'Home',
+      label: 'Mission',
       icon: LayoutDashboard,
       active: pathname.startsWith('/dashboard'),
     },
@@ -392,6 +392,7 @@ export default function AppShell({
   const location = useLocation();
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [headerHidden, setHeaderHidden] = useState(false);
   const [pageCopilotContext, setPageCopilotContext] = useState<string | null>(null);
   const [heroHints, setHeroHints] = useState<HeroHints>({});
   const [statusTick, setStatusTick] = useState(0);
@@ -419,6 +420,7 @@ export default function AppShell({
     dragged: boolean;
   } | null>(null);
   const suppressClickRef = useRef(false);
+  const lastScrollYRef = useRef(0);
   const sidebarItems = buildSidebarItems(location.pathname, location.search);
   const mobileItems = buildMobileItems(location.pathname);
   const effectiveCopilotContext = pageCopilotContext ?? routeContext.copilotContext;
@@ -426,11 +428,37 @@ export default function AppShell({
   const shellHeroState = buildShellHeroState(location.pathname, location.search, heroHints);
   const contextualAiState = buildContextualAiState(location.pathname, location.search, heroHints);
   const analysisLabel = statusTick % 4 === 0 ? 'AI analysing.' : statusTick % 4 === 1 ? 'AI analysing..' : statusTick % 4 === 2 ? 'AI analysing...' : 'AI analysing';
+  const isDashboardRoute = location.pathname.startsWith('/dashboard');
+  const firstName = userLabel.split('@')[0] || 'Explorer';
+  const greetingOptions = [
+    `Mission Ready, ${firstName}`,
+    heroHints.completedTasks && heroHints.completedTasks > 0 ? `Intelligence Updated, ${firstName}` : `Today's Briefing Ready, ${firstName}`,
+    heroHints.watchlistCount && heroHints.watchlistCount > 0 ? `AI has analysed today's opportunities` : `Intelligence Updated`,
+  ];
+  const dashboardGreeting = `🛡 ${greetingOptions[statusTick % greetingOptions.length]}`;
+  const missionReadyCount = Math.max(1, Math.min(6,
+    (heroHints.aiPick ? 1 : 0)
+    + ((heroHints.watchlistCount ?? 0) > 0 ? 1 : 0)
+    + ((heroHints.remainingTasks ?? 0) > 0 ? 1 : 0)
+    + ((heroHints.avgTrustScore ?? 0) >= 70 ? 1 : 0)
+  ));
+  const headerIndicators = isDashboardRoute
+    ? [
+        'AI ONLINE',
+        'MARKET PULSE LIVE',
+        'UPDATED JUST NOW',
+        `${missionReadyCount} MISSIONS READY`,
+        `${Math.max(0, Math.round(heroHints.avgTrustScore ?? 0))}% TRUST`,
+        'WALLET READY',
+      ]
+    : [];
 
   useEffect(() => {
     setPageCopilotContext(null);
     setMobileMenuOpen(false);
     setHeroHints({});
+    setHeaderHidden(false);
+    lastScrollYRef.current = 0;
   }, [location.pathname, location.search]);
 
   useEffect(() => {
@@ -443,6 +471,32 @@ export default function AppShell({
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
     };
+  }, [aiDrawerOpen, mobileMenuOpen]);
+
+  useEffect(() => {
+    if (mobileMenuOpen || aiDrawerOpen) {
+      setHeaderHidden(false);
+      return;
+    }
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const delta = currentScrollY - lastScrollYRef.current;
+
+      if (currentScrollY <= 24) {
+        setHeaderHidden(false);
+      } else if (delta > 8 && currentScrollY > 96) {
+        setHeaderHidden(true);
+      } else if (delta < -8) {
+        setHeaderHidden(false);
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    lastScrollYRef.current = window.scrollY;
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, [aiDrawerOpen, mobileMenuOpen]);
 
   useEffect(() => {
@@ -561,7 +615,7 @@ export default function AppShell({
       <aside className="fixed left-0 top-0 hidden h-screen w-[260px] flex-col border-r border-white/10 bg-[#070b18]/95 px-3 py-4 shadow-[0_0_60px_rgba(31,41,55,0.35)] backdrop-blur-xl lg:flex">
         <Link to="/dashboard" className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
           <div className="text-base font-black gradient-text">AirdropGuard</div>
-          <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">Premium AI Workspace</div>
+          <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">AI Operating System</div>
         </Link>
 
         <nav className="flex-1 space-y-1 overflow-y-auto pr-1">
@@ -600,8 +654,8 @@ export default function AppShell({
         </nav>
 
         <div className="mt-3 rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/20 to-sky-500/10 p-3">
-          <p className="text-xs font-bold text-white">Premium Workspace</p>
-          <p className="mt-1 text-[11px] text-gray-300">One persistent shell for AirdropGuard intelligence, wallet safety and API workflows.</p>
+          <p className="text-xs font-bold text-white">Mission Bridge</p>
+          <p className="mt-1 text-[11px] text-gray-300">One persistent shell for AirdropGuard intelligence, wallet safety and mission workflows.</p>
         </div>
 
         <button
@@ -614,15 +668,32 @@ export default function AppShell({
         </button>
       </aside>
 
-      <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-[#070b18]/95 backdrop-blur-xl lg:left-[260px]">
+      <header className={`fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-[#070b18]/95 backdrop-blur-xl transition-transform duration-300 ease-out lg:left-[260px] ${headerHidden ? '-translate-y-full' : 'translate-y-0'}`}>
         <div className="flex h-16 items-center justify-between gap-4 px-4 sm:h-20 sm:px-6 lg:px-8">
           <div className="min-w-0">
-            <div className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300 sm:block">AirdropGuard App</div>
-            <h1 className="truncate text-base font-black text-white sm:mt-1 sm:text-2xl">{routeContext.title}</h1>
-            <p className="hidden text-xs text-gray-400 sm:block">{routeContext.subtitle}</p>
+            <div className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-300 sm:block">{isDashboardRoute ? 'AirdropGuard AI' : 'AirdropGuard App'}</div>
+            <h1 className="truncate text-base font-black text-white sm:mt-1 sm:text-2xl">{isDashboardRoute ? 'MISSION CONTROL' : routeContext.title}</h1>
+            {isDashboardRoute ? (
+              <div className="hidden sm:flex sm:flex-wrap sm:items-center sm:gap-1.5 sm:pt-1">
+                <span className="text-[11px] font-semibold text-cyan-100">{dashboardGreeting}</span>
+                {headerIndicators.slice(0, 4).map((label) => (
+                  <span key={label} className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-gray-200">
+                    {label}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="hidden text-xs text-gray-400 sm:block">{routeContext.subtitle}</p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
+            {isDashboardRoute && (
+              <div className="hidden items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/8 px-3 py-2 lg:inline-flex">
+                <AiOrb className="h-6 w-6" />
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100">Live Intelligence</span>
+              </div>
+            )}
             <div className="hidden items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-gray-300 sm:inline-flex">
               <UserCircle2 className="h-4 w-4 text-sky-300" />
               <span className="max-w-[160px] truncate">{userLabel}</span>
@@ -703,37 +774,39 @@ export default function AppShell({
           </section>
         )}
 
-        <section className="premium-hover mx-4 mt-4 rounded-2xl border border-cyan-400/18 bg-[linear-gradient(155deg,rgba(5,14,30,0.93),rgba(7,17,36,0.92))] px-3 py-3 shadow-[0_12px_30px_rgba(2,6,23,0.4)] sm:mx-6 sm:px-4 lg:mx-8">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]">
-                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
-                  AI Online
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-cyan-200">Market Pulse Live</span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.05] px-2 py-0.5 text-gray-300">Updated moments ago</span>
+        {!isDashboardRoute && (
+          <section className="premium-hover mx-4 mt-4 rounded-2xl border border-cyan-400/18 bg-[linear-gradient(155deg,rgba(5,14,30,0.93),rgba(7,17,36,0.92))] px-3 py-3 shadow-[0_12px_30px_rgba(2,6,23,0.4)] sm:mx-6 sm:px-4 lg:mx-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em]">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-emerald-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                    AI Online
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-500/10 px-2 py-0.5 text-cyan-200">Market Pulse Live</span>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.05] px-2 py-0.5 text-gray-300">Updated moments ago</span>
+                </div>
+                <p className="mt-2 text-xs font-bold text-cyan-100">{contextualAiState.label}</p>
+                <p className="mt-1 text-sm text-white">{contextualAiState.recommendation}</p>
               </div>
-              <p className="mt-2 text-xs font-bold text-cyan-100">{contextualAiState.label}</p>
-              <p className="mt-1 text-sm text-white">{contextualAiState.recommendation}</p>
+
+              <button
+                type="button"
+                onClick={() => openCopilotWithContext(contextualAiState.copilotContext)}
+                className="ripple-btn inline-flex min-h-[46px] shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-300/35 bg-cyan-500/22 px-4 py-2 text-xs font-black text-white transition-colors hover:bg-cyan-500/30"
+              >
+                <AiOrb className="h-4 w-4" />
+                {contextualAiState.cta}
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => openCopilotWithContext(contextualAiState.copilotContext)}
-              className="ripple-btn inline-flex min-h-[46px] shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-300/35 bg-cyan-500/22 px-4 py-2 text-xs font-black text-white transition-colors hover:bg-cyan-500/30"
-            >
-              <AiOrb className="h-4 w-4" />
-              {contextualAiState.cta}
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <div className="mt-3 flex flex-col gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[11px] text-gray-200">{contextualAiState.tip}</p>
-            <p className="text-[11px] font-semibold text-cyan-200">{analysisLabel}</p>
-          </div>
-        </section>
+            <div className="mt-3 flex flex-col gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[11px] text-gray-200">{contextualAiState.tip}</p>
+              <p className="text-[11px] font-semibold text-cyan-200">{analysisLabel}</p>
+            </div>
+          </section>
+        )}
 
         <div key={`${location.pathname}${location.search}`} className={`animate-in px-4 pb-6 pt-4 duration-300 sm:px-6 lg:px-8 ${contentClasses}`}>
           {children}
@@ -797,8 +870,8 @@ export default function AppShell({
           <aside className="absolute inset-x-3 top-16 bottom-16 overflow-hidden rounded-[28px] border border-white/10 bg-[#070b18]/98 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between border-b border-white/10 bg-[linear-gradient(135deg,rgba(14,165,233,0.12),rgba(15,23,42,0.95))] px-4 py-4">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">AirdropGuard App</div>
-                <div className="mt-1 text-sm font-black text-white">More</div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-300">AirdropGuard AI</div>
+                <div className="mt-1 text-sm font-black text-white">Mission Menu</div>
               </div>
               <button
                 type="button"
@@ -815,7 +888,7 @@ export default function AppShell({
                   <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Primary</p>
                   <div className="grid gap-1">
                     {[
-                      { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+                      { to: '/dashboard', label: 'Mission Control', icon: LayoutDashboard },
                       { to: '/', label: 'Browse Airdrops', icon: Home },
                       { to: '/?filter=trending', label: 'Trending', icon: Flame },
                       { to: '/wallet-checker', label: 'Wallet Check', icon: Wallet },
@@ -842,7 +915,7 @@ export default function AppShell({
                 </div>
 
                 <div>
-                  <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Dashboard Views</p>
+                  <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Mission Views</p>
                   <div className="grid gap-1">
                     {[
                       { to: '/dashboard?view=overview', label: 'Watchlist', icon: Star },

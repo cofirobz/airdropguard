@@ -331,7 +331,7 @@ export default function Layout() {
   const isAppRoute = Boolean(user) && !isAdmin && isAuthenticatedAppPath(location.pathname);
   const routeCopilotContext = buildCopilotRouteContext(location.pathname, location.search);
   const routeTitle = (() => {
-    if (location.pathname.startsWith('/dashboard')) return 'Dashboard';
+    if (location.pathname.startsWith('/dashboard')) return 'Mission Control';
     if (location.pathname === '/' && location.search === '?filter=trending') return 'Trending';
     if (location.pathname === '/') return 'Browse';
     if (location.pathname.startsWith('/airdrop/')) return 'Airdrop Report';
@@ -341,7 +341,7 @@ export default function Layout() {
     return 'AirdropGuard App';
   })();
   const routeSubtitle = (() => {
-    if (location.pathname.startsWith('/dashboard')) return 'Your daily AI workspace for airdrops, tasks and trust signals.';
+    if (location.pathname.startsWith('/dashboard')) return 'AI operating system for airdrops, trust signals and live mission execution.';
     if (location.pathname === '/') return 'Browse live opportunities with a consistent app layout.';
     if (location.pathname.startsWith('/airdrop/')) return 'Review project context, trust and action steps without leaving the shell.';
     if (location.pathname === '/wallet-checker') return 'Run read-only wallet intelligence inside the shared app workspace.';

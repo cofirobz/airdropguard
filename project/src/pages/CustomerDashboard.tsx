@@ -1041,6 +1041,18 @@ export default function CustomerDashboard() {
     : trustDelta >= 0
       ? `AI confidence ${copilotConfidencePct}% • trust is up ${trustDelta.toFixed(1)}% vs last visit`
       : `AI confidence ${copilotConfidencePct}% • trust is down ${Math.abs(trustDelta).toFixed(1)}% vs last visit`;
+  const missionReadyCount = Math.max(1, Math.min(6,
+    (featuredMission ? 1 : 0)
+    + (watchlistCount > 0 ? 1 : 0)
+    + (recentlyVerifiedCount > 0 ? 1 : 0)
+    + (remainingCount > 0 ? 1 : 0)
+  ));
+  const heroGreeting = (() => {
+    if (completedCount > 0 && new Date().getHours() >= 18) return `🛡 Intelligence Updated, ${firstName}`;
+    if (watchlistCount > 0) return `🛡 Today's Briefing Ready, ${firstName}`;
+    if (remainingCount > 0) return `🛡 Mission Ready, ${firstName}`;
+    return `🛡 AI has analysed today's opportunities`;
+  })();
 
   const openProfileOverview = () => {
     setActiveTab('profile');
@@ -1194,7 +1206,7 @@ export default function CustomerDashboard() {
             />
           ))}
 
-          <div className="relative z-10 grid min-h-[100svh] gap-5 md:min-h-[620px] lg:grid-cols-[1.2fr_0.8fr] lg:gap-6">
+          <div className="relative z-10 grid min-h-[calc(100svh-5rem)] gap-5 md:min-h-[620px] lg:grid-cols-[1.2fr_0.8fr] lg:gap-6">
             <div className="flex flex-col justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/12 px-2.5 py-1 text-emerald-100">
@@ -1205,26 +1217,28 @@ export default function CustomerDashboard() {
                   <Activity className="h-3.5 w-3.5 animate-pulse" />
                   Mission Control Live
                 </span>
-                <span className="inline-flex items-center rounded-full border border-white/20 bg-white/[0.08] px-2.5 py-1 text-white/85">
-                  {dashboardHero.subtitle}
-                </span>
+                <span className="inline-flex items-center rounded-full border border-white/20 bg-white/[0.08] px-2.5 py-1 text-white/85">Updated just now</span>
+                <span className="inline-flex items-center rounded-full border border-white/20 bg-white/[0.08] px-2.5 py-1 text-white/85">{missionReadyCount} missions ready</span>
+                <span className="inline-flex items-center rounded-full border border-white/20 bg-white/[0.08] px-2.5 py-1 text-white/85">{Math.round(avgTrustScore)}% trust</span>
+                <span className="inline-flex items-center rounded-full border border-white/20 bg-white/[0.08] px-2.5 py-1 text-white/85">Wallet ready</span>
               </div>
 
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/90">{greeting}, {firstName}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/90">{heroGreeting}</p>
+                  <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-300/90">AirdropGuard AI</p>
                   <h1 className="mt-2 text-3xl font-black leading-[1.02] text-white sm:text-4xl lg:text-5xl">
-                    AirdropGuard Mission Control
+                    MISSION READY
                   </h1>
                   <p className="mt-2 max-w-2xl text-sm text-sky-100/95 sm:text-base">
-                    AI operating system for safer, faster mission execution. Your next highest-value move is pre-ranked and live.
+                    Enter the command bridge for Web3. Your highest-value opportunity is already ranked, verified, and ready to execute.
                   </p>
                   <p className={`mt-2 text-xs font-semibold ${trustDelta === null ? 'text-cyan-100' : trustDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
                     {heroConfidenceLine}
                   </p>
                 </div>
-                <div className="mission-orb-pulse hidden h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/35 bg-cyan-500/12 shadow-[0_0_36px_rgba(34,211,238,0.36)] sm:flex">
-                  <AiOrb className="h-8 w-8" />
+                <div className="mission-orb-pulse hidden h-20 w-20 items-center justify-center rounded-[28px] border border-cyan-300/35 bg-cyan-500/10 shadow-[0_0_46px_rgba(34,211,238,0.34)] sm:flex">
+                  <AiOrb className="h-11 w-11" />
                 </div>
               </div>
 
