@@ -72,6 +72,42 @@
 				"build"
 			],
 			"isBackground": false
+		},
+		{
+			"label": "build-project-cmd",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "build-project-cmd",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "build-project-cmd",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
 		}
 	]
 }

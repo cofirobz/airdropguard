@@ -1283,10 +1283,19 @@ export default function CustomerDashboard() {
                         </div>
                       </div>
 
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="max-w-full truncate rounded-full border border-cyan-300/35 bg-cyan-500/18 px-2.5 py-1 text-[10px] font-semibold text-cyan-100">Estimated Reward: {missionReward}</span>
-                        <span className="rounded-full border border-emerald-400/35 bg-emerald-500/16 px-2.5 py-1 text-[10px] font-semibold text-emerald-100">{featuredMission.risk_level || 'Risk unknown'}</span>
-                        <span className="rounded-full border border-white/20 bg-white/[0.1] px-2.5 py-1 text-[10px] font-semibold text-white">{featuredMission.time_required || 'Time window updating'}</span>
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <div className="flex min-h-[58px] flex-col justify-center rounded-2xl border border-cyan-300/35 bg-cyan-500/18 px-3 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/75">Reward</p>
+                          <p className="mt-1 text-[11px] font-semibold leading-tight text-cyan-100 break-words whitespace-normal">{missionReward}</p>
+                        </div>
+                        <div className="flex min-h-[58px] flex-col justify-center rounded-2xl border border-emerald-400/35 bg-emerald-500/16 px-3 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-100/75">Risk</p>
+                          <p className="mt-1 text-[11px] font-semibold leading-tight text-emerald-100 break-words whitespace-normal">{featuredMission.risk_level || 'Risk unknown'}</p>
+                        </div>
+                        <div className="flex min-h-[58px] flex-col justify-center rounded-2xl border border-white/20 bg-white/[0.1] px-3 py-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">Time</p>
+                          <p className="mt-1 text-[11px] font-semibold leading-tight text-white break-words whitespace-normal">{featuredMission.time_required || 'Time window updating'}</p>
+                        </div>
                       </div>
                     </>
                   ) : (
