@@ -133,6 +133,45 @@
 			],
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "build-project-cmd-social-row",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "build-project-cmd-social-row-active-hero",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "build-project-cmd-social-row-final",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }

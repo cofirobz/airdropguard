@@ -16,12 +16,17 @@ import {
   Grid3X3,
   Layers3,
   Loader2,
+  Instagram,
+  MessageCircle,
+  Music2,
   Search,
+  Send,
   Shield,
   ShieldCheck,
   Sparkles,
   Star,
   Target,
+  Twitter,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -66,6 +71,34 @@ type LeadOpportunity = {
   tone: string;
   detail: string;
 };
+
+const HERO_SOCIAL_LINKS = [
+  {
+    href: 'https://x.com/Dropguardai',
+    label: 'X',
+    Icon: Twitter,
+  },
+  {
+    href: 'https://discord.gg/uDP9xm6Dv',
+    label: 'Discord',
+    Icon: MessageCircle,
+  },
+  {
+    href: 'https://t.me/+yKvXlsatqKs0M2M0',
+    label: 'Telegram',
+    Icon: Send,
+  },
+  {
+    href: 'https://www.tiktok.com/@airdropguard1?_r=1&_t=ZN-979TcOID05e',
+    label: 'TikTok',
+    Icon: Music2,
+  },
+  {
+    href: 'https://www.instagram.com/airdropguard?igsh=bTl2Y3kwbXVoc3h4',
+    label: 'Instagram',
+    Icon: Instagram,
+  },
+];
 
 function safeDisplayCount(value: number, suffix = ''): string {
   return value > 0 ? `${value.toLocaleString()}${suffix}` : 'Growing daily';
@@ -1702,6 +1735,23 @@ export default function HomePage() {
               >
                 Explore Today&apos;s Opportunities
               </a>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-5 sm:gap-2.5 lg:flex-nowrap" aria-label="AirdropGuard social links">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/75">Active on</span>
+              {HERO_SOCIAL_LINKS.map(({ href, label, Icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Follow AirdropGuard on ${label}`}
+                  className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full border border-cyan-300/25 bg-cyan-500/[0.08] px-3 py-1.5 text-[11px] font-semibold text-cyan-100/90 backdrop-blur transition-all hover:-translate-y-0.5 hover:border-cyan-300/45 hover:bg-cyan-400/15 hover:text-white"
+                >
+                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>{label}</span>
+                </a>
+              ))}
             </div>
 
             <div className="mt-5 grid gap-2 sm:mt-6 sm:grid-cols-3">
