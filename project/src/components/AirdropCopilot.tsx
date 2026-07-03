@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Plus, Send, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import AiOrb from './AiOrb';
 
 const FUNCTION_NAME = 'airdrop-copilot';
 const FOOTER_NOTE = 'Educational analysis only. Never share your seed phrase.';
@@ -236,10 +237,13 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
     <div className={`flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#08101f] text-white ${className ?? ''}`}>
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-cyan-400/10 bg-[#08101f]/95 px-4 py-3 backdrop-blur sm:px-5 sm:py-4">
         <div className="min-w-0">
-          <h2 className="text-lg font-black text-white sm:text-xl">AirdropGuard Copilot</h2>
-          <div className="mt-1 inline-flex items-center gap-2 text-xs text-emerald-300">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            Online
+          <div className="flex items-center gap-2">
+            <AiOrb className="h-7 w-7" />
+            <h2 className="text-lg font-black text-white sm:text-xl">AirdropGuard Copilot</h2>
+          </div>
+          <div className="mt-1 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
+            <AiOrb className="h-3.5 w-3.5" />
+            AI Online
           </div>
           {pageContext && (
             <p className="mt-2 max-w-md text-[11px] leading-relaxed text-gray-400">
@@ -276,26 +280,29 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
             const isWelcome = index === 0 && message.role === 'assistant' && message.content === WELCOME_MESSAGE;
             return (
               <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.role === 'user'
+                <div className={`flex max-w-[88%] items-start gap-2 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                  {message.role === 'assistant' && <AiOrb className="mt-1 h-7 w-7 shrink-0" />}
+                  <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.role === 'user'
                   ? 'bg-sky-500 text-white'
                   : 'border border-white/10 bg-[#111b31] text-gray-100'
                 }`}>
-                  <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                  {isWelcome && (
-                    <div className="mt-4 grid grid-cols-1 gap-2">
-                      {QUICK_PROMPTS.map(prompt => (
-                        <button
-                          key={prompt}
-                          type="button"
-                          onClick={() => void sendPrompt(prompt)}
-                          disabled={loading}
-                          className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-sm text-gray-100 transition-colors hover:bg-white/[0.08] disabled:opacity-60"
-                        >
-                          {prompt}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                    <div className="whitespace-pre-wrap break-words">{message.content}</div>
+                    {isWelcome && (
+                      <div className="mt-4 grid grid-cols-1 gap-2">
+                        {QUICK_PROMPTS.map(prompt => (
+                          <button
+                            key={prompt}
+                            type="button"
+                            onClick={() => void sendPrompt(prompt)}
+                            disabled={loading}
+                            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-sm text-gray-100 transition-colors hover:bg-white/[0.08] disabled:opacity-60"
+                          >
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -303,7 +310,8 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
 
           {loading && (
             <div className="flex justify-start">
-              <div className="max-w-[88%] rounded-2xl border border-white/10 bg-[#111b31] px-4 py-3 text-sm text-gray-200">
+              <div className="flex max-w-[88%] items-center gap-2 rounded-2xl border border-white/10 bg-[#111b31] px-4 py-3 text-sm text-gray-200">
+                <AiOrb className="h-5 w-5" />
                 Thinking...
               </div>
             </div>

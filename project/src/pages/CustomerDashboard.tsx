@@ -11,6 +11,7 @@ import {
   Search, UserCircle2, Bot, ChevronRight, LayoutDashboard,
   Home, Activity, CreditCard, LogOut, Settings,
 } from 'lucide-react';
+import AiOrb from '../components/AiOrb';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { AirdropWithTasks } from '../lib/types';
@@ -1158,8 +1159,11 @@ export default function CustomerDashboard() {
         <div className="grid gap-3 md:grid-cols-3">
           <div className="glass-card rounded-[26px] border border-cyan-400/28 bg-[linear-gradient(145deg,rgba(8,145,178,0.2),rgba(8,20,42,0.94))] p-4">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-white">Ask AI</h3>
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-200"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />Online</span>
+              <div className="flex items-center gap-2">
+                <AiOrb className="h-6 w-6" />
+                <h3 className="text-sm font-bold text-white">Ask AI</h3>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-200"><AiOrb className="h-3.5 w-3.5" />Online</span>
             </div>
             <p className="text-xs text-cyan-100">Safer airdrops, smarter decisions.</p>
             <button
@@ -1167,7 +1171,7 @@ export default function CustomerDashboard() {
               onClick={openCopilot}
               className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-xs font-black text-white shadow-[0_12px_28px_rgba(14,165,233,0.34)]"
             >
-              <Sparkles className="h-4 w-4" />
+              <AiOrb className="h-4 w-4" />
               Ask what to do next
             </button>
           </div>

@@ -3,7 +3,7 @@ import type React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   AlertTriangle,
-  Bot,
+  Activity,
   ChevronRight,
   Flame,
   Home,
@@ -18,6 +18,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
+import AiOrb from './AiOrb';
 import AirdropCopilot from './AirdropCopilot';
 
 type RouteContext = {
@@ -39,6 +40,16 @@ type NavItem = {
   label: string;
   icon: React.ElementType;
   active: boolean;
+};
+
+type ShellHeroState = {
+  title: string;
+  message: string;
+  primaryLabel: string;
+  primaryTo: string;
+  secondaryLabel: string;
+  badge: string;
+  glowClass: string;
 };
 
 export function isAuthenticatedAppPath(pathname: string): boolean {
@@ -146,6 +157,73 @@ function buildMobileItems(pathname: string): NavItem[] {
   ];
 }
 
+function buildShellHeroState(pathname: string, search: string): ShellHeroState | null {
+  if (pathname.startsWith('/dashboard')) return null;
+
+  if (pathname === '/') {
+    const filter = new URLSearchParams(search).get('filter');
+    if (filter === 'trending') {
+      return {
+        title: 'Trending Now',
+        message: 'Track what the community is watching today.',
+        primaryLabel: 'View Trending',
+        primaryTo: '/?filter=trending',
+        secondaryLabel: 'Ask AI',
+        badge: 'Market Pulse Live',
+        glowClass: 'from-cyan-500/20 via-blue-500/10 to-violet-500/10',
+      };
+    }
+
+    return {
+      title: 'Discover Opportunities',
+      message: 'Find verified airdrops worth your time.',
+      primaryLabel: 'Browse Airdrops',
+      primaryTo: '/',
+      secondaryLabel: 'Ask AI',
+      badge: 'AI + Human Verified',
+      glowClass: 'from-cyan-500/20 via-sky-500/10 to-violet-500/10',
+    };
+  }
+
+  if (pathname === '/wallet-checker') {
+    return {
+      title: 'Wallet Readiness',
+      message: 'Check your wallet signals safely without connecting to claim sites.',
+      primaryLabel: 'Run Wallet Check',
+      primaryTo: '/wallet-checker',
+      secondaryLabel: 'Ask AI',
+      badge: 'Read-Only Safety',
+      glowClass: 'from-blue-500/20 via-cyan-500/10 to-violet-500/10',
+    };
+  }
+
+  if (pathname === '/scam-alerts') {
+    return {
+      title: 'Risk Radar',
+      message: 'Review warnings before you connect.',
+      primaryLabel: 'View Alerts',
+      primaryTo: '/scam-alerts',
+      secondaryLabel: 'Ask AI',
+      badge: 'Live Warnings',
+      glowClass: 'from-rose-500/20 via-cyan-500/10 to-blue-500/10',
+    };
+  }
+
+  if (pathname === '/pricing' || pathname === '/api-pricing' || pathname === '/api-docs') {
+    return {
+      title: 'API Mission Control',
+      message: 'Scale your airdrop workflow with clearer access and faster decisions.',
+      primaryLabel: 'Open Pricing',
+      primaryTo: '/pricing',
+      secondaryLabel: 'Ask AI',
+      badge: 'Developer Access',
+      glowClass: 'from-violet-500/20 via-cyan-500/10 to-blue-500/10',
+    };
+  }
+
+  return null;
+}
+
 export default function AppShell({
   children,
   userLabel,
@@ -161,6 +239,7 @@ export default function AppShell({
   const mobileItems = buildMobileItems(location.pathname);
   const effectiveCopilotContext = pageCopilotContext ?? routeContext.copilotContext;
   const contentClasses = contentClassName ?? 'space-y-6';
+  const shellHeroState = buildShellHeroState(location.pathname, location.search);
 
   useEffect(() => {
     setPageCopilotContext(null);
@@ -285,6 +364,64 @@ export default function AppShell({
       </header>
 
       <main id="main-content" className="relative pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-20 lg:ml-[260px] lg:pb-10 lg:pt-24" tabIndex={-1}>
+        {shellHeroState && (
+          <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-cyan-400/20 bg-[linear-gradient(145deg,rgba(3,10,24,0.95),rgba(7,17,36,0.95),rgba(11,9,32,0.94))] px-4 py-4 shadow-[0_20px_55px_rgba(3,8,24,0.5),0_0_40px_rgba(34,211,238,0.12)] soft-flow sm:mx-6 sm:px-5 sm:py-5 lg:mx-8">
+            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
+                  <Activity className="h-3.5 w-3.5 animate-pulse" />
+                  {shellHeroState.badge}
+                </div>
+                <h2 className="mt-3 max-w-2xl text-3xl font-black leading-[0.95] text-white sm:text-4xl">{shellHeroState.title}</h2>
+                <p className="mt-3 max-w-xl text-sm text-sky-100/90 sm:text-base">{shellHeroState.message}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link
+                    to={shellHeroState.primaryTo}
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-2xl bg-cyan-500 px-4 py-2 text-xs font-black text-white shadow-[0_12px_28px_rgba(14,165,233,0.32)] transition-colors hover:bg-cyan-400"
+                  >
+                    {shellHeroState.primaryLabel}
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setAiDrawerOpen(true)}
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-white/[0.1]"
+                  >
+                    <AiOrb className="h-4 w-4" />
+                    {shellHeroState.secondaryLabel}
+                  </button>
+                </div>
+              </div>
+
+              <div className={`rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,rgba(8,20,42,0.9),rgba(7,12,24,0.95))] p-4 shadow-[0_0_30px_rgba(34,211,238,0.1)] ${shellHeroState.glowClass}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">AI + Human Verified</p>
+                    <p className="mt-1 text-sm font-bold text-white">Premium mission layer</p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-500/10">
+                    <AiOrb className="h-7 w-7" />
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] text-gray-300">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.04] p-2">
+                    <div className="text-sm font-black text-cyan-200">Live</div>
+                    <div className="mt-1">Signals</div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.04] p-2">
+                    <div className="text-sm font-black text-emerald-200">Safe</div>
+                    <div className="mt-1">Checks</div>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/[0.04] p-2">
+                    <div className="text-sm font-black text-violet-200">Fast</div>
+                    <div className="mt-1">Decisions</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         <div key={`${location.pathname}${location.search}`} className={`animate-in px-4 pb-6 pt-4 duration-300 sm:px-6 lg:px-8 ${contentClasses}`}>
           {children}
         </div>
@@ -312,7 +449,7 @@ export default function AppShell({
             className="-mt-8 inline-flex h-[76px] w-[76px] flex-col items-center justify-center self-center rounded-full border border-cyan-200/85 bg-[radial-gradient(circle_at_30%_30%,#67e8f9,transparent_42%),linear-gradient(145deg,#06b6d4,#2563eb_55%,#0b1225)] text-white shadow-[0_0_0_10px_rgba(34,211,238,0.2),0_22px_40px_rgba(14,165,233,0.45),0_0_30px_rgba(6,182,212,0.22)] transition-all duration-200 hover:scale-105"
             aria-label="Open AI Copilot"
           >
-            <Bot className="h-5 w-5 animate-pulse" />
+            <AiOrb className="h-6 w-6" />
             <span className="mt-0.5 text-[9px] font-black uppercase tracking-[0.08em]">Ask AI</span>
           </button>
 
@@ -463,7 +600,7 @@ export default function AppShell({
         className="fixed bottom-8 right-8 z-[75] hidden min-h-[56px] items-center gap-2 rounded-full border border-sky-300/50 bg-gradient-to-r from-sky-500 via-cyan-500 to-violet-500 px-5 py-3 text-sm font-black text-white shadow-[0_0_0_6px_rgba(56,189,248,0.14),0_18px_40px_rgba(56,189,248,0.3)] transition-transform hover:-translate-y-0.5 hover:scale-[1.02] lg:inline-flex"
         aria-label="Open AirdropGuard Copilot"
       >
-        <Bot className="h-4 w-4" />
+        <AiOrb className="h-4 w-4" />
         Ask AI
       </button>
 

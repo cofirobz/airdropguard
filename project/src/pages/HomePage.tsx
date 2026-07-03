@@ -25,6 +25,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
+import AiOrb from '../components/AiOrb';
 import { supabase } from '../lib/supabase';
 import type { Airdrop } from '../lib/types';
 import AirdropCard from '../components/AirdropCard';
@@ -34,6 +35,7 @@ import FilterBar, { type Filters } from '../components/FilterBar';
 import NewsletterSection from '../components/NewsletterSection';
 import SEO from '../components/SEO';
 import TrustStrip from '../components/TrustStrip';
+import { daysUntil } from '../lib/utils';
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
@@ -56,6 +58,476 @@ type CounterItem = {
   suffix?: string;
   sub: string;
 };
+
+type LeadOpportunity = {
+  title: string;
+  item: Airdrop | null;
+  label: string;
+  tone: string;
+  detail: string;
+};
+
+function safeDisplayCount(value: number, suffix = ''): string {
+  return value > 0 ? `${value.toLocaleString()}${suffix}` : 'Growing daily';
+}
+
+function parseRewardScore(value: string | null | undefined): number {
+  if (!value) return 0;
+
+  const normalized = value.toLowerCase().replace(/[$,]/g, '');
+  const matches = normalized.match(/\d+(?:\.\d+)?(?:k)?/g);
+  if (!matches) return 0;
+
+  const scores = matches.map((part) => {
+    const numeric = Number.parseFloat(part.replace('k', ''));
+    return Number.isFinite(numeric) ? numeric * (part.includes('k') ? 1000 : 1) : 0;
+  });
+
+  return Math.max(...scores, 0);
+}
+
+function TrustRing({ score }: { score: number | null }) {
+  const pct = Math.max(0, Math.min(100, score ?? 0));
+  const size = 74;
+  const stroke = 6;
+  const radius = (size - stroke * 2) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - pct / 100);
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+      <defs>
+        <linearGradient id="trust-ring-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#22D3EE" />
+          <stop offset="100%" stopColor="#3B82F6" />
+        </linearGradient>
+      </defs>
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
+      {pct > 0 && (
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="url(#trust-ring-gradient)"
+          strokeWidth={stroke}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{ transform: 'rotate(-90deg)', transformOrigin: 'center', transition: 'stroke-dashoffset 0.8s ease' }}
+        />
+      )}
+      <circle cx={size / 2} cy={size / 2} r={16} fill="rgba(5,8,22,0.92)" stroke="rgba(255,255,255,0.12)" />
+      <text x="50%" y="52%" textAnchor="middle" className="fill-white text-[14px] font-black" dominantBaseline="middle">
+        {pct > 0 ? pct : '—'}
+      </text>
+    </svg>
+  );
+}
+
+function ConversionBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-100">
+      <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 animate-pulse" />
+      {children}
+    </span>
+  );
+}
+
+function OutcomeCard({ icon: Icon, title, body, tone }: { icon: React.ComponentType<{ className?: string }>; title: string; body: string; tone: string }) {
+  return (
+    <div className="glass-card rounded-[28px] border border-white/10 p-5">
+      <div className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border ${tone}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <h3 className="mt-5 text-lg font-black text-white">{title}</h3>
+      <p className="mt-2 text-sm leading-relaxed text-gray-400">{body}</p>
+    </div>
+  );
+}
+
+function OpportunityCard({ item, title, label, tone, detail }: LeadOpportunity) {
+  const daysLeft = item?.expiry_date ? daysUntil(item.expiry_date) : null;
+
+  return (
+    <Link
+      to={item ? `/airdrop/${item.slug}` : '/auth'}
+      className="group rounded-[28px] border border-white/10 bg-white/[0.03] p-4 transition-transform transition-colors hover:-translate-y-0.5 hover:bg-white/[0.06]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">{title}</div>
+          <div className="mt-2 text-base font-black text-white">{item?.name ?? 'Growing daily'}</div>
+        </div>
+        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${tone}`}>{label}</span>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <TrustRing score={item?.trust_score ?? null} />
+          <div className="space-y-1">
+            <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Trust score</div>
+            <div className="text-sm font-bold text-white">{item?.trust_score ?? 'TBA'}</div>
+            <div className="text-xs text-gray-400">{detail}</div>
+          </div>
+        </div>
+
+        <div className="text-right text-xs text-gray-400">
+          <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Reward</div>
+          <div className="mt-1 font-semibold text-emerald-300">{item?.estimated_reward ?? 'Forecasting'}</div>
+          <div className="mt-1 text-gray-500">{daysLeft !== null ? (daysLeft === 0 ? '< 1 day' : `${daysLeft}d left`) : 'Updated daily'}</div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function HeroMockup({ item }: { item: Airdrop | null }) {
+  return (
+    <div className="relative overflow-hidden rounded-[34px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(8,20,42,0.96),rgba(5,10,24,0.98))] p-4 shadow-[0_24px_60px_rgba(3,8,24,0.55),0_0_40px_rgba(34,211,238,0.12)] sm:p-5">
+      <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-cyan-400/15 blur-3xl" />
+      <div className="pointer-events-none absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-blue-500/15 blur-3xl" />
+
+      <div className="relative flex items-center justify-between gap-3 border-b border-white/10 pb-3">
+        <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Today&apos;s Best Opportunity</div>
+          <div className="mt-1 text-lg font-black text-white">Mission control snapshot</div>
+        </div>
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
+          AI Live
+        </span>
+      </div>
+
+      <div className="relative mt-4 grid gap-4 sm:grid-cols-[0.9fr_1.1fr] sm:items-center">
+        <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4">
+          <div className="flex items-center gap-4">
+            <TrustRing score={item?.trust_score ?? null} />
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Trust Ring</div>
+              <div className="mt-1 text-2xl font-black text-white">{item?.trust_score ?? 'TBA'}</div>
+              <div className="mt-1 text-xs text-gray-400">High clarity, lower friction, faster decisions.</div>
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] text-gray-300">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Reward</div>
+              <div className="mt-1 text-sm font-black text-emerald-300">{item?.estimated_reward ?? 'TBA'}</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Risk</div>
+              <div className="mt-1 text-sm font-black text-amber-300">{item?.risk_level ?? 'TBA'}</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Time</div>
+              <div className="mt-1 text-sm font-black text-white">{item?.time_required ?? 'TBA'}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(15,23,42,0.75),rgba(8,14,28,0.95))] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Featured opportunity</div>
+              <div className="mt-1 text-xl font-black text-white">{item?.name ?? 'Trending opportunities loading'}</div>
+              <div className="mt-1 text-sm text-gray-300">AI analysis, human verification and wallet safety in one view.</div>
+            </div>
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-500/10">
+              <AiOrb className="h-7 w-7" />
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] text-gray-300">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+              <div className="text-gray-500">AI summary</div>
+              <div className="mt-1 font-semibold text-white">Prioritised for trust and timing</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+              <div className="text-gray-500">Estimated reward</div>
+              <div className="mt-1 font-semibold text-emerald-300">{item?.estimated_reward ?? 'Forecasting daily'}</div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              to={item ? `/airdrop/${item.slug}` : '/auth'}
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-2xl bg-cyan-500 px-4 py-2 text-xs font-black text-white shadow-[0_12px_28px_rgba(14,165,233,0.32)] transition-colors hover:bg-cyan-400"
+            >
+              Open report
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+            <Link
+              to="/auth"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-white/[0.08]"
+            >
+              <AiOrb className="h-4 w-4" />
+              Ask AI
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickMetrics({ counters }: { counters: CounterItem[] }) {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {counters.map((item) => (
+          <div key={item.label} className="rounded-[24px] border border-white/10 bg-white/[0.04] px-4 py-4 backdrop-blur">
+            <div className="text-xs uppercase tracking-[0.16em] text-gray-500">{item.label}</div>
+            <div className="mt-2 text-2xl font-black text-white">{item.value.toLocaleString()}{item.suffix ?? ''}</div>
+            <div className="mt-2 text-xs leading-relaxed text-gray-400">{item.sub}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function LiveOpportunitiesSection({ airdrops }: { airdrops: Airdrop[] }) {
+  const trend = [...airdrops].find((item) => item.is_trending) ?? null;
+  const highestTrust = [...airdrops].sort((a, b) => (b.trust_score ?? 0) - (a.trust_score ?? 0))[0] ?? null;
+  const endingSoon = [...airdrops]
+    .filter((item) => item.expiry_date)
+    .sort((a, b) => new Date(a.expiry_date ?? '').getTime() - new Date(b.expiry_date ?? '').getTime())[0] ?? null;
+  const biggestReward = [...airdrops]
+    .filter((item) => item.estimated_reward)
+    .sort((a, b) => parseRewardScore(b.estimated_reward) - parseRewardScore(a.estimated_reward))[0] ?? null;
+
+  const opportunities: LeadOpportunity[] = [
+    { title: 'Trending Today', item: trend ?? highestTrust, label: trend ? 'Momentum' : 'Growing daily', tone: 'border-cyan-300/25 bg-cyan-500/10 text-cyan-100', detail: 'What the community is watching.' },
+    { title: 'Highest Trust Score', item: highestTrust, label: 'Trust first', tone: 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100', detail: 'Best confidence signal on the board.' },
+    { title: 'Ending Soon', item: endingSoon, label: 'Act now', tone: 'border-amber-300/25 bg-amber-500/10 text-amber-100', detail: 'Fastest decisions need clarity.' },
+    { title: 'Biggest Estimated Reward', item: biggestReward, label: 'Reward focus', tone: 'border-violet-300/25 bg-violet-500/10 text-violet-100', detail: 'Forecasts where the upside is highest.' },
+  ];
+
+  return (
+    <section id="live-opportunities" className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Live opportunities</div>
+          <h2 className="mt-2 text-2xl font-black text-white sm:text-4xl">Active proof the platform is working</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-relaxed text-gray-400">
+          See what is moving right now before you spend time in the wrong place.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {opportunities.map((opportunity) => (
+          <OpportunityCard key={opportunity.title} {...opportunity} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function WhySection() {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Why AirdropGuard</div>
+          <h2 className="mt-2 text-2xl font-black text-white sm:text-4xl">Faster decisions. Less noise.</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-relaxed text-gray-400">
+          The page is designed to make users understand the value in seconds, not after a long explanation.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <OutcomeCard icon={Clock} title="Save Hours of Research" body="Filter signal from hype in seconds." tone="border-cyan-300/20 bg-cyan-500/10 text-cyan-100" />
+        <OutcomeCard icon={Shield} title="Avoid Risky Projects" body="See warnings before you connect." tone="border-rose-300/20 bg-rose-500/10 text-rose-100" />
+        <OutcomeCard icon={Target} title="Focus on Better Rewards" body="Spend time where the upside is clearer." tone="border-emerald-300/20 bg-emerald-500/10 text-emerald-100" />
+      </div>
+    </section>
+  );
+}
+
+function HomepageHowItWorksSection() {
+  const steps = [
+    'Browse verified projects',
+    'Let AI prioritise them',
+    'Complete missions',
+    'Track rewards',
+  ];
+
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">How it works</div>
+          <h2 className="mt-2 text-2xl font-black text-white sm:text-4xl">A simple 4-step flow</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-relaxed text-gray-400">
+          The product should feel guided, not overwhelming.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {steps.map((step, index) => (
+          <div key={step} className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-300/20 bg-sky-500/10 text-sm font-black text-sky-100">
+              0{index + 1}
+            </div>
+            <h3 className="mt-4 text-lg font-black text-white">{step}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-gray-400">
+              {index === 0 && 'Start with a short scan of live listings.'}
+              {index === 1 && 'AI ranks trust, reward and effort.'}
+              {index === 2 && 'Complete the best-fit tasks first.'}
+              {index === 3 && 'Keep a simple record of progress and value.'}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CopilotPreviewSection() {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="grid gap-4 lg:grid-cols-[0.94fr_1.06fr] lg:items-stretch">
+        <div className="rounded-[30px] border border-violet-300/20 bg-[linear-gradient(160deg,rgba(139,92,246,0.12),rgba(6,10,22,0.96))] p-5">
+          <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-100">
+            <AiOrb className="h-4 w-4" />
+            AirdropGuard AI
+          </div>
+          <h2 className="mt-4 text-2xl font-black text-white sm:text-4xl">Ask the copilot what to do next.</h2>
+          <p className="mt-3 text-sm leading-relaxed text-gray-300">
+            It gives a clear next move, not generic chatbot noise.
+          </p>
+          <Link
+            to="/auth"
+            className="mt-5 inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-black text-white transition-colors hover:bg-cyan-400"
+          >
+            Ask AirdropGuard AI
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="rounded-[30px] border border-white/10 bg-[#0b1224]/92 p-5">
+          <div className="space-y-3">
+            <div className="flex justify-end">
+              <div className="max-w-[82%] rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-medium text-white">
+                I only have 20 minutes today.
+              </div>
+            </div>
+            <div className="flex justify-start">
+              <div className="max-w-[90%] rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-gray-200">
+                Focus on your safest high-potential opportunities first. I’ll prioritise projects by trust, reward potential and time required.
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {['Trust first', 'Reward forecast', 'Time aware'].map((item) => (
+                <div key={item} className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center text-xs font-semibold text-white">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HomepageTrustSection({ counters }: { counters: CounterItem[] }) {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Social proof</div>
+          <h2 className="mt-2 text-2xl font-black text-white sm:text-4xl">Trust signals users can scan fast</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-relaxed text-gray-400">
+          Metrics are visible, simple and honest so visitors know why AirdropGuard is worth returning to.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {counters.map((item) => (
+          <div key={item.label} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
+            <div className="text-xs uppercase tracking-[0.16em] text-gray-500">{item.label}</div>
+            <div className="mt-2 text-2xl font-black text-white">{item.value > 0 ? `${item.value.toLocaleString()}${item.suffix ?? ''}` : 'Growing daily'}</div>
+            <div className="mt-2 text-xs leading-relaxed text-gray-400">{item.sub}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FreeVsProSection() {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Free vs Pro</div>
+          <h2 className="mt-2 text-2xl font-black text-white sm:text-4xl">Start free, upgrade when you need more depth</h2>
+        </div>
+        <p className="max-w-2xl text-sm leading-relaxed text-gray-400">
+          Give users a low-friction entry point, then show them what becomes available when they want better prioritisation.
+        </p>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-[30px] border border-white/10 bg-white/[0.03] p-5">
+          <div className="text-sm font-bold text-white">Free</div>
+          <ul className="mt-4 space-y-3 text-sm text-gray-300">
+            <li>Browse verified airdrops</li>
+            <li>Basic trust insights</li>
+            <li>Community results</li>
+          </ul>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link to="/auth" className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-cyan-400">
+              Start Free
+            </Link>
+            <Link to="/auth" className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]">
+              Upgrade Later
+            </Link>
+          </div>
+        </div>
+
+        <div className="rounded-[30px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(34,211,238,0.08),rgba(6,10,22,0.96))] p-5">
+          <div className="text-sm font-bold text-white">Pro</div>
+          <ul className="mt-4 space-y-3 text-sm text-gray-200">
+            <li>AI Mission Control</li>
+            <li>Priority alerts</li>
+            <li>Advanced wallet intelligence</li>
+            <li>Deeper opportunity insights</li>
+          </ul>
+          <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-gray-300">
+            Built for users who want clearer decisions and less noise.
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HomepageFinalCtaSection() {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <div className="relative overflow-hidden rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_24%),radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_24%),linear-gradient(180deg,#09111e_0%,#040814_100%)] px-5 py-10 text-center sm:px-10 sm:py-14">
+        <div className="mx-auto max-w-3xl">
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Final step</div>
+          <h2 className="mt-4 text-3xl font-black text-white sm:text-5xl">Your next airdrop could be worth hundreds - don&apos;t waste time on the wrong ones.</h2>
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link to="/auth" className="inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-cyan-500 px-6 py-3 text-sm font-black text-white transition-colors hover:bg-cyan-400">
+              Create Free Account
+            </Link>
+            <Link to="/" className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white/[0.08]">
+              Explore Airdrops
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function isFeaturedPlacement(airdrop: Airdrop): boolean {
   const anyAirdrop = airdrop as Airdrop & { is_sponsored?: boolean };
@@ -1088,7 +1560,7 @@ export default function HomePage() {
         url: 'https://airdropguard.com',
         logo: 'https://airdropguard.com/airdrop_guards.png',
         description:
-          'AirdropGuard is a crypto intelligence platform providing AI-assisted analysis, human-reviewed airdrops, wallet safety tools, trust signals and Copilot guidance.',
+          'AirdropGuard is the AI mission control for crypto airdrops, combining AI analysis, human verification, wallet safety intelligence and prioritised opportunity discovery.',
         sameAs: ['https://x.com/Dropguardai'],
       },
       {
@@ -1100,38 +1572,44 @@ export default function HomePage() {
           '@id': 'https://airdropguard.com/#organization',
         },
         description:
-          'Discover verified crypto airdrops, analyse risk with AI, check your wallet safely and use Copilot to focus on opportunities that deserve your time.',
+          'Discover verified crypto airdrops, avoid scams, check your wallet safely and use Copilot to focus on the opportunities that deserve your time.',
       },
     ],
   };
 
   const trustCounters: CounterItem[] = useMemo(() => {
     const aiAnalyses = airdrops.filter(item => item.ai_summary || item.ai_risk_analysis || item.ai_reward_estimate).length;
+    const trustScores = airdrops
+      .map(item => item.trust_score)
+      .filter((score): score is number => typeof score === 'number' && Number.isFinite(score));
+    const averageTrust = trustScores.length ? Math.round(trustScores.reduce((sum, score) => sum + score, 0) / trustScores.length) : 0;
+
     return [
       {
-        label: 'Projects Analysed',
-        value: airdrops.length,
-        sub: 'Approved projects currently visible on the platform.',
-      },
-      {
-        label: 'Verified Listings',
+        label: 'Verified Projects',
         value: verifiedProjects.length,
-        sub: 'Listings reviewed and surfaced with stronger confidence.',
-      },
-      {
-        label: 'Community Members',
-        value: communityCount,
-        sub: 'Community result submissions currently recorded.',
-      },
-      {
-        label: 'Wallets Analysed',
-        value: walletCount,
-        sub: 'Saved wallet intelligence reports in platform history.',
+        sub: 'Trusted listings currently visible.',
       },
       {
         label: 'AI Analyses',
         value: aiAnalyses,
-        sub: 'Listings with AI-generated intelligence coverage.',
+        sub: 'Listings with AI coverage.',
+      },
+      {
+        label: 'Community Results',
+        value: communityCount,
+        sub: 'User reports shared on the platform.',
+      },
+      {
+        label: 'Wallet Checks',
+        value: walletCount,
+        sub: 'Read-only safety scans recorded.',
+      },
+      {
+        label: 'Average Trust Score',
+        value: averageTrust,
+        suffix: '%',
+        sub: trustScores.length ? 'Across scored listings.' : 'Growing daily.',
       },
     ];
   }, [airdrops, verifiedProjects.length, communityCount, walletCount]);
@@ -1147,44 +1625,89 @@ export default function HomePage() {
     <>
       <SEO
         title="AirdropGuard | The AI-Powered Platform for Smarter Crypto Airdrops"
-        description="Discover verified opportunities, analyse risk with AI, check your wallet safely and use Copilot to focus on the crypto airdrops that deserve your time."
+        description="Stop wasting time on scam airdrops. Find high-quality crypto opportunities in seconds with AI analysis, human verification and wallet safety intelligence."
         canonical="https://airdropguard.com/"
         schema={homepageSchema}
       />
 
-      <HeroSection
-        loading={loading}
-        stats={{
-          analysed: airdrops.length,
-          verified: verifiedProjects.length,
-          aiAnalyses: airdrops.filter(item => item.ai_summary || item.ai_risk_analysis || item.ai_reward_estimate).length,
-        }}
-        featured={featured}
-        topVerified={topVerified}
-      />
+      <section className="relative overflow-hidden border-b border-cyan-500/10 bg-[radial-gradient(circle_at_8%_8%,rgba(34,211,238,0.18),transparent_24%),radial-gradient(circle_at_88%_14%,rgba(59,130,246,0.2),transparent_22%),linear-gradient(180deg,#030712_0%,#061025_52%,#040a17_100%)]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-24 top-8 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl" />
+          <div className="absolute -right-20 top-20 h-72 w-72 rounded-full bg-blue-500/25 blur-3xl" />
+        </div>
 
-      <TodaysBestOpportunityCard airdrop={topVerified[0] ?? featured} />
-      <MeetAirdropGuardAI />
-      <HowItWorksSection />
-      <TrendingTodaySection items={topVerified.length > 0 ? topVerified : airdrops.filter(item => item.is_trending)} />
-      <TrustSection counters={trustCounters} />
-      <DeepDiveAccordions />
-      <MobileActionCards />
+        <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 pt-6 sm:px-6 sm:pb-14 sm:pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:px-8 lg:pb-20">
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100 sm:text-xs">
+              <AiOrb className="h-3.5 w-3.5" />
+              AI Mission Control for crypto airdrops
+            </div>
 
-      <div className="hidden sm:block">
-        <TrustStrip />
-      </div>
+            <h1 className="mt-4 max-w-3xl text-[2rem] font-black leading-[0.95] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-6xl">
+              Stop wasting time on scam airdrops.
+            </h1>
 
-      <section id="airdrops" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-20">
+            <p className="mt-3 max-w-xl text-sm font-medium text-gray-200 sm:mt-5 sm:text-lg">
+              Find high-quality crypto opportunities in seconds with AI analysis, human verification and wallet safety intelligence.
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:mt-6 sm:flex sm:flex-wrap sm:gap-2.5">
+              {['AI + Human Verified', 'Estimated Reward Forecasts', 'Updated Daily', 'Check Before You Connect'].map((label) => (
+                <ConversionBadge key={label}>{label}</ConversionBadge>
+              ))}
+            </div>
+
+            <div className="mt-5 flex flex-col gap-2.5 sm:mt-7 sm:flex-row">
+              <Link
+                to="/auth"
+                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-6 py-3 text-sm font-black text-white shadow-[0_12px_26px_rgba(34,211,238,0.26)] transition-colors hover:bg-cyan-400"
+              >
+                Start Free
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <a
+                href="#live-opportunities"
+                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] px-6 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/[0.1]"
+              >
+                Explore Today&apos;s Opportunities
+              </a>
+            </div>
+
+            <div className="mt-5 grid gap-2 sm:mt-6 sm:grid-cols-3">
+              {[
+                { label: 'AI Online', tone: 'text-cyan-200' },
+                { label: 'Human Reviewed', tone: 'text-emerald-200' },
+                { label: 'Read-Only Wallet Checks', tone: 'text-violet-200' },
+              ].map(item => (
+                <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-semibold text-white">
+                  <span className={item.tone}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="relative z-10">
+            <HeroMockup item={topVerified[0] ?? featured ?? null} />
+          </div>
+        </div>
+      </section>
+
+      <WhySection />
+      <LiveOpportunitiesSection airdrops={airdrops} />
+      <HomepageHowItWorksSection />
+      <CopilotPreviewSection />
+      <HomepageTrustSection counters={trustCounters} />
+      <FreeVsProSection />
+
+      <section id="airdrops" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-16">
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Explore Airdrops</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Browse live listings</div>
             <h2 className="mt-3 text-2xl font-black text-white sm:text-4xl">
-              <span className="sm:hidden">Top airdrops right now</span>
-              <span className="hidden sm:inline">Find the opportunities that deserve your time</span>
+              Explore the projects users can actually act on
             </h2>
             <p className="mt-3 max-w-2xl text-xs leading-relaxed text-gray-400 sm:text-base">
-              Browse live opportunities, filter by chain and risk, then open the full research page for trust signals, rewards, tasks and supporting evidence.
+              Browse live opportunities, filter by chain and risk, and open the full research page for trust signals, rewards, tasks and supporting evidence.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -1285,12 +1808,7 @@ export default function HomePage() {
         )}
       </section>
 
-      <div className="hidden md:block">
-        <SocialProofSection featured={featured ?? topVerified[0] ?? null} latestVerified={topVerified} />
-      </div>
-      <div className="hidden md:block">
-        <FinalCtaSection />
-      </div>
+      <HomepageFinalCtaSection />
       <div className="hidden md:block">
         <NewsletterSection />
       </div>
