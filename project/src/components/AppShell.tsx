@@ -50,6 +50,20 @@ type ShellHeroState = {
   secondaryLabel: string;
   badge: string;
   glowClass: string;
+  changedLabel: string;
+  nextAction: string;
+  whyItMatters: string;
+};
+
+type HeroHints = {
+  watchlistCount?: number;
+  remainingTasks?: number;
+  completedTasks?: number;
+  streakDays?: number;
+  avgTrustScore?: number;
+  aiPick?: string;
+  tabLabel?: string;
+  userLabel?: string;
 };
 
 export function isAuthenticatedAppPath(pathname: string): boolean {
@@ -157,67 +171,94 @@ function buildMobileItems(pathname: string): NavItem[] {
   ];
 }
 
-function buildShellHeroState(pathname: string, search: string): ShellHeroState | null {
+function buildShellHeroState(pathname: string, search: string, hints: HeroHints): ShellHeroState | null {
   if (pathname.startsWith('/dashboard')) return null;
+
+  const hour = new Date().getHours();
+  const dayGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const watchlistNote = hints.watchlistCount && hints.watchlistCount > 0
+    ? `${hints.watchlistCount} tracked project${hints.watchlistCount === 1 ? '' : 's'}`
+    : 'watchlist ready to start';
+  const taskNote = typeof hints.remainingTasks === 'number'
+    ? `${hints.remainingTasks} task${hints.remainingTasks === 1 ? '' : 's'} remaining`
+    : 'no tasks tracked yet';
+  const trustNote = typeof hints.avgTrustScore === 'number' && hints.avgTrustScore > 0
+    ? `${hints.avgTrustScore}% average trust`
+    : 'trust baseline updating';
 
   if (pathname === '/') {
     const filter = new URLSearchParams(search).get('filter');
     if (filter === 'trending') {
       return {
-        title: 'Trending Now',
-        message: 'Track what the community is watching today.',
+        title: `${dayGreeting}, Projects Everyone Is Watching`,
+        message: 'Track momentum shifts and focus on opportunities that are attracting verified attention.',
         primaryLabel: 'View Trending',
         primaryTo: '/?filter=trending',
         secondaryLabel: 'Ask AI',
         badge: 'Market Pulse Live',
         glowClass: 'from-cyan-500/20 via-blue-500/10 to-violet-500/10',
+        changedLabel: `What changed: ${hints.aiPick ? `${hints.aiPick} is accelerating` : 'momentum signals updated'}`,
+        nextAction: `Do next: compare top trust movers and review ${taskNote}`,
+        whyItMatters: `Why it matters: timing + trust improves qualification odds (${trustNote}).`,
       };
     }
 
     return {
-      title: 'Discover Opportunities',
-      message: 'Find verified airdrops worth your time.',
+      title: `${dayGreeting}, Discover Your Next Opportunity`,
+      message: 'Use AI-assisted ranking and human verification to decide what deserves your time first.',
       primaryLabel: 'Browse Airdrops',
       primaryTo: '/',
       secondaryLabel: 'Ask AI',
       badge: 'AI + Human Verified',
       glowClass: 'from-cyan-500/20 via-sky-500/10 to-violet-500/10',
+      changedLabel: `What changed: ${watchlistNote} and live opportunities refreshed.`,
+      nextAction: `Do next: open a verified report then ask AI for your top 3 priorities.`,
+      whyItMatters: `Why it matters: better prioritisation reduces wasted effort and scam exposure.`,
     };
   }
 
   if (pathname === '/wallet-checker') {
     return {
-      title: 'Wallet Readiness',
-      message: 'Check your wallet signals safely without connecting to claim sites.',
+      title: `${dayGreeting}, Your Wallet Health Report`,
+      message: 'Check wallet readiness safely with read-only intelligence before interacting with new claim flows.',
       primaryLabel: 'Run Wallet Check',
       primaryTo: '/wallet-checker',
       secondaryLabel: 'Ask AI',
       badge: 'Read-Only Safety',
       glowClass: 'from-blue-500/20 via-cyan-500/10 to-violet-500/10',
+      changedLabel: 'What changed: wallet risk signals may have shifted since your last scan.',
+      nextAction: 'Do next: run a fresh scan and review suspicious assets first.',
+      whyItMatters: 'Why it matters: safer wallets qualify more consistently over time.',
     };
   }
 
   if (pathname === '/scam-alerts') {
     return {
-      title: 'Risk Radar',
-      message: 'Review warnings before you connect.',
+      title: `${dayGreeting}, Never Miss Another Opportunity`,
+      message: 'Review risk radar alerts before connecting so you can avoid avoidable losses.',
       primaryLabel: 'View Alerts',
       primaryTo: '/scam-alerts',
       secondaryLabel: 'Ask AI',
       badge: 'Live Warnings',
       glowClass: 'from-rose-500/20 via-cyan-500/10 to-blue-500/10',
+      changedLabel: 'What changed: new warnings are prioritized by urgency.',
+      nextAction: 'Do next: clear critical alerts, then continue your top mission.',
+      whyItMatters: 'Why it matters: avoiding one scam can save weeks of progress.',
     };
   }
 
   if (pathname === '/pricing' || pathname === '/api-pricing' || pathname === '/api-docs') {
     return {
-      title: 'API Mission Control',
-      message: 'Scale your airdrop workflow with clearer access and faster decisions.',
+      title: `${dayGreeting}, Developer Mission Control`,
+      message: 'Scale your intelligence workflow with structured access, clearer signals and faster automation.',
       primaryLabel: 'Open Pricing',
       primaryTo: '/pricing',
       secondaryLabel: 'Ask AI',
       badge: 'Developer Access',
       glowClass: 'from-violet-500/20 via-cyan-500/10 to-blue-500/10',
+      changedLabel: `What changed: API usage and opportunity data are continuously refreshed (${trustNote}).`,
+      nextAction: 'Do next: confirm your plan and ship your first endpoint call.',
+      whyItMatters: 'Why it matters: faster integrations turn research into repeatable workflows.',
     };
   }
 
@@ -235,15 +276,17 @@ export default function AppShell({
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pageCopilotContext, setPageCopilotContext] = useState<string | null>(null);
+  const [heroHints, setHeroHints] = useState<HeroHints>({});
   const sidebarItems = buildSidebarItems(location.pathname, location.search);
   const mobileItems = buildMobileItems(location.pathname);
   const effectiveCopilotContext = pageCopilotContext ?? routeContext.copilotContext;
   const contentClasses = contentClassName ?? 'space-y-6';
-  const shellHeroState = buildShellHeroState(location.pathname, location.search);
+  const shellHeroState = buildShellHeroState(location.pathname, location.search, heroHints);
 
   useEffect(() => {
     setPageCopilotContext(null);
     setMobileMenuOpen(false);
+    setHeroHints({});
   }, [location.pathname, location.search]);
 
   useEffect(() => {
@@ -266,15 +309,21 @@ export default function AppShell({
 
     const handleOpen = () => setAiDrawerOpen(true);
     const handleClose = () => setAiDrawerOpen(false);
+    const handleHeroHints = (event: Event) => {
+      const detail = (event as CustomEvent<HeroHints | undefined>).detail;
+      setHeroHints(detail ?? {});
+    };
 
     window.addEventListener('ag:copilot-context', handleContext as EventListener);
     window.addEventListener('ag:copilot-open', handleOpen);
     window.addEventListener('ag:copilot-close', handleClose);
+    window.addEventListener('ag:hero-hints', handleHeroHints as EventListener);
 
     return () => {
       window.removeEventListener('ag:copilot-context', handleContext as EventListener);
       window.removeEventListener('ag:copilot-open', handleOpen);
       window.removeEventListener('ag:copilot-close', handleClose);
+      window.removeEventListener('ag:hero-hints', handleHeroHints as EventListener);
     };
   }, []);
 
@@ -416,6 +465,11 @@ export default function AppShell({
                     <div className="text-sm font-black text-violet-200">Fast</div>
                     <div className="mt-1">Decisions</div>
                   </div>
+                </div>
+                <div className="mt-4 space-y-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-[11px] leading-relaxed text-gray-200">
+                  <p>{shellHeroState.changedLabel}</p>
+                  <p>{shellHeroState.nextAction}</p>
+                  <p>{shellHeroState.whyItMatters}</p>
                 </div>
               </div>
             </div>

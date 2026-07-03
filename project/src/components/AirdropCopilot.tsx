@@ -20,6 +20,15 @@ type ChatMessage = {
   content: string;
 };
 
+type SessionMemory = {
+  previousQuestions: string[];
+  comparedProjects: string[];
+  dismissedOpportunities: string[];
+  preferredChains: string[];
+  preferredDifficulty: string | null;
+  preferredRisk: string | null;
+};
+
 type CopilotSummary = {
   userName?: string;
   totalAirdrops?: number;
@@ -141,6 +150,123 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionMemory, setSessionMemory] = useState<SessionMemory>({
+    previousQuestions: [],
+    comparedProjects: [],
+    dismissedOpportunities: [],
+    preferredChains: [],
+    preferredDifficulty: null,
+    preferredRisk: null,
+  });
+
+  const memoryNotes = (() => {
+    const notes: string[] = [];
+    if (sessionMemory.comparedProjects.length > 0) {
+      notes.push(`Compared projects: ${sessionMemory.comparedProjects.slice(-4).join(', ')}`);
+    }
+    if (sessionMemory.preferredRisk) {
+      notes.push(`Preferred risk: ${sessionMemory.preferredRisk}`);
+    }
+    if (sessionMemory.preferredDifficulty) {
+      notes.push(`Preferred difficulty: ${sessionMemory.preferredDifficulty}`);
+    }
+    if (sessionMemory.preferredChains.length > 0) {
+      notes.push(`Preferred chains: ${sessionMemory.preferredChains.slice(-3).join(', ')}`);
+    }
+    if (sessionMemory.dismissedOpportunities.length > 0) {
+      notes.push(`Dismissed opportunities: ${sessionMemory.dismissedOpportunities.slice(-3).join(', ')}`);
+    }
+    return notes;
+  })();
+
+  const updateMemoryFromPrompt = (prompt: string) => {
+    const trimmed = prompt.trim();
+    const lower = trimmed.toLowerCase();
+
+    const compareMatch = lower.match(/compare\s+([a-z0-9-]{2,})\s+(?:and|vs\.?|versus)\s+([a-z0-9-]{2,})/i);
+    const chainMatches = ['ethereum', 'base', 'arbitrum', 'optimism', 'polygon', 'bnb', 'solana', 'sui']
+      .filter(chain => lower.includes(chain));
+
+    setSessionMemory((prev) => {
+      const compared = [...prev.comparedProjects];
+      if (compareMatch) {
+        const projects = [compareMatch[1], compareMatch[2]].map((value) => value.toUpperCase());
+        projects.forEach((project) => {
+          if (!compared.includes(project)) compared.push(project);
+        });
+      }
+
+      const dismissed = [...prev.dismissedOpportunities];
+      if (lower.includes('skip') || lower.includes('dismiss')) {
+        dismissed.push(trimmed.slice(0, 80));
+      }
+
+      const preferredRisk = lower.includes('low risk')
+        ? 'Low'
+        : lower.includes('medium risk')
+          ? 'Medium'
+          : lower.includes('high risk')
+            ? 'High'
+            : prev.preferredRisk;
+
+      const preferredDifficulty = lower.includes('beginner') || lower.includes('easy')
+        ? 'Easy'
+        : lower.includes('moderate') || lower.includes('medium difficulty')
+          ? 'Moderate'
+          : lower.includes('hard') || lower.includes('advanced')
+            ? 'Hard'
+            : prev.preferredDifficulty;
+
+      const preferredChains = [...prev.preferredChains];
+      chainMatches.forEach((chain) => {
+        const formatted = chain[0].toUpperCase() + chain.slice(1);
+        if (!preferredChains.includes(formatted)) preferredChains.push(formatted);
+      });
+
+      const previousQuestions = [...prev.previousQuestions, trimmed].slice(-8);
+
+      return {
+        previousQuestions,
+        comparedProjects: compared.slice(-8),
+        dismissedOpportunities: dismissed.slice(-6),
+        preferredChains: preferredChains.slice(-6),
+        preferredDifficulty,
+        preferredRisk,
+      };
+    });
+  };
+
+  const buildMemoryContext = () => {
+    const memoryLines: string[] = [];
+
+    if (sessionMemory.previousQuestions.length > 0) {
+      memoryLines.push(`Previous questions this session: ${sessionMemory.previousQuestions.slice(-3).join(' | ')}`);
+    }
+    if (sessionMemory.comparedProjects.length > 0) {
+      memoryLines.push(`Projects already compared: ${sessionMemory.comparedProjects.join(', ')}`);
+    }
+    if (sessionMemory.dismissedOpportunities.length > 0) {
+      memoryLines.push(`User dismissed opportunities: ${sessionMemory.dismissedOpportunities.join(' ; ')}`);
+    }
+    if (sessionMemory.preferredChains.length > 0) {
+      memoryLines.push(`Preferred chains: ${sessionMemory.preferredChains.join(', ')}`);
+    }
+    if (sessionMemory.preferredDifficulty) {
+      memoryLines.push(`Preferred difficulty: ${sessionMemory.preferredDifficulty}`);
+    }
+    if (sessionMemory.preferredRisk) {
+      memoryLines.push(`Preferred risk: ${sessionMemory.preferredRisk}`);
+    }
+
+    if (!pageContext && memoryLines.length === 0) return undefined;
+
+    return [
+      pageContext ? `Page context: ${pageContext}` : null,
+      memoryLines.length > 0 ? `Session memory (facts from this session only): ${memoryLines.join(' | ')}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+  };
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -149,6 +275,8 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
   const sendPrompt = async (input: string) => {
     const content = input.trim();
     if (!content || loading) return;
+
+    updateMemoryFromPrompt(content);
 
     if (!user) {
       setError('Please sign in to use AirdropGuard Copilot.');
@@ -179,8 +307,9 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
     setError(null);
 
     try {
+      const combinedContext = buildMemoryContext();
       const response = await supabase.functions.invoke(FUNCTION_NAME, {
-        body: { message: content, context: pageContext },
+        body: { message: content, context: combinedContext },
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
@@ -249,6 +378,15 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
             <p className="mt-2 max-w-md text-[11px] leading-relaxed text-gray-400">
               Context-aware guidance is enabled for this page.
             </p>
+          )}
+          {memoryNotes.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {memoryNotes.map((note) => (
+                <span key={note} className="inline-flex max-w-full items-center rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] text-gray-300">
+                  <span className="truncate">{note}</span>
+                </span>
+              ))}
+            </div>
           )}
         </div>
 

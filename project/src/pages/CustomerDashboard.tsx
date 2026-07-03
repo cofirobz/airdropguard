@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import AiOrb from '../components/AiOrb';
 import { supabase } from '../lib/supabase';
+import { event as trackAnalyticsEvent } from '../lib/analytics';
 import { useAuth } from '../contexts/AuthContext';
 import type { AirdropWithTasks } from '../lib/types';
 import { getBookmarks } from '../lib/utils';
@@ -667,6 +668,7 @@ export default function CustomerDashboard() {
   const [reputation, setReputation] = useState<UserReputation | null>(null);
   const [unlocks, setUnlocks] = useState<UserUnlock[]>([]);
   const [dashboardSearch, setDashboardSearch] = useState('');
+  const [trustDelta, setTrustDelta] = useState<number | null>(null);
   const requestedView = searchParams.get('view');
 
   useEffect(() => {
@@ -895,6 +897,105 @@ export default function CustomerDashboard() {
   const featuredMission = focusAirdrops[0] ?? priorityAirdrops[0] ?? null;
   const missionTrust = Math.max(0, Math.min(100, featuredMission?.trust_score ?? avgTrustScore));
   const missionReward = featuredMission?.estimated_reward || 'Reward window updating';
+  const favoriteChain = (() => {
+    const counts: Record<string, number> = {};
+    safeAirdrops.forEach((item) => {
+      item.blockchain?.forEach((chain) => {
+        counts[chain] = (counts[chain] ?? 0) + 1;
+      });
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  })();
+  const preferredRisk = (() => {
+    const tally = { Low: 0, Medium: 0, High: 0 };
+    safeAirdrops.forEach((item) => {
+      if (item.risk_level === 'Low' || item.risk_level === 'Medium' || item.risk_level === 'High') {
+        tally[item.risk_level] += 1;
+      }
+    });
+    return Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Medium';
+  })();
+  const preferredDifficulty = (() => {
+    const tally = { Easy: 0, Moderate: 0, Hard: 0 };
+    safeAirdrops.forEach((item) => {
+      if (item.difficulty === 'Easy' || item.difficulty === 'Moderate' || item.difficulty === 'Hard') {
+        tally[item.difficulty] += 1;
+      }
+    });
+    return Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Moderate';
+  })();
+  const recentlyVerifiedCount = safeAirdrops.filter(item => {
+    if (item.listing_state !== 'verified' && !item.human_verified) return false;
+    const updatedTime = new Date(item.updated_at).getTime();
+    return Number.isFinite(updatedTime) && Date.now() - updatedTime <= 72 * 3_600_000;
+  }).length;
+
+  const briefingRecommendations = [
+    {
+      id: 'top-pick',
+      label: 'Top pick',
+      title: featuredMission?.name ?? 'Top opportunity updating',
+      action: featuredMission ? `Start ${featuredMission.name}` : 'Review top opportunities',
+      context: `Prioritize today's top mission: ${featuredMission?.name ?? 'none selected yet'}. Explain why this is best using trust score ${missionTrust}, risk ${featuredMission?.risk_level ?? 'unknown'}, reward ${missionReward}, and give a step-by-step start plan with the first action in under 2 minutes.`,
+    },
+    {
+      id: 'deadlines',
+      label: 'Deadlines',
+      title: expiresTodayCount > 0 ? `${expiresTodayCount} project${expiresTodayCount === 1 ? '' : 's'} ending soon` : 'No urgent expiries today',
+      action: expiresTodayCount > 0 ? 'Review urgent deadlines' : 'Plan tomorrow deadlines',
+      context: `Review expiring opportunities. Today there are ${expiresTodayCount} urgent expiries and ${remainingCount} tasks remaining. Tell me which tasks to complete first, what can be safely deferred, and what deadline risks matter most.`,
+    },
+    {
+      id: 'watchlist',
+      label: 'Watchlist',
+      title: watchlistCount > 0 ? `${watchlistCount} watchlist project${watchlistCount === 1 ? '' : 's'} active` : 'Watchlist not started',
+      action: watchlistCount > 0 ? 'Optimize my watchlist' : 'Build my first watchlist',
+      context: watchlistCount > 0
+        ? `Optimize my watchlist of ${watchlistCount} projects. Compare watchlist vs trending, highlight weak picks, and suggest the 2 strongest replacements based on trust, urgency and effort.`
+        : 'I have no watchlist yet. Recommend the first 3 projects I should track now based on trust, urgency, and low-effort start path.',
+    },
+  ];
+
+  const dashboardHero = (() => {
+    if (activeTab === 'tasks') {
+      return {
+        title: 'Daily Mission Tracker',
+        subtitle: `You have ${remainingCount} task${remainingCount === 1 ? '' : 's'} left.`,
+        detail: 'Complete your highest-trust unfinished missions first.',
+      };
+    }
+    if (activeTab === 'airdrops') {
+      return {
+        title: 'Discover Your Next Opportunity',
+        subtitle: `${safeAirdrops.length} live project${safeAirdrops.length === 1 ? '' : 's'} are available.`,
+        detail: 'Use trust, reward and urgency to decide faster.',
+      };
+    }
+    if (activeTab === 'api') {
+      return {
+        title: 'Developer Mission Control',
+        subtitle: 'Manage access and turn intelligence into workflows.',
+        detail: 'Your API state is synced with the latest account context.',
+      };
+    }
+    if (activeTab === 'profile') {
+      return {
+        title: 'Personal Mission Profile',
+        subtitle: `${watchlistCount} tracked project${watchlistCount === 1 ? '' : 's'} and ${streakDays} day streak.`,
+        detail: 'Keep your reputation and habit loop moving forward.',
+      };
+    }
+    return {
+      title: 'Today\'s Mission',
+      subtitle: `${remainingCount} tasks left • ${watchlistCount} watchlist`,
+      detail: 'Focus on your best opportunity, then let AI prioritise your next step.',
+    };
+  })();
+  const heroConfidenceLine = trustDelta === null
+    ? `AI confidence ${copilotConfidencePct}% • baseline set today`
+    : trustDelta >= 0
+      ? `AI confidence ${copilotConfidencePct}% • trust is up ${trustDelta.toFixed(1)}% vs last visit`
+      : `AI confidence ${copilotConfidencePct}% • trust is down ${Math.abs(trustDelta).toFixed(1)}% vs last visit`;
 
   const openProfileOverview = () => {
     setActiveTab('profile');
@@ -906,6 +1007,45 @@ export default function CustomerDashboard() {
   const openCopilot = useCallback(() => {
     window.dispatchEvent(new CustomEvent('ag:copilot-open'));
   }, []);
+
+  const handleBriefingActionClick = useCallback((item: { id: string; title: string; action: string; context: string }, index: number) => {
+    trackAnalyticsEvent('dashboard_briefing_action_click', {
+      recommendation_id: item.id,
+      action_label: item.action,
+      recommendation_title: item.title,
+      recommendation_index: index,
+      active_tab: activeTab,
+      has_trust_delta: trustDelta !== null,
+      trust_delta_value: trustDelta,
+      watchlist_count: watchlistCount,
+      remaining_tasks: remainingCount,
+    });
+
+    window.dispatchEvent(new CustomEvent('ag:copilot-context', {
+      detail: {
+        context: item.context,
+      },
+    }));
+
+    openCopilot();
+  }, [activeTab, openCopilot, remainingCount, trustDelta, watchlistCount]);
+
+  useEffect(() => {
+    if (!user) return;
+    const key = `ag_prev_trust_${user.id}`;
+    const prevRaw = localStorage.getItem(key);
+    const prev = prevRaw ? Number(prevRaw) : null;
+
+    if (prev !== null && Number.isFinite(prev) && avgTrustScore > 0) {
+      setTrustDelta(avgTrustScore - prev);
+    } else {
+      setTrustDelta(null);
+    }
+
+    if (avgTrustScore > 0) {
+      localStorage.setItem(key, String(avgTrustScore));
+    }
+  }, [avgTrustScore, user]);
 
   useEffect(() => {
     if (requestedView === 'airdrops') setActiveTab('airdrops');
@@ -945,7 +1085,7 @@ export default function CustomerDashboard() {
       }
 
       if (activeTab === 'tasks') {
-        return `Task tracking tab. ${remainingCount} tasks remain across ${taskAirdrops.length} airdrops.`;
+        return `Task tracking tab. ${remainingCount} tasks remain across ${taskAirdrops.length} airdrops. ${completedCount} missions completed this session.`;
       }
 
       if (activeTab === 'api') {
@@ -953,14 +1093,29 @@ export default function CustomerDashboard() {
       }
 
       if (activeTab === 'profile') {
-        return `Profile tab. Reputation level ${level}, ${watchlistCount} watchlist items and account activity are in focus.`;
+        return `Profile tab. Reputation level ${level}, ${watchlistCount} watchlist items and account activity are in focus. Streak: ${streakDays} days.`;
       }
 
-      return `Dashboard overview. Today's focus is ${focusAirdrops[0]?.name ?? 'not set yet'}, with ${watchlistCount} watchlist items and ${remainingCount} tasks remaining.`;
+      return `Dashboard overview. Today's focus is ${focusAirdrops[0]?.name ?? 'not set yet'}, with ${watchlistCount} watchlist items and ${remainingCount} tasks remaining. Completed missions: ${completedCount}. Favorite chain: ${favoriteChain ?? 'unknown'}. Preferred difficulty: ${preferredDifficulty}. Typical risk profile: ${preferredRisk}.`;
     })();
 
     window.dispatchEvent(new CustomEvent('ag:copilot-context', { detail: { context } }));
-  }, [activeTab, dashboardSearch, focusAirdrops, level, remainingCount, taskAirdrops.length, watchlistCount]);
+  }, [activeTab, completedCount, dashboardSearch, favoriteChain, focusAirdrops, level, preferredDifficulty, preferredRisk, remainingCount, streakDays, taskAirdrops.length, watchlistCount]);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('ag:hero-hints', {
+      detail: {
+        watchlistCount,
+        remainingTasks: remainingCount,
+        completedTasks: completedCount,
+        streakDays,
+        avgTrustScore,
+        aiPick: briefingRecommendations[0]?.title,
+        tabLabel: activeTab,
+        userLabel: firstName,
+      },
+    }));
+  }, [activeTab, avgTrustScore, briefingRecommendations, completedCount, firstName, remainingCount, streakDays, watchlistCount]);
 
   if (authLoading || loading) {
     return (
@@ -978,9 +1133,12 @@ export default function CustomerDashboard() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">{greeting}, {firstName} 👋</p>
-                <h1 className="mt-1 text-2xl font-black text-white sm:text-3xl">AirdropGuard Intelligence Dashboard</h1>
+                <h1 className="mt-1 text-2xl font-black text-white sm:text-3xl">{dashboardHero.title}</h1>
                 <p className="mt-1 text-sm text-gray-200">
-                  Mission control for your next best airdrop moves.
+                  {dashboardHero.detail}
+                </p>
+                <p className={`mt-1.5 text-xs font-semibold ${trustDelta === null ? 'text-cyan-100' : trustDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
+                  {heroConfidenceLine}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">
@@ -992,7 +1150,7 @@ export default function CustomerDashboard() {
                     Market Pulse Live
                   </span>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-500/10 px-2.5 py-1 text-[10px] font-semibold text-sky-200">
-                    Updated recently
+                    {dashboardHero.subtitle}
                   </span>
                 </div>
               </div>
@@ -1201,7 +1359,17 @@ export default function CustomerDashboard() {
               <span className="text-[10px] text-violet-100">{watchlistAirdrops.length}</span>
             </div>
             {watchlistAirdrops.length === 0 ? (
-              <p className="text-xs text-gray-200">No bookmarks yet. Save projects to build your mission queue.</p>
+              <div className="space-y-2">
+                <p className="text-xs text-gray-200">No watchlist yet. Start tracking projects so AI can personalise your recommendations.</p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('airdrops')}
+                  className="inline-flex min-h-[38px] items-center gap-2 rounded-xl border border-violet-300/30 bg-violet-500/15 px-3 py-2 text-[11px] font-bold text-violet-100"
+                >
+                  Start tracking projects
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ) : (
               <div className="space-y-2">
                 {watchlistAirdrops.slice(0, 3).map(item => (
@@ -1228,6 +1396,56 @@ export default function CustomerDashboard() {
             )}
           </div>
         </div>
+
+        <section className="rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(6,14,32,0.96),rgba(8,20,42,0.92))] p-4 shadow-[0_18px_45px_rgba(3,8,24,0.45)] sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">Daily AI Briefing</p>
+              <h3 className="mt-1 text-xl font-black text-white">What changed and what to do now</h3>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full border border-cyan-300/25 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-semibold text-cyan-100">
+              Updated moments ago
+            </span>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px]">
+            <span className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 font-semibold text-cyan-100">
+              {briefingRecommendations[0]?.title}
+            </span>
+            <span className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 font-semibold text-emerald-100">
+              {recentlyVerifiedCount} verified in 72h
+            </span>
+            <span className={`inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 font-semibold ${trustDelta === null ? 'text-white' : trustDelta >= 0 ? 'text-emerald-200' : 'text-rose-200'}`}>
+              {trustDelta === null ? 'Trust baseline set' : `${trustDelta >= 0 ? '+' : ''}${trustDelta.toFixed(1)} trust vs last visit`}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleBriefingActionClick(briefingRecommendations[0], 0)}
+            className="mt-4 inline-flex min-h-[50px] w-full items-center justify-between gap-3 rounded-2xl border border-cyan-300/40 bg-gradient-to-r from-cyan-500/30 to-blue-500/30 px-4 py-3 text-left text-sm font-black text-white shadow-[0_12px_30px_rgba(14,165,233,0.22)] transition-colors hover:from-cyan-500/40 hover:to-blue-500/40"
+          >
+            <span>Start Today&apos;s Mission</span>
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          </button>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {briefingRecommendations.map((item, index) => (
+              <button
+                key={item.title}
+                type="button"
+                onClick={() => handleBriefingActionClick(item, index)}
+                className="inline-flex min-h-[48px] items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-left text-xs font-semibold text-white transition-colors hover:bg-white/[0.06]"
+              >
+                <span className="min-w-0">
+                  <span className="block text-[10px] uppercase tracking-[0.14em] text-cyan-200/90">{item.label}</span>
+                  <span className="block truncate">{item.action}</span>
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+              </button>
+            ))}
+          </div>
+        </section>
 
         <div className="hidden gap-4 lg:grid lg:grid-cols-2" id="profile-section">
           <div className="glass-card p-4 border border-sky-500/20 transition-all duration-200 hover:-translate-y-0.5">
