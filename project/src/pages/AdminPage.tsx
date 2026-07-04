@@ -217,6 +217,87 @@ interface OpsUser {
   plan: 'free' | 'api' | 'premium';
 }
 
+type AdminAuditPayload = {
+  actionTaken: string;
+  aiRecommendation: string;
+  finalDecision: string;
+  notes?: string;
+  context?: Record<string, unknown>;
+};
+
+type AdminAuditLog = {
+  id: string;
+  action_at: string;
+  admin_user_id: string | null;
+  admin_identifier: string;
+  action_taken: string;
+  ai_recommendation: string | null;
+  final_decision: string;
+  notes: string | null;
+  context: Record<string, unknown> | null;
+};
+
+type AuditTargetType = 'airdrop' | 'article' | 'banner' | 'submission' | 'scam_report' | 'homepage' | 'unknown';
+
+function inferAuditTarget(log: AdminAuditLog): { targetType: AuditTargetType; targetNameOrId: string } {
+  const ctx = (log.context && typeof log.context === 'object' ? log.context : {}) as Record<string, unknown>;
+  const action = String(log.action_taken || '').toLowerCase();
+
+  if (ctx.airdropId) {
+    return {
+      targetType: 'airdrop',
+      targetNameOrId: String(ctx.airdropName || ctx.projectName || ctx.airdropId),
+    };
+  }
+
+  if (ctx.articleId) {
+    return {
+      targetType: 'article',
+      targetNameOrId: String(ctx.title || ctx.articleId),
+    };
+  }
+
+  if (ctx.bannerId) {
+    return {
+      targetType: 'banner',
+      targetNameOrId: String(ctx.advertiser || ctx.bannerId),
+    };
+  }
+
+  if (ctx.submissionId) {
+    return {
+      targetType: 'submission',
+      targetNameOrId: String(ctx.projectName || ctx.submissionId),
+    };
+  }
+
+  if (ctx.reportId) {
+    return {
+      targetType: 'scam_report',
+      targetNameOrId: String(ctx.projectName || ctx.reportId),
+    };
+  }
+
+  if (ctx.projectIds) {
+    const ids = Array.isArray(ctx.projectIds) ? ctx.projectIds.map(String).join(', ') : String(ctx.projectIds);
+    return {
+      targetType: 'homepage',
+      targetNameOrId: ids || 'homepage recommendations',
+    };
+  }
+
+  if (action.includes('airdrop')) return { targetType: 'airdrop', targetNameOrId: 'unknown airdrop' };
+  if (action.includes('article')) return { targetType: 'article', targetNameOrId: 'unknown article' };
+  if (action.includes('banner')) return { targetType: 'banner', targetNameOrId: 'unknown banner' };
+  if (action.includes('submission')) return { targetType: 'submission', targetNameOrId: 'unknown submission' };
+  if (action.includes('scam report') || action.includes('report')) return { targetType: 'scam_report', targetNameOrId: 'unknown report' };
+  if (action.includes('homepage') || action.includes('featured') || action.includes('trending')) {
+    return { targetType: 'homepage', targetNameOrId: 'homepage recommendation' };
+  }
+
+  return { targetType: 'unknown', targetNameOrId: 'unknown target' };
+}
+
 const BANNER_PLACEMENT_OPTIONS: BannerPlacement[] = [
   'Homepage Hero Banner',
   'Homepage Mid-Page Banner',
@@ -303,6 +384,23 @@ function titleFromLevel(level: number) {
   if (level >= 15) return 'DeFi Explorer';
   if (level >= 8) return 'Airdrop Hunter';
   return 'New Explorer';
+}
+
+function truncateText(value: string, max = 120) {
+  const text = value.trim();
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Invalid date';
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 async function awardApprovedScamReportRep(userId: string) {
@@ -880,6 +978,43 @@ export default function AdminPage() {
     setToast({ msg, type });
   }, []);
 
+  const promptHumanVerificationNotes = useCallback((actionLabel: string) => {
+    const input = window.prompt(`Human verification required for: ${actionLabel}\n\nAdd reviewer notes (required):`, '');
+    if (input === null) return null;
+    const notes = input.trim();
+    if (!notes) {
+      showToast('Human verification notes are required for publish actions.', 'error');
+      return null;
+    }
+    return notes;
+  }, [showToast]);
+
+  const logAdminAudit = useCallback(async ({
+    actionTaken,
+    aiRecommendation,
+    finalDecision,
+    notes,
+    context,
+  }: AdminAuditPayload) => {
+    const adminIdentifier = (user as { email?: string } | null)?.email || user?.id || 'admin';
+
+    const { error } = await supabase
+      .from('admin_audit_logs')
+      .insert({
+        admin_user_id: user?.id ?? null,
+        admin_identifier: adminIdentifier,
+        action_taken: actionTaken,
+        ai_recommendation: aiRecommendation,
+        final_decision: finalDecision,
+        notes: notes ?? null,
+        context: context ?? {},
+      });
+
+    if (error) {
+      console.warn('admin_audit_logs unavailable or insert failed', error);
+    }
+  }, [user]);
+
   const [stats, setStats] = useState<Stats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -894,6 +1029,14 @@ export default function AdminPage() {
   const [expandedScamReport, setExpandedScamReport] = useState<string | null>(null);
   const [scamReportNotes, setScamReportNotes] = useState<Record<string, string>>({});
   const [reviewingScamReport, setReviewingScamReport] = useState<string | null>(null);
+
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
+  const [auditLoading, setAuditLoading] = useState(true);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditActionFilter, setAuditActionFilter] = useState('all');
+  const [auditTargetFilter, setAuditTargetFilter] = useState<'all' | AuditTargetType>('all');
+  const [auditAdminFilter, setAuditAdminFilter] = useState('all');
 
   // ── Modal state ───────────────────────────────────────────────────────────
   const [modalMode, setModalMode] = useState<'add' | 'edit' | null>(null);
@@ -1047,6 +1190,65 @@ export default function AdminPage() {
     return opsUsers.filter((u) => u.email.toLowerCase().includes(needle));
   }, [opsUsers, userSearch]);
 
+  const auditActionOptions = useMemo(() => {
+    const options = Array.from(new Set(auditLogs.map((log) => log.action_taken).filter(Boolean)));
+    return options.sort((a, b) => a.localeCompare(b));
+  }, [auditLogs]);
+
+  const auditAdminOptions = useMemo(() => {
+    const options = Array.from(new Set(auditLogs.map((log) => log.admin_identifier).filter(Boolean)));
+    return options.sort((a, b) => a.localeCompare(b));
+  }, [auditLogs]);
+
+  const filteredAuditLogs = useMemo(() => {
+    const needle = auditSearch.trim().toLowerCase();
+
+    return [...auditLogs]
+      .filter((log) => {
+        const target = inferAuditTarget(log);
+
+        if (auditActionFilter !== 'all' && log.action_taken !== auditActionFilter) return false;
+        if (auditTargetFilter !== 'all' && target.targetType !== auditTargetFilter) return false;
+        if (auditAdminFilter !== 'all' && log.admin_identifier !== auditAdminFilter) return false;
+
+        if (!needle) return true;
+
+        const haystack = [
+          log.admin_identifier,
+          log.action_taken,
+          target.targetType,
+          target.targetNameOrId,
+          log.ai_recommendation || '',
+          log.final_decision,
+          log.notes || '',
+        ].join(' ').toLowerCase();
+
+        return haystack.includes(needle);
+      })
+      .sort((a, b) => new Date(b.action_at).getTime() - new Date(a.action_at).getTime());
+  }, [auditLogs, auditSearch, auditActionFilter, auditTargetFilter, auditAdminFilter]);
+
+  const auditEntriesTodayCount = useMemo(() => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    return auditLogs.filter((log) => {
+      const ts = new Date(log.action_at).getTime();
+      return Number.isFinite(ts) && ts >= startOfDay;
+    }).length;
+  }, [auditLogs]);
+
+  const auditNeedsAttentionStatus = auditLoading
+    ? 'Loading activity'
+    : auditError
+    ? 'Audit logs unavailable'
+    : 'Human verification today';
+
+  const auditNeedsAttentionBlurb = auditLoading
+    ? 'Fetching latest admin verification history.'
+    : auditError
+    ? 'Audit log fetch failed. Open section to retry safely.'
+    : 'Trace publish, reject, approve, feature, banner and article decisions.';
+
   const newUsersCount = useMemo(() => {
     const last7 = Date.now() - 7 * 86_400_000;
     return opsUsers.filter((u) => new Date(u.createdAt).getTime() >= last7).length;
@@ -1155,8 +1357,11 @@ export default function AdminPage() {
     setBannerModalMode('edit');
   };
 
-  const saveBannerForm = () => {
+  const saveBannerForm = async () => {
     const resolvedStatus = deriveBannerStatus(bannerForm.status, bannerForm.startDate, bannerForm.endDate);
+    const requiresPublishReview = resolvedStatus === 'Live';
+    const reviewNotes = requiresPublishReview ? promptHumanVerificationNotes(`Publish banner for ${bannerForm.advertiserName || 'unknown advertiser'}`) : '';
+    if (requiresPublishReview && !reviewNotes) return;
 
     if (bannerModalMode === 'add') {
       const nextBanner: BannerAd = {
@@ -1167,6 +1372,21 @@ export default function AdminPage() {
       };
       setBanners((prev) => [nextBanner, ...prev]);
       showToast('Banner created');
+
+      if (resolvedStatus === 'Live') {
+        await logAdminAudit({
+          actionTaken: 'Publish banner advertisement',
+          aiRecommendation: `Banner status ${bannerForm.status}`,
+          finalDecision: 'Approved and published',
+          notes: reviewNotes ?? undefined,
+          context: {
+            advertiser: nextBanner.advertiserName,
+            destinationUrl: nextBanner.destinationUrl,
+            placement: nextBanner.placement,
+            bannerId: nextBanner.id,
+          },
+        });
+      }
     } else {
       setBanners((prev) => prev.map((banner) => {
         if (banner.id !== editingBannerId) return banner;
@@ -1178,6 +1398,21 @@ export default function AdminPage() {
         };
       }));
       showToast('Banner updated');
+
+      if (resolvedStatus === 'Live') {
+        await logAdminAudit({
+          actionTaken: 'Publish banner advertisement',
+          aiRecommendation: `Banner status ${bannerForm.status}`,
+          finalDecision: 'Approved and published',
+          notes: reviewNotes ?? undefined,
+          context: {
+            advertiser: bannerForm.advertiserName,
+            destinationUrl: bannerForm.destinationUrl,
+            placement: bannerForm.placement,
+            bannerId: editingBannerId,
+          },
+        });
+      }
     }
 
     setBannerModalMode(null);
@@ -1291,6 +1526,17 @@ export default function AdminPage() {
     setSaving(true);
 
     try {
+      const existing = editingId ? airdrops.find((row) => row.id === editingId) : null;
+      const publishingNow = form.published && !existing?.published;
+      const reviewNotes = publishingNow
+        ? promptHumanVerificationNotes(`Publish airdrop ${form.name.trim()}`)
+        : '';
+
+      if (publishingNow && !reviewNotes) {
+        setSaving(false);
+        return;
+      }
+
       const payload = {
         name: form.name.trim(),
         ticker: form.ticker.trim(),
@@ -1316,6 +1562,7 @@ export default function AdminPage() {
         reward_potential: form.reward_potential,
         difficulty: form.difficulty,
         published: form.published,
+        human_verified: form.published,
         is_featured: form.is_featured,
         is_trending: form.is_trending,
         is_sponsored: form.is_sponsored,
@@ -1351,6 +1598,20 @@ export default function AdminPage() {
           } catch (analysisErr) {
             showToast(`${form.name} added, but automatic AI enrichment failed: ${analysisErr instanceof Error ? analysisErr.message : 'Unknown error'}`, 'error');
           }
+
+          if (form.published) {
+            await logAdminAudit({
+              actionTaken: 'Publish airdrop',
+              aiRecommendation: `Trust ${form.risk_level} risk | Reward ${form.reward_potential}`,
+              finalDecision: 'Approved and published',
+              notes: reviewNotes ?? undefined,
+              context: {
+                airdropId: newAirdrop.id,
+                airdropName: form.name.trim(),
+                source: 'airdrop_form_add',
+              },
+            });
+          }
         }
 
         showToast(`${form.name} added successfully${taskCount ? ` with ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''} and AI enrichment started`);
@@ -1362,6 +1623,36 @@ export default function AdminPage() {
           .eq('id', editingId!);
 
         if (error) throw error;
+
+        const becamePublished = Boolean(payload.published && existing && !existing.published);
+        const becameUnpublished = Boolean(existing?.published && !payload.published);
+
+        if (becamePublished) {
+          await logAdminAudit({
+            actionTaken: 'Publish airdrop',
+            aiRecommendation: `Trust ${existing?.trust_score ?? 'unknown'} | Risk ${existing?.risk_level ?? 'unknown'}`,
+            finalDecision: 'Approved and published',
+            notes: reviewNotes ?? undefined,
+            context: {
+              airdropId: editingId,
+              airdropName: form.name.trim(),
+              source: 'airdrop_form_edit',
+            },
+          });
+        }
+
+        if (becameUnpublished) {
+          await logAdminAudit({
+            actionTaken: 'Unpublish airdrop',
+            aiRecommendation: `Trust ${existing?.trust_score ?? 'unknown'} | Risk ${existing?.risk_level ?? 'unknown'}`,
+            finalDecision: 'Unpublished',
+            context: {
+              airdropId: editingId,
+              airdropName: form.name.trim(),
+              source: 'airdrop_form_edit',
+            },
+          });
+        }
 
         const taskCount = await saveTasksForAirdrop(editingId!, form.tasks_text);
         showToast(`${form.name} updated${taskCount ? ` with ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''}`);
@@ -1477,14 +1768,36 @@ export default function AdminPage() {
     }
   }, []);
 
+  const fetchAuditLogs = useCallback(async () => {
+    setAuditLoading(true);
+    setAuditError(null);
+
+    try {
+      const { data, error } = await supabase
+        .from('admin_audit_logs')
+        .select('*')
+        .order('action_at', { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+      setAuditLogs((data ?? []) as AdminAuditLog[]);
+    } catch (error) {
+      setAuditLogs([]);
+      setAuditError(error instanceof Error ? error.message : 'Unable to load admin audit logs.');
+    } finally {
+      setAuditLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authLoading && isAdmin) {
       fetchAirdrops();
       fetchStats();
       fetchSubmissions();
       fetchScamReports();
+      fetchAuditLogs();
     }
-  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports]);
+  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -1495,6 +1808,19 @@ export default function AdminPage() {
   const updateSubmissionStatus = async (id: string, status: string) => {
     await supabase.from('airdrop_submissions').update({ status, reviewed_at: new Date().toISOString() }).eq('id', id);
     setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+    const submission = submissions.find((row) => row.id === id);
+    if (submission) {
+      await logAdminAudit({
+        actionTaken: 'Review airdrop submission',
+        aiRecommendation: submission.ai_recommendation || 'No AI recommendation available',
+        finalDecision: status,
+        notes: subNotes[id] || undefined,
+        context: {
+          submissionId: id,
+          projectName: submission.project_name,
+        },
+      });
+    }
     fetchStats();
   };
 
@@ -1531,6 +1857,18 @@ export default function AdminPage() {
         reviewed_at: patch.reviewed_at as string | null,
         rep_awarded: typeof patch.rep_awarded === 'boolean' ? patch.rep_awarded : r.rep_awarded,
       } : r));
+
+      await logAdminAudit({
+        actionTaken: 'Review scam report',
+        aiRecommendation: report.reason || 'No AI recommendation available',
+        finalDecision: status,
+        notes: String(patch.admin_notes ?? '') || undefined,
+        context: {
+          reportId: report.id,
+          projectName: report.project_name,
+          repAwarded: awarded,
+        },
+      });
 
       showToast(
         status === 'approved'
@@ -1674,7 +2012,7 @@ export default function AdminPage() {
               : <Brain className="w-4 h-4" />}
             {refreshingAll ? 'Analyzing…' : 'Refresh All AI'}
           </button>
-          <button onClick={() => { fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); }}
+          <button onClick={() => { fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); }}
             aria-label="Refresh admin data"
             className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
@@ -1766,6 +2104,14 @@ export default function AdminPage() {
               jumpToSection('admin-content');
             }}
           />
+          <ActionCard
+            title="Today's Audit Entries"
+            count={auditLoading || auditError ? 0 : auditEntriesTodayCount}
+            status={auditNeedsAttentionStatus}
+            blurb={auditNeedsAttentionBlurb}
+            actionLabel="Open Audit Log"
+            onAction={() => jumpToSection('admin-audit-logs')}
+          />
         </div>
       </section>
 
@@ -1802,7 +2148,22 @@ export default function AdminPage() {
                       className="px-2.5 py-1 rounded-lg border border-white/15 text-gray-300"
                     >Draft</button>
                     <button
-                      onClick={() => setControlArticles((prev) => prev.map((row) => row.id === article.id ? { ...row, status: 'published', updatedAt: new Date().toISOString() } : row))}
+                      onClick={async () => {
+                        const reviewNotes = promptHumanVerificationNotes(`Publish article \"${article.title}\"`);
+                        if (!reviewNotes) return;
+
+                        setControlArticles((prev) => prev.map((row) => row.id === article.id ? { ...row, status: 'published', updatedAt: new Date().toISOString() } : row));
+                        await logAdminAudit({
+                          actionTaken: 'Publish article',
+                          aiRecommendation: 'Draft article prepared by AI-assisted workflow',
+                          finalDecision: 'Published',
+                          notes: reviewNotes,
+                          context: {
+                            articleId: article.id,
+                            title: article.title,
+                          },
+                        });
+                      }}
                       className="px-2.5 py-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
                     >Publish</button>
                   </div>
@@ -1839,6 +2200,19 @@ export default function AdminPage() {
                   showToast('Selected project not found', 'error');
                   return;
                 }
+                const reviewNotes = promptHumanVerificationNotes(`Approve featured project: ${project.name}`);
+                if (!reviewNotes) return;
+
+                await logAdminAudit({
+                  actionTaken: 'Approve featured project',
+                  aiRecommendation: `Trust ${project.trust_score ?? 'unknown'} | Risk ${project.risk_level ?? 'unknown'}`,
+                  finalDecision: 'Approved for feature',
+                  notes: reviewNotes,
+                  context: {
+                    airdropId: project.id,
+                    projectName: project.name,
+                  },
+                });
                 await openEdit(project);
               }}
               className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200"
@@ -1862,6 +2236,18 @@ export default function AdminPage() {
                   showToast('No matching project found', 'error');
                   return;
                 }
+                const reviewNotes = promptHumanVerificationNotes('Approve homepage trending recommendations');
+                if (!reviewNotes) return;
+
+                await logAdminAudit({
+                  actionTaken: 'Approve homepage recommendations',
+                  aiRecommendation: 'Trending candidates selected by AI + admin shortlist',
+                  finalDecision: 'Approved for homepage trending queue',
+                  notes: reviewNotes,
+                  context: {
+                    projectIds: ids,
+                  },
+                });
                 await openEdit(project);
               }}
               className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200"
@@ -1988,6 +2374,147 @@ export default function AdminPage() {
           <button onClick={() => jumpToSection('admin-submissions')} className="px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-200">Review Submission</button>
           <button onClick={() => window.open('/pricing', '_blank', 'noopener,noreferrer')} className="px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-200">Open API Access</button>
         </div>
+      </section>
+
+      <section id="admin-audit-logs" className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.04] p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-cyan-200">ADMIN AUDIT LOG</h2>
+            <p className="text-xs text-gray-400 mt-1">Read-only human verification history for publish, approve, reject, feature and banner decisions.</p>
+          </div>
+          <button
+            onClick={() => fetchAuditLogs()}
+            className="px-3 py-1.5 rounded-lg border border-cyan-500/25 bg-cyan-500/10 text-xs text-cyan-200"
+          >
+            Refresh Logs
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+          <input
+            value={auditSearch}
+            onChange={(e) => setAuditSearch(e.target.value)}
+            placeholder="Search logs"
+            className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white"
+          />
+
+          <select
+            value={auditActionFilter}
+            onChange={(e) => setAuditActionFilter(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white"
+          >
+            <option value="all">All actions</option>
+            {auditActionOptions.map((action) => (
+              <option key={action} value={action}>{action}</option>
+            ))}
+          </select>
+
+          <select
+            value={auditTargetFilter}
+            onChange={(e) => setAuditTargetFilter(e.target.value as 'all' | AuditTargetType)}
+            className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white"
+          >
+            <option value="all">All target types</option>
+            <option value="airdrop">Airdrop</option>
+            <option value="article">Article</option>
+            <option value="banner">Banner</option>
+            <option value="submission">Submission</option>
+            <option value="scam_report">Scam report</option>
+            <option value="homepage">Homepage</option>
+            <option value="unknown">Unknown</option>
+          </select>
+
+          <select
+            value={auditAdminFilter}
+            onChange={(e) => setAuditAdminFilter(e.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white"
+          >
+            <option value="all">All administrators</option>
+            {auditAdminOptions.map((admin) => (
+              <option key={admin} value={admin}>{admin}</option>
+            ))}
+          </select>
+        </div>
+
+        {auditLoading && (
+          <div className="glass-card p-6 text-center text-sm text-gray-400">
+            <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin text-cyan-300" />
+            Loading audit logs...
+          </div>
+        )}
+
+        {!auditLoading && auditError && (
+          <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+            <p>Unable to load audit logs: {auditError}</p>
+          </div>
+        )}
+
+        {!auditLoading && !auditError && filteredAuditLogs.length === 0 && (
+          <div className="glass-card p-6 text-center text-sm text-gray-500">
+            No audit logs found yet.
+          </div>
+        )}
+
+        {!auditLoading && !auditError && filteredAuditLogs.length > 0 && (
+          <>
+            <div className="space-y-2 md:hidden">
+              {filteredAuditLogs.map((log) => {
+                const target = inferAuditTarget(log);
+                return (
+                  <article key={log.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-white">{log.action_taken}</p>
+                      <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-gray-300">{target.targetType}</span>
+                    </div>
+                    <p className="mt-1 text-gray-400">{target.targetNameOrId}</p>
+                    <p className="mt-1 text-gray-500">Admin: {log.admin_identifier}</p>
+                    <p className="mt-1 text-gray-500">Date/time: {formatDateTime(log.action_at)}</p>
+                    <p className="mt-1 text-gray-400">Decision: {log.final_decision}</p>
+                    {log.ai_recommendation && <p className="mt-1 text-gray-500">AI: {truncateText(log.ai_recommendation, 120)}</p>}
+                    {log.notes && <p className="mt-1 text-gray-500">Notes: {truncateText(log.notes, 120)}</p>}
+                    <p className="mt-1 text-gray-600">Created at: {formatDateTime(log.action_at)}</p>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1100px] text-xs">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="px-3 py-2 text-left text-gray-400">Date/time</th>
+                    <th className="px-3 py-2 text-left text-gray-400">Administrator</th>
+                    <th className="px-3 py-2 text-left text-gray-400">Action taken</th>
+                    <th className="px-3 py-2 text-left text-gray-400">Target type</th>
+                    <th className="px-3 py-2 text-left text-gray-400">Target</th>
+                    <th className="px-3 py-2 text-left text-gray-400">AI recommendation</th>
+                    <th className="px-3 py-2 text-left text-gray-400">Final human decision</th>
+                    <th className="px-3 py-2 text-left text-gray-400">Notes</th>
+                    <th className="px-3 py-2 text-left text-gray-400">Created at</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredAuditLogs.map((log) => {
+                    const target = inferAuditTarget(log);
+                    return (
+                      <tr key={log.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-3 py-2 text-gray-300">{formatDateTime(log.action_at)}</td>
+                        <td className="px-3 py-2 text-gray-300">{log.admin_identifier}</td>
+                        <td className="px-3 py-2 text-white">{log.action_taken}</td>
+                        <td className="px-3 py-2 text-gray-300 capitalize">{target.targetType.replace('_', ' ')}</td>
+                        <td className="px-3 py-2 text-gray-300">{target.targetNameOrId}</td>
+                        <td className="px-3 py-2 text-gray-400">{log.ai_recommendation ? truncateText(log.ai_recommendation, 130) : '—'}</td>
+                        <td className="px-3 py-2 text-emerald-300">{log.final_decision}</td>
+                        <td className="px-3 py-2 text-gray-400">{log.notes ? truncateText(log.notes, 130) : '—'}</td>
+                        <td className="px-3 py-2 text-gray-500">{formatDateTime(log.action_at)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
 
       {/* ── Airdrop table ──────────────────────────────────────────────────── */}
@@ -2268,8 +2795,34 @@ export default function AdminPage() {
                         {/* Publish toggle */}
                         <button
                           onClick={async () => {
-                            const { error } = await supabase.from('airdrops').update({ published: !a.published }).eq('id', a.id);
-                            if (!error) { setAirdrops(prev => prev.map(x => x.id === a.id ? { ...x, published: !x.published } : x)); fetchStats(); }
+                            const nextPublished = !a.published;
+                            const reviewNotes = nextPublished
+                              ? promptHumanVerificationNotes(`Publish airdrop ${a.name}`)
+                              : '';
+                            if (nextPublished && !reviewNotes) return;
+
+                            const patch = {
+                              published: nextPublished,
+                              human_verified: nextPublished ? true : a.human_verified,
+                            };
+
+                            const { error } = await supabase.from('airdrops').update(patch).eq('id', a.id);
+                            if (!error) {
+                              setAirdrops(prev => prev.map(x => x.id === a.id ? { ...x, ...patch } : x));
+                              fetchStats();
+
+                              await logAdminAudit({
+                                actionTaken: nextPublished ? 'Publish airdrop' : 'Unpublish airdrop',
+                                aiRecommendation: `Trust ${a.trust_score ?? 'unknown'} | Risk ${a.risk_level ?? 'unknown'}`,
+                                finalDecision: nextPublished ? 'Approved and published' : 'Unpublished',
+                                notes: reviewNotes ?? undefined,
+                                context: {
+                                  airdropId: a.id,
+                                  airdropName: a.name,
+                                  listingState: a.listing_state,
+                                },
+                              });
+                            }
                           }}
                           title={a.published ? 'Unpublish' : 'Publish'}
                           className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"

@@ -45,6 +45,11 @@ type Airdrop = {
   investors: string | null;
   team_info: string | null;
   docs_url: string | null;
+  github_url?: string | null;
+  source?: string | null;
+  score_reasons?: string[] | null;
+  sub_scores?: Record<string, number> | null;
+  contract_address?: string | null;
   blacklist_reason: string | null;
   scam_reason: string | null;
   ai_risk_analysis: string | null;
@@ -563,6 +568,8 @@ function OpportunityListCard({
                 {hasValue(a.funding_info) && <SmallBadge>Funded</SmallBadge>}
                 {hasValue(a.docs_url) && <SmallBadge>Docs</SmallBadge>}
               </div>
+
+              <DiscoveryReasonPanel airdrop={a} />
             </li>
           ))}
         </ul>
@@ -803,6 +810,68 @@ function SmallBadge({ children }: { children: React.ReactNode }) {
   );
 }
 
+function DiscoveryReasonPanel({ airdrop }: { airdrop: Airdrop }) {
+  const reasoning = buildDiscoveryReasoning(airdrop);
+
+  return (
+    <div className="mt-3 rounded-lg border border-white/10 bg-black/25 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-200">Why was this discovered?</p>
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className={`rounded-full border px-2 py-0.5 ${reasoning.confidenceLevel === 'High'
+            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+            : reasoning.confidenceLevel === 'Medium'
+            ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+            : 'border-gray-500/30 bg-gray-500/10 text-gray-300'}`}>
+            {reasoning.confidenceLevel}
+          </span>
+          <span className="text-cyan-100">AI Confidence {reasoning.confidencePct}%</span>
+        </div>
+      </div>
+
+      <p className="mt-2 text-xs text-gray-300">{reasoning.explanation}</p>
+
+      <SignalList title="Positive Signals" items={reasoning.positiveSignals} tone="emerald" />
+      <SignalList title="Negative Signals" items={reasoning.negativeSignals} tone="rose" />
+      <SignalList title="Missing Information" items={reasoning.missingInformation} tone="amber" />
+      <SignalList title="Potential Risks" items={reasoning.potentialRisks} tone="violet" />
+
+      <div className="mt-2 text-[11px] text-cyan-100">
+        Recommended Next Action: <span className="font-semibold text-white">{reasoning.recommendedNextAction}</span>
+      </div>
+    </div>
+  );
+}
+
+function SignalList({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: string[];
+  tone: 'emerald' | 'rose' | 'amber' | 'violet';
+}) {
+  const toneClass = tone === 'emerald'
+    ? 'text-emerald-300'
+    : tone === 'rose'
+    ? 'text-rose-300'
+    : tone === 'amber'
+    ? 'text-amber-300'
+    : 'text-violet-300';
+
+  return (
+    <div className="mt-2">
+      <p className={`text-[10px] font-semibold uppercase tracking-[0.12em] ${toneClass}`}>{title}</p>
+      <ul className="mt-1 space-y-1">
+        {items.slice(0, 4).map((item) => (
+          <li key={`${title}-${item}`} className="text-xs text-gray-300">• {item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function lower(value: unknown) {
   return String(value || "").trim().toLowerCase();
 }
@@ -882,6 +951,138 @@ function aiConfidenceReasons(a: Airdrop) {
 }
 
 function stars(score: number | null) {
+
+type DiscoveryReasoning = {
+  confidencePct: number;
+  confidenceLevel: "High" | "Medium" | "Low";
+  evidenceReasons: string[];
+  explanation: string;
+  positiveSignals: string[];
+  negativeSignals: string[];
+  missingInformation: string[];
+  potentialRisks: string[];
+  recommendedNextAction: "Research Further" | "Import" | "Monitor" | "Wait" | "Ignore";
+};
+
+function buildDiscoveryReasoning(a: Airdrop): DiscoveryReasoning {
+  const evidenceReasons = detectEvidenceReasons(a);
+  const confidencePct = calculateAiConfidence(a);
+  const confidenceLevel: "High" | "Medium" | "Low" = confidencePct >= 75 ? "High" : confidencePct >= 55 ? "Medium" : "Low";
+
+  const positiveSignals = [
+    ...evidenceReasons,
+    hasValue(a.funding_info) ? "Large VC funding" : "",
+    hasValue(a.investors) ? "Well-known investors" : "",
+    hasValue(a.github_url) ? "Active GitHub development" : "",
+    hasValue(a.docs_url) ? "New documentation published" : "",
+    a.is_trending ? "Strong community growth" : "",
+    !hasValue(a.contract_address) ? "Token not yet launched" : "",
+    a.listing_state === "verified" || a.human_verified ? "Strong security indicators" : "",
+  ].filter(Boolean);
+
+  const negativeSignals = [
+    lower(a.risk_level) === "high" ? "High modelled risk level" : "",
+    Boolean(a.blacklist_reason) ? "Blacklist reason detected" : "",
+    Boolean(a.scam_reason) ? "Scam reason detected" : "",
+    lower(a.listing_state).includes("under_review") ? "Still under review" : "",
+  ].filter(Boolean);
+
+  const missingInformation = [
+    hasValue(a.docs_url) ? "" : "Documentation URL",
+    hasValue(a.github_url) ? "" : "GitHub repository activity",
+    hasValue(a.funding_info) || hasValue(a.investors) ? "" : "Funding and investor confirmation",
+    hasValue(a.team_info) ? "" : "Team information",
+    hasValue(a.contract_address) ? "" : "Official token contract",
+  ].filter(Boolean);
+
+  const potentialRisks = [
+    lower(a.risk_level) === "high" ? "Potentially elevated execution risk." : "",
+    !hasValue(a.contract_address) ? "Token launch details are not yet confirmed." : "",
+    !hasValue(a.docs_url) ? "Limited official documentation available." : "",
+    !hasValue(a.github_url) ? "Unable to independently verify developer velocity." : "",
+    Boolean(a.blacklist_reason) ? short(a.blacklist_reason ?? "") : "",
+    Boolean(a.scam_reason) ? short(a.scam_reason ?? "") : "",
+  ].filter(Boolean);
+
+  const recommendedNextAction = deriveRecommendationAction(a, confidencePct);
+
+  const explanation = `This project was detected because ${sentenceJoin(evidenceReasons.slice(0, 5))}. These characteristics historically correlate with projects that later distribute community rewards.`;
+
+  return {
+    confidencePct,
+    confidenceLevel,
+    evidenceReasons: evidenceReasons.length ? evidenceReasons : ["High ecosystem activity"],
+    explanation,
+    positiveSignals: positiveSignals.length ? positiveSignals : ["High ecosystem activity"],
+    negativeSignals: negativeSignals.length ? negativeSignals : ["No major negative signals currently highlighted"],
+    missingInformation: missingInformation.length ? missingInformation : ["No major information gaps detected"],
+    potentialRisks: potentialRisks.length ? potentialRisks : ["No material risk escalation signal detected right now"],
+    recommendedNextAction,
+  };
+}
+
+function detectEvidenceReasons(a: Airdrop): string[] {
+  const fromScoreReasons = Array.isArray(a.score_reasons)
+    ? a.score_reasons.map((reason) => compactReason(reason)).filter(Boolean)
+    : [];
+
+  const source = lower(a.source);
+  const summary = `${lower(a.ai_summary)} ${lower(a.funding_info)} ${lower(a.investors)} ${lower(a.docs_url)}`;
+
+  const inferred = [
+    /testnet/.test(summary) ? "Testnet launched" : "",
+    /mainnet/.test(summary) ? "Mainnet announced" : "",
+    /(campaign|incentiv)/.test(summary) ? "Incentivised campaign detected" : "",
+    /(points|public points)/.test(summary) ? "Public points programme" : "",
+    hasValue(a.funding_info) ? "Large VC funding" : "",
+    hasValue(a.investors) ? "Well-known investors" : "",
+    hasValue(a.github_url) ? "Active GitHub development" : "",
+    hasValue(a.docs_url) ? "New documentation published" : "",
+    a.is_trending ? "Strong community growth" : "",
+    source.includes("blog") ? "Official blog announcement" : "",
+    source.includes("discord") ? "Discord announcement" : "",
+    source.includes("telegram") ? "Telegram announcement" : "",
+    source.includes("twitter") || source.includes("x") ? "X announcement" : "",
+    source.includes("galxe") ? "Galxe campaign" : "",
+    source.includes("zealy") ? "Zealy campaign" : "",
+    source.includes("layer3") ? "Layer3 campaign" : "",
+    source.includes("questn") ? "QuestN campaign" : "",
+    !hasValue(a.contract_address) ? "Token not yet launched" : "",
+    lower(a.listing_state) === "verified" || a.human_verified ? "Strong security indicators" : "",
+  ].filter(Boolean);
+
+  return [...fromScoreReasons, ...inferred].filter((reason, index, arr) => arr.indexOf(reason) === index);
+}
+
+function compactReason(reason: string): string {
+  const text = reason.trim();
+  if (!text) return "";
+  if (/github/i.test(text)) return "Active GitHub development";
+  if (/fund|raise|investor/i.test(text)) return "Large VC funding";
+  if (/docs|documentation|whitepaper/i.test(text)) return "New documentation published";
+  if (/community|social|discord|telegram|twitter|x/i.test(text)) return "Strong community growth";
+  if (/testnet/i.test(text)) return "Testnet launched";
+  if (/mainnet/i.test(text)) return "Mainnet announced";
+  if (/campaign|quest|galxe|zealy|layer3|questn/i.test(text)) return "Incentivised campaign detected";
+  if (/token/i.test(text) && /not|unlaunched|pending|no /.test(text.toLowerCase())) return "Token not yet launched";
+  return text.length > 80 ? `${text.slice(0, 79)}…` : text;
+}
+
+function deriveRecommendationAction(a: Airdrop, confidencePct: number): "Research Further" | "Import" | "Monitor" | "Wait" | "Ignore" {
+  if (Boolean(a.blacklist_reason) || Boolean(a.scam_reason)) return "Ignore";
+  if (lower(a.risk_level) === "high" && confidencePct < 60) return "Wait";
+  if (lower(a.risk_level) === "low" && confidencePct >= 78 && (a.listing_state === "verified" || a.human_verified)) return "Import";
+  if (confidencePct >= 60) return "Research Further";
+  return "Monitor";
+}
+
+function sentenceJoin(items: string[]): string {
+  const filtered = items.filter(Boolean);
+  if (filtered.length === 0) return "it shows high ecosystem activity";
+  if (filtered.length === 1) return filtered[0];
+  if (filtered.length === 2) return `${filtered[0]} and ${filtered[1]}`;
+  return `${filtered.slice(0, -1).join(", ")}, and ${filtered[filtered.length - 1]}`;
+}
   const value = score || 0;
   if (value >= 80) return "★★★★★";
   if (value >= 65) return "★★★★☆";
