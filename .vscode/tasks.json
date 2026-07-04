@@ -322,6 +322,348 @@
 				"build"
 			],
 			"isBackground": false
+		},
+		{
+			"label": "verify-prod-build-after-category-enum-fix",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "list-admin-sections",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Select-String -Path 'project/src/pages/AdminPage.tsx' -Pattern '<section id=\"'"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "apply-admin-growth-migration",
+			"type": "shell",
+			"command": "supabase",
+			"args": [
+				"db",
+				"query",
+				"--linked",
+				"--file",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf\\project\\supabase\\migrations\\20260704174500_add_admin_growth_features.sql"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-admin-growth-tables",
+			"type": "shell",
+			"command": "supabase",
+			"args": [
+				"db",
+				"query",
+				"--linked",
+				"select table_name from information_schema.tables where table_schema='public' and table_name in ('ai_article_drafts','competitor_sources','competitor_opportunities','admin_notifications') order by table_name;"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-admin-growth-tables-file",
+			"type": "shell",
+			"command": "supabase",
+			"args": [
+				"db",
+				"query",
+				"--linked",
+				"--file",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf\\project\\scripts\\verify_admin_growth_tables.sql"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-admin-growth-policies",
+			"type": "shell",
+			"command": "supabase",
+			"args": [
+				"db",
+				"query",
+				"--linked",
+				"--file",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf\\project\\scripts\\verify_admin_growth_policies.sql"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "build-project-production",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-status-short",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf",
+				"status",
+				"--short"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "scan-browser-snapshots-admin",
+			"type": "shell",
+			"command": "rg",
+			"args": [
+				"-n",
+				"URL:|/admin|Welcome back|Admin|Sign In|Control Center|admin-",
+				"c:\\Users\\Admin\\AppData\\Roaming\\Code\\User\\workspaceStorage\\33a57c29bab2e314b502849331ee9150\\GitHub.copilot-chat\\chat-session-resources\\d1e6622e-efb0-4651-ba1c-f03128f5eb5c\\call_*\\content.txt"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "build-project-production-final",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-status-short-final",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf",
+				"status",
+				"--short"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "check-live-competitor-tables",
+			"type": "shell",
+			"command": "supabase",
+			"args": [
+				"db",
+				"query",
+				"--linked",
+				"--file",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf\\project\\supabase\\migrations\\20260704174500_add_admin_growth_features.sql"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-competitor-live-tables-and-policies",
+			"type": "shell",
+			"command": "supabase",
+			"args": [
+				"db",
+				"query",
+				"--linked",
+				"--file",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf\\project\\scripts\\_tmp_verify_competitor_tables.sql"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "competitor-watch-db-health-and-cache-reload",
+			"type": "shell",
+			"command": "supabase",
+			"args": [
+				"db",
+				"query",
+				"--linked",
+				"--file",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf\\project\\scripts\\_tmp_competitor_watch_health.sql"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "build-after-competitor-nav-fix",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-competitor-migration-version",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$p = Join-Path $env:TEMP 'ag_verify_migration.sql'; Set-Content -Path $p -Value \"select version from supabase_migrations.schema_migrations where version='20260704174500';\"; supabase db query --linked --file $p; Remove-Item $p -Force"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-competitor-migration-version-file",
+			"type": "shell",
+			"command": "supabase",
+			"args": [
+				"db",
+				"query",
+				"--linked",
+				"--file",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf\\project\\scripts\\_tmp_verify_migration_version.sql"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "competitor-live-check-single-result",
+			"type": "shell",
+			"command": "supabase",
+			"args": [
+				"db",
+				"query",
+				"--linked",
+				"--file",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf\\project\\scripts\\_tmp_competitor_live_check.sql"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "reload-postgrest-schema-cache",
+			"type": "shell",
+			"command": "supabase",
+			"args": [
+				"db",
+				"query",
+				"--linked",
+				"--file",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf\\project\\scripts\\_tmp_reload_pgrst_schema.sql"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-status-short-post-fix",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf",
+				"status",
+				"--short"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "build-after-competitor-ux-quality",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-status-short-competitor-final",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf",
+				"status",
+				"--short"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "build-after-airdropio-tuning",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-status-short-after-airdropio-tune",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf",
+				"status",
+				"--short"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "build-after-source-scan-badge",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-status-short-source-scan",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf",
+				"status",
+				"--short"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "build-after-competitor-tightening",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-status-short-after-tightening",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"c:\\Users\\Admin\\Downloads\\project-bolt-sb1-bv6hgflf",
+				"status",
+				"--short"
+			],
+			"isBackground": false
 		}
 	]
 }

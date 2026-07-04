@@ -9,7 +9,7 @@ import {
   Database, Shield, Activity, Mail, Users, Key, Zap, RefreshCw, Download,
   Inbox, CheckCheck, XCircle, ChevronDown, ChevronUp, ExternalLink,
   FileText, Plus, X, Pencil, Trash2, AlertTriangle, LogOut, ShieldCheck, Gift,
-  ImagePlus, Monitor, CalendarClock, BadgeCheck,
+  ImagePlus, Monitor, CalendarClock, BadgeCheck, Bell, Newspaper, Radar, Sparkles,
 } from 'lucide-react';
 import type { Airdrop, Blockchain, Category } from '../lib/types';
 import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
@@ -269,6 +269,7 @@ interface BannerAd {
 type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt'>;
 
 type ContentView = 'airdrops' | 'articles' | 'hero' | 'featured' | 'trending' | 'learn' | 'sections';
+type AdminView = 'overview' | 'airdrops' | 'submissions' | 'content' | 'ai-drafts' | 'competitor-watch' | 'users' | 'api' | 'banners' | 'audit-logs' | 'system-tools';
 
 interface ControlArticle {
   id: string;
@@ -308,7 +309,1075 @@ type AdminAuditLog = {
   context: Record<string, unknown> | null;
 };
 
+type AIDraftStatus = 'ai_assisted_draft' | 'human_reviewed' | 'verified_airdropguard' | 'published' | 'rejected';
+
+type AIArticleDraft = {
+  id: string;
+  week_start: string;
+  title: string;
+  slug: string;
+  summary: string;
+  body: string;
+  meta_title: string;
+  meta_description: string;
+  estimated_read_minutes: number;
+  status: AIDraftStatus;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+};
+
+type CompetitorSource = {
+  id: string;
+  source_name: string;
+  source_url: string;
+  is_active: boolean;
+  last_checked_at: string | null;
+  created_at: string;
+};
+
+type CompetitorOpportunityStatus = 'new' | 'queued' | 'ignored' | 'duplicate' | 'drafted';
+
+type CompetitorOpportunity = {
+  id: string;
+  source_id: string;
+  project_name: string;
+  source_url: string;
+  discovered_at: string;
+  category: string | null;
+  blockchain: string | null;
+  confidence_level: 'low' | 'medium' | 'high';
+  why_matched: string;
+  similarity_score: number | null;
+  status: CompetitorOpportunityStatus;
+  notes: string | null;
+  created_at: string;
+};
+
+type CompetitorSourceScanStatus = 'never_scanned' | 'source_only' | 'none_found' | 'found' | 'failed';
+
+type CompetitorSourceScanResult = {
+  status: CompetitorSourceScanStatus;
+  lastCheckedAt: string | null;
+  totalScans: number;
+  successfulScans: number;
+  opportunitiesFound: number;
+  newProjects: number;
+  duplicateProjects: number;
+  failedExtractions: number;
+  durationMs: number | null;
+  lastSuccessfulScan: string | null;
+  successRate: number;
+  health: 'green' | 'amber' | 'red';
+  note: string;
+};
+
+type DiscoveryComparisonType = 'exact_match' | 'similar_project' | 'new_project';
+type DiscoveryPriority = 'high' | 'medium' | 'low';
+
+type DiscoveryCandidate = {
+  projectName: string;
+  projectUrl: string | null;
+  listingUrl: string;
+  blockchain: string | null;
+  category: string | null;
+  shortDescription: string | null;
+  listingDate: string | null;
+  confidence: 'low' | 'medium' | 'high';
+  sourceLabel: string;
+  officialDocsUrl: string | null;
+  githubUrl: string | null;
+  officialXUrl: string | null;
+  officialDiscordUrl: string | null;
+  fundingInfo: string | null;
+  teamInfo: string | null;
+};
+
+type DiscoveryExtractionResult = {
+  candidates: DiscoveryCandidate[];
+  cardsFound: number;
+  candidatesRejected: number;
+  rejectedByReason: Record<string, number>;
+  rejectionSamples: string[];
+};
+
+type PendingDiscoveryCandidate = {
+  id: string;
+  sourceId: string;
+  sourceName: string;
+  checkedAt: string;
+  adapterId: string;
+  candidate: DiscoveryCandidate;
+  comparisonType: DiscoveryComparisonType;
+  confidenceScore: number;
+  whyNew: string;
+  matchedProject: string | null;
+  compareMessage: string;
+  sourceReliability: number;
+  sourceMentions: number;
+  discoveryScore: number;
+  discoveryPriority: DiscoveryPriority;
+  firstDiscoveredAt: string;
+};
+
+type CompetitorScanDebugResult = {
+  adapterUsed: string | null;
+  pageFetched: string;
+  fetchStatus: number | null;
+  cardsFound: number;
+  candidatesRejected: number;
+  rejectionReasons: Record<string, number>;
+  rejectionSamples: string[];
+  validCandidatesExtracted: number;
+  outcomeReason: string | null;
+};
+
+type CompetitorWatchScanResult = {
+  sourceId: string;
+  sourceName: string;
+  sourceUrl: string;
+  checkedAt: string;
+  adapterUsed: string | null;
+  fetchStatus: number | null;
+  cardsFound: number;
+  candidatesExtracted: DiscoveryCandidate[];
+  candidatesRejected: number;
+  rejectionReasons: Record<string, number>;
+  rejectionSamples: string[];
+  finalOutcome:
+    | 'ok'
+    | 'blocked_by_cloudflare'
+    | 'http_403'
+    | 'http_429'
+    | 'timeout'
+    | 'no_html'
+    | 'javascript_rendered'
+    | 'no_adapter_matched'
+    | 'no_cards_found'
+    | 'all_candidates_rejected'
+    | 'fetch_failed';
+  outcomeMessage: string;
+};
+
+type CompetitorWatchScanResponse = {
+  results: CompetitorWatchScanResult[];
+};
+
+type SourceAdapter = {
+  id: string;
+  label: string;
+  hostPatterns: RegExp[];
+  listingPathPatterns: RegExp[];
+};
+
+type AdminNotification = {
+  id: string;
+  notification_type: string;
+  title: string;
+  message: string;
+  severity: 'info' | 'success' | 'warning' | 'error';
+  is_read: boolean;
+  context: Record<string, unknown> | null;
+  created_at: string;
+};
+
 type AuditTargetType = 'airdrop' | 'article' | 'banner' | 'submission' | 'scam_report' | 'homepage' | 'unknown';
+
+const GENERIC_COMPETITOR_NAMES = new Set([
+  'airdrop',
+  'airdrops',
+  'crypto',
+  'search',
+  'browse',
+  'category',
+  'new',
+  'latest',
+  'claim',
+  'reward',
+  'rewards',
+  'campaign',
+  'campaigns',
+]);
+
+const URL_NOISE_TOKENS = new Set([
+  'www',
+  'com',
+  'io',
+  'org',
+  'net',
+  'app',
+  'site',
+  'www2',
+  'blog',
+  'news',
+  'airdrop',
+  'airdrops',
+  'crypto',
+  'claim',
+  'rewards',
+  'campaign',
+  'projects',
+  'project',
+  'list',
+  'listing',
+  'drop',
+  'drops',
+  'search',
+  'browse',
+  'category',
+  'filter',
+  'tag',
+  'new',
+  'latest',
+]);
+
+const GENERIC_SOURCE_URL_PATTERNS = [
+  '/search',
+  '?query=',
+  '&query=',
+  '/browse',
+  '/category',
+  '/tag',
+  '/filter',
+  '/airdrops',
+  '/new',
+  '/latest',
+];
+
+const DISCOVERY_SOURCE_ADAPTERS: SourceAdapter[] = [
+  {
+    id: 'airdrop-io',
+    label: 'airdrop.io',
+    hostPatterns: [/^airdrop\.io$/i, /(^|\.)airdrop\.io$/i],
+    listingPathPatterns: [/\/airdrop\/[a-z0-9-]{3,}/i, /\/project\/[a-z0-9-]{3,}/i],
+  },
+  {
+    id: 'airdrops-io',
+    label: 'airdrops.io',
+    hostPatterns: [/^airdrops\.io$/i, /(^|\.)airdrops\.io$/i],
+    listingPathPatterns: [/\/airdrop\//i, /\/project\//i, /\/campaign\//i, /\/token\//i],
+  },
+  {
+    id: 'airdropalert',
+    label: 'airdropalert.com',
+    hostPatterns: [/^airdropalert\.com$/i, /(^|\.)airdropalert\.com$/i],
+    listingPathPatterns: [/\/airdrops\/[a-z0-9-]{3,}/i, /\/airdrop\/[a-z0-9-]{3,}/i],
+  },
+  {
+    id: 'layer3',
+    label: 'Layer3',
+    hostPatterns: [/^layer3\.xyz$/i, /(^|\.)layer3\.xyz$/i],
+    listingPathPatterns: [/\/quests\/[a-z0-9-]{3,}/i, /\/campaigns\/[a-z0-9-]{3,}/i, /\/bounties\/[a-z0-9-]{3,}/i],
+  },
+  {
+    id: 'galxe',
+    label: 'Galxe',
+    hostPatterns: [/^galxe\.com$/i, /(^|\.)galxe\.com$/i],
+    listingPathPatterns: [/\/quest\/[a-z0-9-]{3,}/i, /\/campaign\/[a-z0-9-]{3,}/i, /\/events\/[a-z0-9-]{3,}/i],
+  },
+  {
+    id: 'intract',
+    label: 'Intract',
+    hostPatterns: [/^intract\.io$/i, /(^|\.)intract\.io$/i],
+    listingPathPatterns: [/\/quest\//i, /\/campaign\//i, /\/tasks\//i],
+  },
+  {
+    id: 'zealy',
+    label: 'Zealy',
+    hostPatterns: [/^zealy\.io$/i, /(^|\.)zealy\.io$/i],
+    listingPathPatterns: [/\/c\/[^/]+\/questboard\/[a-z0-9-]{3,}/i, /\/questboard\/[a-z0-9-]{3,}/i],
+  },
+  {
+    id: 'coinmarketcap-airdrops',
+    label: 'CoinMarketCap Airdrops',
+    hostPatterns: [/^coinmarketcap\.com$/i, /(^|\.)coinmarketcap\.com$/i],
+    listingPathPatterns: [/\/airdrop\/[a-z0-9-]{3,}/i],
+  },
+];
+
+const SOURCE_RELIABILITY_SCORES: Record<string, number> = {
+  'airdrop-io': 74,
+  'airdrops-io': 72,
+  airdropalert: 76,
+  layer3: 90,
+  galxe: 88,
+  intract: 82,
+  zealy: 80,
+  'coinmarketcap-airdrops': 85,
+};
+
+function getAdapterReliabilityScore(adapterId: string | null): number {
+  if (!adapterId) return 70;
+  return SOURCE_RELIABILITY_SCORES[adapterId] ?? 70;
+}
+
+function tokenizeName(value: string): string[] {
+  return normalizeProjectName(value)
+    .split(' ')
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function tokenOverlapScore(a: string, b: string): number {
+  const aTokens = new Set(tokenizeName(a));
+  const bTokens = new Set(tokenizeName(b));
+  if (aTokens.size === 0 || bTokens.size === 0) return 0;
+
+  let overlap = 0;
+  aTokens.forEach((token) => {
+    if (bTokens.has(token)) overlap += 1;
+  });
+
+  return overlap / Math.max(aTokens.size, bTokens.size);
+}
+
+function compareCandidateAgainstAirdrops(
+  candidate: DiscoveryCandidate,
+  airdrops: Airdrop[]
+): {
+  comparison: DiscoveryComparisonType;
+  confidenceScore: number;
+  whyNew: string;
+  matchedProject: string | null;
+} {
+  const normalizedCandidate = normalizeProjectName(candidate.projectName);
+  const exactMatch = airdrops.find((airdrop) => normalizeProjectName(airdrop.name) === normalizedCandidate);
+  if (exactMatch) {
+    return {
+      comparison: 'exact_match',
+      confidenceScore: 96,
+      whyNew: `Matches existing listing exactly (${exactMatch.name}).`,
+      matchedProject: exactMatch.name,
+    };
+  }
+
+  let bestSimilar: { name: string; score: number } | null = null;
+  for (const airdrop of airdrops) {
+    const score = tokenOverlapScore(candidate.projectName, airdrop.name);
+    if (!bestSimilar || score > bestSimilar.score) {
+      bestSimilar = { name: airdrop.name, score };
+    }
+  }
+
+  if (bestSimilar && bestSimilar.score >= 0.55) {
+    return {
+      comparison: 'similar_project',
+      confidenceScore: Math.min(90, Math.round(62 + bestSimilar.score * 30)),
+      whyNew: `Similar to ${bestSimilar.name}, but not an exact listing match.`,
+      matchedProject: bestSimilar.name,
+    };
+  }
+
+  return {
+    comparison: 'new_project',
+    confidenceScore: 84,
+    whyNew: 'No exact or close existing listing match found in AirdropGuard.',
+    matchedProject: null,
+  };
+}
+
+function computeDiscoveryScore(input: {
+  sourceReliability: number;
+  sourceMentions: number;
+  hasDocs: boolean;
+  hasGithub: boolean;
+  hasX: boolean;
+  hasDiscord: boolean;
+  hasBlockchain: boolean;
+  hasFunding: boolean;
+  hasTeam: boolean;
+}): number {
+  const mentionsBonus = Math.min(15, (input.sourceMentions - 1) * 4);
+  const score =
+    input.sourceReliability * 0.45 +
+    mentionsBonus +
+    (input.hasDocs ? 10 : 0) +
+    (input.hasGithub ? 7 : 0) +
+    (input.hasX ? 5 : 0) +
+    (input.hasDiscord ? 5 : 0) +
+    (input.hasBlockchain ? 6 : 0) +
+    (input.hasFunding ? 4 : 0) +
+    (input.hasTeam ? 3 : 0);
+
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function getDiscoveryPriority(score: number): DiscoveryPriority {
+  if (score >= 78) return 'high';
+  if (score >= 55) return 'medium';
+  return 'low';
+}
+
+function getSourceHealthIndicator(successRate: number, lastStatus: CompetitorSourceScanStatus): 'green' | 'amber' | 'red' {
+  if (lastStatus === 'failed' || successRate < 0.5) return 'red';
+  if (successRate < 0.8) return 'amber';
+  return 'green';
+}
+
+const BLOCKCHAIN_KEYWORDS: Array<{ keyword: string; value: string }> = [
+  { keyword: 'ethereum', value: 'Ethereum' },
+  { keyword: 'base', value: 'Base' },
+  { keyword: 'arbitrum', value: 'Arbitrum' },
+  { keyword: 'optimism', value: 'Optimism' },
+  { keyword: 'solana', value: 'Solana' },
+  { keyword: 'polygon', value: 'Polygon' },
+  { keyword: 'bsc', value: 'BNB Chain' },
+  { keyword: 'bnb', value: 'BNB Chain' },
+  { keyword: 'avalanche', value: 'Avalanche' },
+  { keyword: 'sui', value: 'Sui' },
+  { keyword: 'aptos', value: 'Aptos' },
+];
+
+const CATEGORY_KEYWORDS: Array<{ keyword: string; value: string }> = [
+  { keyword: 'defi', value: 'DeFi' },
+  { keyword: 'nft', value: 'NFT' },
+  { keyword: 'gaming', value: 'Gaming' },
+  { keyword: 'social', value: 'Social' },
+  { keyword: 'infra', value: 'Infrastructure' },
+  { keyword: 'layer 2', value: 'Layer2' },
+  { keyword: 'wallet', value: 'Wallet' },
+  { keyword: 'dao', value: 'DAO' },
+];
+
+function toTitleCase(value: string): string {
+  return value
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function sanitizeProjectCandidate(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+
+  const normalized = decodeURIComponent(String(raw))
+    .replace(/[\-_]+/g, ' ')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized || normalized.length < 3) return null;
+  if (/^\d+$/.test(normalized)) return null;
+
+  const lowered = normalized.toLowerCase();
+  if (GENERIC_COMPETITOR_NAMES.has(lowered)) return null;
+
+  const words = lowered.split(' ').filter(Boolean);
+  if (words.every((word) => URL_NOISE_TOKENS.has(word))) return null;
+
+  return toTitleCase(normalized);
+}
+
+function isGenericSourceUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    const combined = `${parsed.pathname}${parsed.search}`.toLowerCase();
+    return GENERIC_SOURCE_URL_PATTERNS.some((pattern) => combined.includes(pattern));
+  } catch {
+    const lowered = rawUrl.toLowerCase();
+    return GENERIC_SOURCE_URL_PATTERNS.some((pattern) => lowered.includes(pattern));
+  }
+}
+
+function isGenericOpportunityName(name: string): boolean {
+  const cleaned = sanitizeProjectCandidate(name);
+  if (!cleaned) return true;
+  const lowered = cleaned.toLowerCase();
+  return GENERIC_COMPETITOR_NAMES.has(lowered);
+}
+
+function normalizeProjectName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function resolveSourceAdapter(sourceUrl: string): SourceAdapter | null {
+  try {
+    const hostname = new URL(sourceUrl).hostname.replace(/^www\./, '').toLowerCase();
+    return DISCOVERY_SOURCE_ADAPTERS.find((adapter) => adapter.hostPatterns.some((pattern) => pattern.test(hostname))) || null;
+  } catch {
+    return null;
+  }
+}
+
+function pickTextContent(...candidates: Array<string | null | undefined>): string | null {
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const cleaned = candidate.replace(/\s+/g, ' ').trim();
+    if (cleaned) return cleaned;
+  }
+  return null;
+}
+
+function inferBlockchainFromText(text: string): string | null {
+  const lowered = text.toLowerCase();
+  const matched = BLOCKCHAIN_KEYWORDS.find((item) => lowered.includes(item.keyword));
+  return matched ? matched.value : null;
+}
+
+function inferCategoryFromText(text: string): string | null {
+  const lowered = text.toLowerCase();
+  const matched = CATEGORY_KEYWORDS.find((item) => lowered.includes(item.keyword));
+  return matched ? matched.value : null;
+}
+
+function extractDateFromText(text: string): string | null {
+  const isoLike = text.match(/\b\d{4}-\d{2}-\d{2}\b/);
+  if (isoLike) return isoLike[0];
+
+  const natural = text.match(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:,\s*\d{4})?\b/i);
+  if (natural) return natural[0];
+
+  return null;
+}
+
+function extractOfficialUrlsFromCard(card: Element, sourceUrl: string): {
+  docsUrl: string | null;
+  githubUrl: string | null;
+  xUrl: string | null;
+  discordUrl: string | null;
+} {
+  let docsUrl: string | null = null;
+  let githubUrl: string | null = null;
+  let xUrl: string | null = null;
+  let discordUrl: string | null = null;
+
+  const anchors = Array.from(card.querySelectorAll('a[href]'));
+  for (const anchor of anchors) {
+    const href = anchor.getAttribute('href');
+    if (!href) continue;
+    let resolved: URL;
+    try {
+      resolved = new URL(href, sourceUrl);
+    } catch {
+      continue;
+    }
+
+    const host = resolved.hostname.replace(/^www\./, '').toLowerCase();
+    const value = resolved.toString();
+    if (!githubUrl && host.includes('github.com')) githubUrl = value;
+    if (!xUrl && (host === 'x.com' || host.endsWith('.x.com') || host.includes('twitter.com'))) xUrl = value;
+    if (!discordUrl && (host.includes('discord.gg') || host.includes('discord.com'))) discordUrl = value;
+    if (!docsUrl && (host.includes('docs.') || resolved.pathname.toLowerCase().includes('/docs'))) docsUrl = value;
+  }
+
+  return { docsUrl, githubUrl, xUrl, discordUrl };
+}
+
+function inferFundingFromText(text: string): string | null {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  const fundingMatch = normalized.match(/\b(raised|funded|seed|series\s+[a-z]|backed\s+by)\b[^.\n]{0,120}/i);
+  return fundingMatch ? fundingMatch[0] : null;
+}
+
+function inferTeamFromText(text: string): string | null {
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  const teamMatch = normalized.match(/\b(founder|founded\s+by|team|co-?founder)\b[^.\n]{0,120}/i);
+  return teamMatch ? teamMatch[0] : null;
+}
+
+type AdapterParserRule = {
+  cardSelectors: string[];
+  titleSelectors: string[];
+  descriptionSelectors: string[];
+  dateSelectors: string[];
+  linkSelectors: string[];
+};
+
+const ADAPTER_PARSER_RULES: Record<string, AdapterParserRule> = {
+  galxe: {
+    cardSelectors: ['[data-testid*="campaign" i]', '[data-testid*="quest" i]', 'article', 'li'],
+    titleSelectors: ['h1', 'h2', 'h3', '[data-testid*="title" i]', '[class*="title" i]'],
+    descriptionSelectors: ['p', '[data-testid*="description" i]', '[class*="desc" i]'],
+    dateSelectors: ['time', '[data-testid*="date" i]', '[class*="date" i]'],
+    linkSelectors: ['a[href*="/quest/"]', 'a[href*="/campaign/"]', 'a[href*="/events/"]'],
+  },
+  layer3: {
+    cardSelectors: ['[data-testid*="quest" i]', '[class*="quest" i]', 'article', 'li'],
+    titleSelectors: ['h1', 'h2', 'h3', '[class*="title" i]', '[class*="name" i]'],
+    descriptionSelectors: ['p', '[class*="description" i]', '[class*="summary" i]'],
+    dateSelectors: ['time', '[class*="date" i]'],
+    linkSelectors: ['a[href*="/quests/"]', 'a[href*="/campaigns/"]', 'a[href*="/bounties/"]'],
+  },
+  zealy: {
+    cardSelectors: ['[data-testid*="quest" i]', '[class*="quest" i]', 'article', 'li'],
+    titleSelectors: ['h1', 'h2', 'h3', '[class*="title" i]', '[class*="name" i]'],
+    descriptionSelectors: ['p', '[class*="description" i]', '[class*="summary" i]'],
+    dateSelectors: ['time', '[class*="date" i]'],
+    linkSelectors: ['a[href*="/questboard/"]', 'a[href*="/c/"]'],
+  },
+  airdropalert: {
+    cardSelectors: ['[class*="airdrop" i]', '[class*="post" i]', 'article', 'li'],
+    titleSelectors: ['h1', 'h2', 'h3', '[class*="title" i]', '[rel="bookmark"]'],
+    descriptionSelectors: ['p', '[class*="excerpt" i]', '[class*="summary" i]'],
+    dateSelectors: ['time', '[class*="date" i]'],
+    linkSelectors: ['a[href*="/airdrops/"]', 'a[href*="/airdrop/"]'],
+  },
+  'airdrop-io': {
+    cardSelectors: ['[class*="airdrop" i]', 'article', 'li'],
+    titleSelectors: ['h1', 'h2', 'h3', '[class*="title" i]', '[class*="name" i]'],
+    descriptionSelectors: ['p', '[class*="description" i]', '[class*="summary" i]'],
+    dateSelectors: ['time', '[class*="date" i]'],
+    linkSelectors: ['a[href*="/airdrop/"]', 'a[href*="/project/"]'],
+  },
+  'coinmarketcap-airdrops': {
+    cardSelectors: ['[data-testid*="airdrop" i]', '[class*="airdrop" i]', 'article', 'li', 'tr'],
+    titleSelectors: ['h1', 'h2', 'h3', '[class*="title" i]', '[data-testid*="name" i]'],
+    descriptionSelectors: ['p', '[class*="description" i]', '[class*="summary" i]'],
+    dateSelectors: ['time', '[class*="date" i]'],
+    linkSelectors: ['a[href*="/airdrop/"]'],
+  },
+};
+
+const DEFAULT_ADAPTER_PARSER_RULE: AdapterParserRule = {
+  cardSelectors: ['article', 'li', 'div', 'section'],
+  titleSelectors: ['h1', 'h2', 'h3', 'h4', '[class*="title" i]', '[data-testid*="title" i]'],
+  descriptionSelectors: ['p', '[class*="desc" i]', '[class*="summary" i]'],
+  dateSelectors: ['time', '[class*="date" i]', '[data-testid*="date" i]'],
+  linkSelectors: ['a[href]'],
+};
+
+const NAVIGATION_PATH_SEGMENTS = new Set([
+  'airdrop',
+  'airdrops',
+  'campaign',
+  'campaigns',
+  'quest',
+  'quests',
+  'explore',
+  'discover',
+  'leaderboard',
+  'community',
+  'communities',
+  'categories',
+  'category',
+  'tags',
+  'tag',
+  'search',
+  'news',
+  'blog',
+]);
+
+const GENERIC_CARD_TEXT_TOKENS = new Set([
+  'view details',
+  'learn more',
+  'join now',
+  'explore',
+  'see more',
+  'airdrops',
+  'campaigns',
+  'quests',
+]);
+
+function getAdapterParserRule(adapter: SourceAdapter): AdapterParserRule {
+  return ADAPTER_PARSER_RULES[adapter.id] || DEFAULT_ADAPTER_PARSER_RULE;
+}
+
+function isNavigationListingUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    const parts = parsed.pathname
+      .split('/')
+      .map((part) => part.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (parts.length === 0) return true;
+
+    const last = parts[parts.length - 1];
+    if (NAVIGATION_PATH_SEGMENTS.has(last)) return true;
+    if (parts.length <= 2 && parts.every((part) => NAVIGATION_PATH_SEGMENTS.has(part))) return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+function hasMeaningfulProjectSignal(text: string): boolean {
+  const cleaned = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!cleaned || cleaned.length < 20) return false;
+  return !Array.from(GENERIC_CARD_TEXT_TOKENS).every((token) => cleaned.includes(token));
+}
+
+function collectAdapterCards(doc: Document, adapter: SourceAdapter): Element[] {
+  const rule = getAdapterParserRule(adapter);
+  const cards = new Set<Element>();
+
+  for (const selector of rule.cardSelectors) {
+    const nodes = doc.querySelectorAll(selector);
+    nodes.forEach((node) => {
+      const card = node.closest('article, li, div, section, tr') || node;
+      cards.add(card);
+    });
+  }
+
+  return Array.from(cards);
+}
+
+function pickCardNodeText(card: Element, selectors: string[]): string | null {
+  for (const selector of selectors) {
+    const node = card.querySelector(selector);
+    const text = pickTextContent(node?.textContent);
+    if (text) return text;
+  }
+  return null;
+}
+
+function isProjectListingUrl(rawUrl: string, adapter: SourceAdapter): boolean {
+  if (isGenericSourceUrl(rawUrl)) return false;
+  if (isNavigationListingUrl(rawUrl)) return false;
+  return adapter.listingPathPatterns.some((pattern) => pattern.test(rawUrl));
+}
+
+function extractDiscoveryCandidatesFromHtml(
+  html: string,
+  source: CompetitorSource,
+  adapter: SourceAdapter
+): DiscoveryExtractionResult {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const cards = collectAdapterCards(doc, adapter);
+  const fallbackAnchors = cards.length === 0 ? Array.from(doc.querySelectorAll('a[href]')) : [];
+  const parserRule = getAdapterParserRule(adapter);
+  const dedupe = new Set<string>();
+  const found: DiscoveryCandidate[] = [];
+  let rejectedCount = 0;
+  const rejectedByReason: Record<string, number> = {};
+  const rejectionSamples: string[] = [];
+
+  const reject = (reason: string, sample?: string | null) => {
+    rejectedCount += 1;
+    rejectedByReason[reason] = (rejectedByReason[reason] || 0) + 1;
+    if (sample && rejectionSamples.length < 8) {
+      rejectionSamples.push(`${reason}: ${sample.slice(0, 120)}`);
+    }
+  };
+
+  const sourceHostname = (() => {
+    try {
+      return new URL(source.source_url).hostname.replace(/^www\./, '');
+    } catch {
+      return '';
+    }
+  })();
+
+  const processingUnits = cards.length > 0
+    ? cards
+    : fallbackAnchors.map((anchor) => anchor.closest('article, li, div, section, tr') || anchor);
+
+  for (const card of processingUnits) {
+    const candidateLinks = new Set<string>();
+    const scopedLinkNodes = new Set<Element>();
+
+    for (const selector of parserRule.linkSelectors) {
+      card.querySelectorAll(selector).forEach((node) => scopedLinkNodes.add(node));
+    }
+    card.querySelectorAll('a[href]').forEach((node) => scopedLinkNodes.add(node));
+
+    for (const node of Array.from(scopedLinkNodes)) {
+      const href = node.getAttribute('href');
+      if (!href) continue;
+      try {
+        const resolved = new URL(href, source.source_url).toString();
+        if (!isProjectListingUrl(resolved, adapter)) continue;
+        candidateLinks.add(resolved);
+      } catch {
+        continue;
+      }
+    }
+
+    const listingUrl = Array.from(candidateLinks)[0] || source.source_url;
+    const hasListingLink = candidateLinks.size > 0;
+
+    const rawName = pickTextContent(
+      pickCardNodeText(card, parserRule.titleSelectors),
+      card.getAttribute('data-project-name'),
+      card.getAttribute('aria-label'),
+      card.getAttribute('title')
+    );
+    const projectName = sanitizeProjectCandidate(rawName);
+
+    if (!projectName) {
+      reject('no_project_like_title', rawName);
+      continue;
+    }
+
+    if (isGenericOpportunityName(projectName)) {
+      reject('generic_project_name', projectName);
+      continue;
+    }
+
+    const shortDescription = pickCardNodeText(card, parserRule.descriptionSelectors);
+    const explicitDate = pickCardNodeText(card, parserRule.dateSelectors);
+    const listingDate = explicitDate ? extractDateFromText(explicitDate) : extractDateFromText(card.textContent || '');
+    const fullCardText = card.textContent || '';
+    const officialUrls = extractOfficialUrlsFromCard(card, source.source_url);
+    const fundingInfo = inferFundingFromText(fullCardText);
+    const teamInfo = inferTeamFromText(fullCardText);
+
+    if (!shortDescription && !listingDate && !hasMeaningfulProjectSignal(fullCardText)) {
+      continue;
+    }
+
+    const projectUrl = (() => {
+      const externalAnchors = Array.from(card.querySelectorAll('a[href^="http"]'));
+      for (const externalAnchor of externalAnchors) {
+        const value = externalAnchor.getAttribute('href');
+        if (!value) continue;
+        if (isGenericSourceUrl(value)) continue;
+        try {
+          const externalUrl = new URL(value, source.source_url);
+          if (externalUrl.hostname.replace(/^www\./, '') === sourceHostname) {
+            continue;
+          }
+          return externalUrl.toString();
+        } catch {
+          continue;
+        }
+      }
+      return null;
+    })();
+
+    const combinedText = [projectName, shortDescription, fullCardText].join(' ');
+    const blockchain = inferBlockchainFromText(combinedText);
+    const category = inferCategoryFromText(combinedText);
+    const hasDescription = Boolean(shortDescription && shortDescription.trim());
+    const hasEcosystemSignal = Boolean(blockchain || category);
+
+    if (!(hasListingLink || hasDescription || hasEcosystemSignal)) {
+      reject('missing_supporting_signal', projectName);
+      continue;
+    }
+
+    const confidence: 'low' | 'medium' | 'high' = projectUrl && shortDescription
+      ? 'high'
+      : shortDescription || listingDate
+      ? 'medium'
+      : 'low';
+
+    const dedupeKey = `${normalizeProjectName(projectName)}::${listingUrl}`;
+    if (dedupe.has(dedupeKey)) {
+      reject('duplicate_candidate', projectName);
+      continue;
+    }
+    dedupe.add(dedupeKey);
+
+    found.push({
+      projectName,
+      projectUrl,
+      listingUrl,
+      blockchain,
+      category,
+      shortDescription,
+      listingDate,
+      confidence,
+      sourceLabel: adapter.label,
+      officialDocsUrl: officialUrls.docsUrl,
+      githubUrl: officialUrls.githubUrl,
+      officialXUrl: officialUrls.xUrl,
+      officialDiscordUrl: officialUrls.discordUrl,
+      fundingInfo,
+      teamInfo,
+    });
+  }
+
+  return {
+    candidates: found,
+    cardsFound: processingUnits.length,
+    candidatesRejected: rejectedCount,
+    rejectedByReason,
+    rejectionSamples,
+  };
+}
+
+const COMPETITOR_STATUS_META: Record<CompetitorOpportunityStatus, { label: string; tone: string }> = {
+  new: {
+    label: 'Queued',
+    tone: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200',
+  },
+  queued: {
+    label: 'In Review',
+    tone: 'border-sky-500/30 bg-sky-500/10 text-sky-200',
+  },
+  ignored: {
+    label: 'Ignored',
+    tone: 'border-white/20 bg-white/[0.04] text-gray-300',
+  },
+  duplicate: {
+    label: 'Duplicate',
+    tone: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+  },
+  drafted: {
+    label: 'Draft Created',
+    tone: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+  },
+};
+
+const COMPETITOR_SOURCE_SCAN_META: Record<CompetitorSourceScanStatus, { label: string; tone: string }> = {
+  never_scanned: {
+    label: 'Never scanned',
+    tone: 'border-white/20 bg-white/[0.03] text-gray-300',
+  },
+  source_only: {
+    label: 'Source-only detection',
+    tone: 'border-violet-500/30 bg-violet-500/10 text-violet-200',
+  },
+  none_found: {
+    label: 'Source scanned - no project opportunities found',
+    tone: 'border-sky-500/30 bg-sky-500/10 text-sky-200',
+  },
+  found: {
+    label: 'Project opportunities found',
+    tone: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+  },
+  failed: {
+    label: 'Scan failed',
+    tone: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
+  },
+};
+
+const DISCOVERY_COMPARISON_META: Record<DiscoveryComparisonType, { label: string; tone: string }> = {
+  exact_match: {
+    label: 'Exact match',
+    tone: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+  },
+  similar_project: {
+    label: 'Similar project',
+    tone: 'border-sky-500/30 bg-sky-500/10 text-sky-200',
+  },
+  new_project: {
+    label: 'New project',
+    tone: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+  },
+};
+
+const DISCOVERY_PRIORITY_META: Record<DiscoveryPriority, { label: string; tone: string }> = {
+  high: {
+    label: '🔥 High Priority',
+    tone: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
+  },
+  medium: {
+    label: '⭐ Medium Priority',
+    tone: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+  },
+  low: {
+    label: '📦 Low Priority',
+    tone: 'border-white/20 bg-white/[0.04] text-gray-300',
+  },
+};
+
+const SOURCE_HEALTH_META: Record<'green' | 'amber' | 'red', { label: string; tone: string }> = {
+  green: {
+    label: 'Green',
+    tone: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+  },
+  amber: {
+    label: 'Amber',
+    tone: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+  },
+  red: {
+    label: 'Red',
+    tone: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
+  },
+};
+
+function getCompetitorConfidenceLabel(opportunity: CompetitorOpportunity): string {
+  if (opportunity.confidence_level === 'low') {
+    return 'Low confidence - needs manual review';
+  }
+  if (opportunity.confidence_level === 'medium') {
+    return 'Medium confidence - verify before drafting';
+  }
+  return 'High confidence - still requires human review';
+}
+
+function getOpportunityDiscoveryDetails(opportunity: CompetitorOpportunity): {
+  sourceLabel: string;
+  projectUrl: string | null;
+  listingUrl: string;
+  shortDescription: string | null;
+  listingDate: string | null;
+  compare: string;
+  comparisonType: DiscoveryComparisonType;
+  confidenceScore: number;
+  whyNew: string;
+  matchedProject: string | null;
+  adapterId: string | null;
+  sourceReliability: number;
+  officialDocsUrl: string | null;
+  githubUrl: string | null;
+  officialXUrl: string | null;
+  officialDiscordUrl: string | null;
+  fundingInfo: string | null;
+  teamInfo: string | null;
+  firstDiscoveredAt: string | null;
+  sourceMentions: number;
+  discoveryScore: number;
+  discoveryPriority: DiscoveryPriority;
+} {
+  const fallback = {
+    sourceLabel: 'Unknown source',
+    projectUrl: null,
+    listingUrl: opportunity.source_url,
+    shortDescription: null,
+    listingDate: null,
+    compare: 'No existing AirdropGuard listing match found',
+    comparisonType: 'new_project' as DiscoveryComparisonType,
+    confidenceScore: 60,
+    whyNew: 'No prior AirdropGuard listing match found.',
+    matchedProject: null,
+    adapterId: null,
+    sourceReliability: 70,
+    officialDocsUrl: null,
+    githubUrl: null,
+    officialXUrl: null,
+    officialDiscordUrl: null,
+    fundingInfo: null,
+    teamInfo: null,
+    firstDiscoveredAt: opportunity.discovered_at,
+    sourceMentions: 1,
+    discoveryScore: 55,
+    discoveryPriority: 'medium' as DiscoveryPriority,
+  };
+
+  if (!opportunity.notes) return fallback;
+
+  try {
+    const parsed = JSON.parse(opportunity.notes) as Record<string, unknown>;
+    return {
+      sourceLabel: typeof parsed.source === 'string' && parsed.source.trim() ? parsed.source : fallback.sourceLabel,
+      projectUrl: typeof parsed.project_url === 'string' && parsed.project_url.trim() ? parsed.project_url : null,
+      listingUrl: typeof parsed.listing_url === 'string' && parsed.listing_url.trim() ? parsed.listing_url : fallback.listingUrl,
+      shortDescription: typeof parsed.short_description === 'string' && parsed.short_description.trim() ? parsed.short_description : null,
+      listingDate: typeof parsed.listing_date === 'string' && parsed.listing_date.trim() ? parsed.listing_date : null,
+      compare: typeof parsed.compare === 'string' && parsed.compare.trim() ? parsed.compare : fallback.compare,
+      comparisonType: parsed.comparison_type === 'exact_match' || parsed.comparison_type === 'similar_project' || parsed.comparison_type === 'new_project'
+        ? parsed.comparison_type
+        : fallback.comparisonType,
+      confidenceScore: typeof parsed.confidence_score === 'number' ? parsed.confidence_score : fallback.confidenceScore,
+      whyNew: typeof parsed.why_new === 'string' && parsed.why_new.trim() ? parsed.why_new : fallback.whyNew,
+      matchedProject: typeof parsed.matched_project === 'string' && parsed.matched_project.trim() ? parsed.matched_project : null,
+      adapterId: typeof parsed.adapter_id === 'string' && parsed.adapter_id.trim() ? parsed.adapter_id : null,
+      sourceReliability: typeof parsed.source_reliability === 'number' ? parsed.source_reliability : fallback.sourceReliability,
+      officialDocsUrl: typeof parsed.official_docs_url === 'string' && parsed.official_docs_url.trim() ? parsed.official_docs_url : null,
+      githubUrl: typeof parsed.github_url === 'string' && parsed.github_url.trim() ? parsed.github_url : null,
+      officialXUrl: typeof parsed.official_x_url === 'string' && parsed.official_x_url.trim() ? parsed.official_x_url : null,
+      officialDiscordUrl: typeof parsed.official_discord_url === 'string' && parsed.official_discord_url.trim() ? parsed.official_discord_url : null,
+      fundingInfo: typeof parsed.funding_info === 'string' && parsed.funding_info.trim() ? parsed.funding_info : null,
+      teamInfo: typeof parsed.team_info === 'string' && parsed.team_info.trim() ? parsed.team_info : null,
+      firstDiscoveredAt: typeof parsed.first_discovered_at === 'string' && parsed.first_discovered_at.trim() ? parsed.first_discovered_at : fallback.firstDiscoveredAt,
+      sourceMentions: typeof parsed.source_mentions === 'number' ? parsed.source_mentions : fallback.sourceMentions,
+      discoveryScore: typeof parsed.discovery_score === 'number' ? parsed.discovery_score : fallback.discoveryScore,
+      discoveryPriority: parsed.discovery_priority === 'high' || parsed.discovery_priority === 'medium' || parsed.discovery_priority === 'low'
+        ? parsed.discovery_priority
+        : fallback.discoveryPriority,
+    };
+  } catch {
+    return fallback;
+  }
+}
 
 function inferAuditTarget(log: AdminAuditLog): { targetType: AuditTargetType; targetNameOrId: string } {
   const ctx = (log.context && typeof log.context === 'object' ? log.context : {}) as Record<string, unknown>;
@@ -1080,6 +2149,72 @@ export default function AdminPage() {
     }
   }, [formatSupabaseError]);
 
+  const getSupabaseErrorCode = useCallback((error: unknown) => {
+    const err = error as { code?: string };
+    return err?.code ?? null;
+  }, []);
+
+  const describeFunctionInvokeError = useCallback((error: unknown) => {
+    const err = error as {
+      name?: string;
+      message?: string;
+      status?: number;
+      context?: unknown;
+      details?: unknown;
+      error?: unknown;
+    };
+
+    const parts: string[] = [];
+    if (err?.name) parts.push(`name=${err.name}`);
+    if (typeof err?.status === 'number') parts.push(`status=${err.status}`);
+    if (err?.message) parts.push(`message=${err.message}`);
+
+    const contextValue = err?.context ?? err?.details ?? err?.error;
+    if (contextValue !== undefined) {
+      try {
+        const serialized = typeof contextValue === 'string' ? contextValue : JSON.stringify(contextValue);
+        if (serialized && serialized !== '{}') parts.push(`body=${serialized}`);
+      } catch {
+        // ignore serialization errors
+      }
+    }
+
+    if (parts.length > 0) return parts.join(' | ');
+    return describeError(error);
+  }, [describeError]);
+
+  const describeFunctionInvokeErrorDetailed = useCallback(async (error: unknown) => {
+    const base = describeFunctionInvokeError(error);
+    const err = error as { context?: unknown };
+    const maybeResponse = err?.context as { status?: number; text?: () => Promise<string> } | undefined;
+
+    if (!maybeResponse || typeof maybeResponse.text !== 'function') {
+      return base;
+    }
+
+    try {
+      const bodyText = await maybeResponse.text();
+      const statusText = typeof maybeResponse.status === 'number' ? `status=${maybeResponse.status}` : null;
+      const cleanedBody = bodyText?.trim();
+      if (!cleanedBody) {
+        return statusText ? `${base} | ${statusText}` : base;
+      }
+
+      return [base, statusText, `body=${cleanedBody}`].filter(Boolean).join(' | ');
+    } catch {
+      return base;
+    }
+  }, [describeFunctionInvokeError]);
+
+  const setCompetitorUiError = useCallback((message: string, error?: unknown) => {
+    const details = error ? describeError(error) : null;
+    setCompetitorError(message);
+    setCompetitorErrorDetails(details);
+    if (details) {
+      console.warn('[Admin][CompetitorWatch]', { message, details });
+    }
+  }, [describeError]);
+
   const dismissVerificationModal = useCallback((result: string | null) => {
     verificationNotesResolverRef.current?.(result);
     verificationNotesResolverRef.current = null;
@@ -1247,6 +2382,7 @@ export default function AdminPage() {
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [bannerForm, setBannerForm] = useState<BannerFormData>(BLANK_BANNER_FORM);
   const [previewBannerId, setPreviewBannerId] = useState<string | null>(null);
+  const [adminView, setAdminView] = useState<AdminView>('overview');
   const [contentView, setContentView] = useState<ContentView>('airdrops');
   const [controlArticles, setControlArticles] = useState<ControlArticle[]>([
     {
@@ -1277,6 +2413,28 @@ export default function AdminPage() {
   const [opsUsers, setOpsUsers] = useState<OpsUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userSearch, setUserSearch] = useState('');
+
+  const [aiDrafts, setAIDrafts] = useState<AIArticleDraft[]>([]);
+  const [aiDraftsLoading, setAIDraftsLoading] = useState(false);
+  const [aiDraftsError, setAIDraftsError] = useState<string | null>(null);
+  const [generatingDraft, setGeneratingDraft] = useState(false);
+
+  const [competitorSources, setCompetitorSources] = useState<CompetitorSource[]>([]);
+  const [competitorOpportunities, setCompetitorOpportunities] = useState<CompetitorOpportunity[]>([]);
+  const [competitorLoading, setCompetitorLoading] = useState(false);
+  const [competitorError, setCompetitorError] = useState<string | null>(null);
+  const [competitorErrorDetails, setCompetitorErrorDetails] = useState<string | null>(null);
+  const [competitorNotConfigured, setCompetitorNotConfigured] = useState(false);
+  const [competitorSourceScanResults, setCompetitorSourceScanResults] = useState<Record<string, CompetitorSourceScanResult>>({});
+  const [competitorScanDebugResults, setCompetitorScanDebugResults] = useState<Record<string, CompetitorScanDebugResult>>({});
+  const [previewScanModeEnabled, setPreviewScanModeEnabled] = useState(true);
+  const [pendingDiscoveryCandidates, setPendingDiscoveryCandidates] = useState<PendingDiscoveryCandidate[]>([]);
+  const [checkingCompetitors, setCheckingCompetitors] = useState(false);
+  const [newSourceName, setNewSourceName] = useState('');
+  const [newSourceUrl, setNewSourceUrl] = useState('');
+
+  const [adminNotifications, setAdminNotifications] = useState<AdminNotification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [lastEnrichmentStats, setLastEnrichmentStats] = useState<{
     websites_analyzed: number; docs_found: number; funding_found: number;
     github_found: number; token_detected: number; investors_found: number;
@@ -1476,6 +2634,32 @@ export default function AdminPage() {
     [pendingBannerEnquiries, featuredListingEnquiries]
   );
 
+  const unreadNotificationsCount = useMemo(
+    () => adminNotifications.filter((item) => !item.is_read).length,
+    [adminNotifications]
+  );
+
+  const adminNavItems: Array<{ id: AdminView; label: string; blurb: string }> = useMemo(() => [
+    { id: 'overview', label: 'Overview', blurb: 'Command centre summary and alerts' },
+    { id: 'airdrops', label: 'Airdrops', blurb: 'Listings, publish, health, queue' },
+    { id: 'submissions', label: 'Submissions', blurb: 'Project and scam report triage' },
+    { id: 'content', label: 'Articles / Content', blurb: 'Editorial and homepage control' },
+    { id: 'ai-drafts', label: 'AI Article Drafts', blurb: 'Weekly AI drafts for review' },
+    { id: 'competitor-watch', label: 'Competitor Watch', blurb: 'Missing-opportunity monitoring' },
+    { id: 'users', label: 'Users', blurb: 'Users and adoption overview' },
+    { id: 'api', label: 'API', blurb: 'Subscriptions, keys and revenue' },
+    { id: 'banners', label: 'Banners', blurb: 'Ad campaigns and placements' },
+    { id: 'audit-logs', label: 'Audit Logs', blurb: 'Human decision trail' },
+    { id: 'system-tools', label: 'System Tools', blurb: 'AI queue and system maintenance' },
+  ], []);
+
+  const activeAdminNavItem = useMemo(
+    () => adminNavItems.find((item) => item.id === adminView) ?? adminNavItems[0],
+    [adminNavItems, adminView]
+  );
+
+  const canShowSection = useCallback((section: AdminView) => adminView === section, [adminView]);
+
   const jumpToSection = (id: string) => {
     const section = document.getElementById(id);
     section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1530,6 +2714,183 @@ export default function AdminPage() {
       setUsersLoading(false);
     }
   }, [submissions]);
+
+  const createAdminNotification = useCallback(async (
+    notification: Omit<AdminNotification, 'id' | 'is_read' | 'created_at'>
+  ) => {
+    const { data, error } = await supabase
+      .from('admin_notifications')
+      .insert({
+        notification_type: notification.notification_type,
+        title: notification.title,
+        message: notification.message,
+        severity: notification.severity,
+        context: notification.context ?? {},
+      })
+      .select('id, notification_type, title, message, severity, is_read, context, created_at')
+      .single();
+
+    if (error) {
+      console.warn('[Admin][Notifications] Failed to create notification', {
+        error: describeError(error),
+        notification,
+      });
+      return;
+    }
+
+    if (data) {
+      setAdminNotifications((prev) => [data as AdminNotification, ...prev]);
+    }
+  }, [describeError]);
+
+  const fetchAdminNotifications = useCallback(async () => {
+    setNotificationsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('admin_notifications')
+        .select('id, notification_type, title, message, severity, is_read, context, created_at')
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (error) throw error;
+      setAdminNotifications((data ?? []) as AdminNotification[]);
+    } catch (error) {
+      console.warn('[Admin][Notifications] Unable to load notifications', describeError(error));
+      setAdminNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, [describeError]);
+
+  const fetchAIDrafts = useCallback(async () => {
+    setAIDraftsLoading(true);
+    setAIDraftsError(null);
+    try {
+      const { data, error } = await supabase
+        .from('ai_article_drafts')
+        .select('id, week_start, title, slug, summary, body, meta_title, meta_description, estimated_read_minutes, status, created_at, updated_at, published_at')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAIDrafts((data ?? []) as AIArticleDraft[]);
+    } catch (error) {
+      const exact = describeError(error);
+      setAIDrafts([]);
+      setAIDraftsError(exact);
+      console.error('[Admin][AIDrafts] Fetch failed', exact);
+    } finally {
+      setAIDraftsLoading(false);
+    }
+  }, [describeError]);
+
+  const fetchCompetitorWatchData = useCallback(async () => {
+    setCompetitorLoading(true);
+    setCompetitorError(null);
+    setCompetitorErrorDetails(null);
+    setCompetitorNotConfigured(false);
+    try {
+      const [sourceRes, oppRes] = await Promise.all([
+        supabase
+          .from('competitor_sources')
+          .select('id, source_name, source_url, is_active, last_checked_at, created_at')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('competitor_opportunities')
+          .select('id, source_id, project_name, source_url, discovered_at, category, blockchain, confidence_level, why_matched, similarity_score, status, notes, created_at')
+          .order('discovered_at', { ascending: false })
+          .limit(200),
+      ]);
+
+      if (sourceRes.error) throw sourceRes.error;
+      if (oppRes.error) throw oppRes.error;
+
+      const sources = (sourceRes.data ?? []) as CompetitorSource[];
+      const opportunities = (oppRes.data ?? []) as CompetitorOpportunity[];
+
+      setCompetitorSources(sources);
+      setCompetitorOpportunities(opportunities);
+
+      const derivedScanResults: Record<string, CompetitorSourceScanResult> = {};
+      sources.forEach((source) => {
+        const sourceItems = opportunities.filter((item) => item.source_id === source.id);
+        const sourceOppCount = sourceItems.length;
+        const duplicateCount = sourceItems.filter((item) => item.status === 'duplicate').length;
+        const newCount = sourceItems.filter((item) => item.status !== 'duplicate' && item.status !== 'ignored').length;
+        if (!source.last_checked_at) {
+          derivedScanResults[source.id] = {
+            status: 'never_scanned',
+            lastCheckedAt: null,
+            totalScans: 0,
+            successfulScans: 0,
+            opportunitiesFound: 0,
+            newProjects: 0,
+            duplicateProjects: 0,
+            failedExtractions: 0,
+            durationMs: null,
+            lastSuccessfulScan: null,
+            successRate: 0,
+            health: 'red',
+            note: 'No scan recorded yet.',
+          };
+          return;
+        }
+
+        if (sourceOppCount > 0) {
+          derivedScanResults[source.id] = {
+            status: 'found',
+            lastCheckedAt: source.last_checked_at,
+            totalScans: 1,
+            successfulScans: 1,
+            opportunitiesFound: sourceOppCount,
+            newProjects: newCount,
+            duplicateProjects: duplicateCount,
+            failedExtractions: 0,
+            durationMs: null,
+            lastSuccessfulScan: source.last_checked_at,
+            successRate: 1,
+            health: 'green',
+            note: 'Project opportunities found in recent scans.',
+          };
+          return;
+        }
+
+        derivedScanResults[source.id] = {
+          status: 'none_found',
+          lastCheckedAt: source.last_checked_at,
+          totalScans: 1,
+          successfulScans: 1,
+          opportunitiesFound: 0,
+          newProjects: 0,
+          duplicateProjects: 0,
+          failedExtractions: 0,
+          durationMs: null,
+          lastSuccessfulScan: source.last_checked_at,
+          successRate: 1,
+          health: 'amber',
+          note: 'Only source-level signals detected in recent scans.',
+        };
+      });
+
+      setCompetitorSourceScanResults(derivedScanResults);
+    } catch (error) {
+      const code = getSupabaseErrorCode(error);
+
+      if (code === 'PGRST205') {
+        setCompetitorNotConfigured(true);
+        setCompetitorUiError('Competitor Watch is not configured yet. Please apply the Competitor Watch migration and refresh schema cache.', error);
+      } else if (code === '42501') {
+        setCompetitorUiError('Your admin account does not currently have permission to access Competitor Watch.', error);
+      } else {
+        setCompetitorUiError('Unable to load Competitor Watch right now. Please try again.', error);
+      }
+
+      setCompetitorSources([]);
+      setCompetitorOpportunities([]);
+      setCompetitorSourceScanResults({});
+    } finally {
+      setCompetitorLoading(false);
+    }
+  }, [getSupabaseErrorCode, setCompetitorUiError]);
 
   const fetchArticleTrustData = useCallback(async () => {
     setArticleTrustLoading(true);
@@ -1647,6 +3008,1073 @@ export default function AdminPage() {
       };
     });
   }, [selectedControlArticle]);
+
+  const getWeekStartISO = useCallback((value = new Date()) => {
+    const d = new Date(value);
+    const day = d.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d.toISOString().split('T')[0];
+  }, []);
+
+  const generateWeeklyDraft = useCallback(async () => {
+    setGeneratingDraft(true);
+
+    try {
+      const weekStart = getWeekStartISO();
+      const { data: existing, error: existingError } = await supabase
+        .from('ai_article_drafts')
+        .select('id,title')
+        .eq('week_start', weekStart)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+      if (existing) {
+        showToast(`Weekly draft already exists: ${existing.title}`, 'error');
+        setAdminView('ai-drafts');
+        return;
+      }
+
+      const topics = [
+        'Airdrop Safety Playbook',
+        'Scam Prevention Checklist',
+        'Wallet Safety Operations',
+        'Malicious Token Red Flags',
+        'Qualifying Safely for Airdrops',
+        'Weekly Airdrop Trend Intelligence',
+      ];
+      const dayNumber = Math.floor(new Date().getTime() / 86_400_000);
+      const topic = topics[dayNumber % topics.length];
+      const title = `${topic} - Week of ${weekStart}`;
+      const slug = `weekly-${weekStart}-${topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+      const summary = 'AI-assisted weekly editorial draft focused on safe airdrop participation and trust-first risk control.';
+      const body = [
+        `# ${title}`,
+        '',
+        '## Key Risks This Week',
+        '- Identify suspicious claim URLs before wallet interactions.',
+        '- Validate contract addresses from official sources only.',
+        '- Use burner wallets for unverified experiments.',
+        '',
+        '## Human Review Checklist',
+        '1. Validate sources and links.',
+        '2. Confirm security guidance is accurate.',
+        '3. Mark as Human Reviewed before publication.',
+      ].join('\n');
+
+      const payload = {
+        week_start: weekStart,
+        title,
+        slug,
+        summary,
+        body,
+        meta_title: `${title} | AirdropGuard`,
+        meta_description: summary,
+        estimated_read_minutes: 8,
+        status: 'ai_assisted_draft' as AIDraftStatus,
+      };
+
+      const { data, error } = await supabase
+        .from('ai_article_drafts')
+        .insert(payload)
+        .select('id, week_start, title, slug, summary, body, meta_title, meta_description, estimated_read_minutes, status, created_at, updated_at, published_at')
+        .single();
+
+      if (error) throw error;
+
+      if (data) setAIDrafts((prev) => [data as AIArticleDraft, ...prev]);
+      await createAdminNotification({
+        notification_type: 'ai_draft_ready',
+        title: 'New AI article draft ready',
+        message: `${title} was generated and is awaiting human review.`,
+        severity: 'success',
+        context: { draftSlug: slug },
+      });
+
+      await logAdminAudit({
+        actionTaken: 'Generate AI article draft',
+        aiRecommendation: 'Weekly safety-focused draft generation',
+        finalDecision: 'Draft generated for review',
+        context: { weekStart, slug, title },
+      }, { source: 'ai_article_drafts_generate' });
+
+      showToast('Weekly AI draft generated');
+      setAdminView('ai-drafts');
+    } catch (error) {
+      const exact = describeError(error);
+      console.error('[Admin][AIDrafts] Generate weekly draft failed', exact);
+      showToast(`Unable to generate weekly draft: ${exact}`, 'error');
+      await createAdminNotification({
+        notification_type: 'admin_error',
+        title: 'Weekly draft generation failed',
+        message: exact,
+        severity: 'error',
+        context: { area: 'ai_article_drafts' },
+      });
+    } finally {
+      setGeneratingDraft(false);
+    }
+  }, [getWeekStartISO, showToast, describeError, createAdminNotification, logAdminAudit]);
+
+  const updateDraft = useCallback(async (draftId: string, patch: Partial<AIArticleDraft>, actionLabel: string) => {
+    try {
+      const updatePayload = {
+        ...patch,
+        updated_at: new Date().toISOString(),
+      } as Record<string, unknown>;
+
+      const { data, error } = await supabase
+        .from('ai_article_drafts')
+        .update(updatePayload)
+        .eq('id', draftId)
+        .select('id, week_start, title, slug, summary, body, meta_title, meta_description, estimated_read_minutes, status, created_at, updated_at, published_at')
+        .single();
+
+      if (error) throw error;
+
+      setAIDrafts((prev) => prev.map((row) => (row.id === draftId ? (data as AIArticleDraft) : row)));
+      await logAdminAudit({
+        actionTaken: actionLabel,
+        aiRecommendation: 'AI-assisted draft workflow',
+        finalDecision: 'Human decision recorded',
+        context: { draftId, patch },
+      }, { source: 'ai_article_drafts_update' });
+
+      if (patch.status === 'ai_assisted_draft') {
+        showToast('Draft reset to AI-Assisted Draft');
+      } else if (patch.status === 'human_reviewed') {
+        showToast('Draft marked as Human Reviewed');
+      } else if (patch.status === 'verified_airdropguard') {
+        showToast('Draft marked as Verified by AirdropGuard');
+      } else if (patch.status === 'published') {
+        showToast('Draft marked as Published (manual action)');
+      } else {
+        showToast('Draft updated');
+      }
+    } catch (error) {
+      const exact = describeError(error);
+      showToast(`Unable to update draft: ${exact}`, 'error');
+    }
+  }, [describeError, logAdminAudit, showToast]);
+
+  const deleteDraft = useCallback(async (draft: AIArticleDraft) => {
+    try {
+      const { error } = await supabase
+        .from('ai_article_drafts')
+        .delete()
+        .eq('id', draft.id);
+
+      if (error) throw error;
+      setAIDrafts((prev) => prev.filter((row) => row.id !== draft.id));
+      await logAdminAudit({
+        actionTaken: 'Delete AI article draft',
+        aiRecommendation: 'Remove draft from pipeline',
+        finalDecision: 'Draft deleted',
+        context: { draftId: draft.id, title: draft.title },
+      }, { source: 'ai_article_drafts_delete' });
+      showToast('Draft deleted');
+    } catch (error) {
+      showToast(`Unable to delete draft: ${describeError(error)}`, 'error');
+    }
+  }, [describeError, logAdminAudit, showToast]);
+
+  const addCompetitorSource = useCallback(async () => {
+    const name = newSourceName.trim();
+    const url = newSourceUrl.trim();
+    if (!name || !url) {
+      showToast('Source name and URL are required', 'error');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('competitor_sources')
+        .insert({
+          source_name: name,
+          source_url: url,
+          is_active: true,
+        })
+        .select('id, source_name, source_url, is_active, last_checked_at, created_at')
+        .single();
+
+      if (error) throw error;
+
+      setCompetitorSources((prev) => [data as CompetitorSource, ...prev]);
+      if (data) {
+        setCompetitorSourceScanResults((prev) => ({
+          ...prev,
+          [String(data.id)]: {
+            status: 'never_scanned',
+            lastCheckedAt: null,
+            totalScans: 0,
+            successfulScans: 0,
+            opportunitiesFound: 0,
+            newProjects: 0,
+            duplicateProjects: 0,
+            failedExtractions: 0,
+            durationMs: null,
+            lastSuccessfulScan: null,
+            successRate: 0,
+            health: 'red',
+            note: 'No scan recorded yet.',
+          },
+        }));
+      }
+      setNewSourceName('');
+      setNewSourceUrl('');
+
+      await logAdminAudit({
+        actionTaken: 'Add competitor source',
+        aiRecommendation: 'Track competitor/source listings',
+        finalDecision: 'Source added',
+        context: { sourceName: name, sourceUrl: url },
+      }, { source: 'competitor_watch_add_source' });
+
+      showToast('Competitor source added');
+    } catch (error) {
+      setCompetitorUiError('Unable to add source right now. Please try again.', error);
+      showToast('Unable to add source right now. Please try again.', 'error');
+    }
+  }, [newSourceName, newSourceUrl, showToast, logAdminAudit, setCompetitorUiError]);
+
+  const removeCompetitorSource = useCallback(async (source: CompetitorSource) => {
+    try {
+      const { error } = await supabase.from('competitor_sources').delete().eq('id', source.id);
+      if (error) throw error;
+      setCompetitorSources((prev) => prev.filter((row) => row.id !== source.id));
+      setCompetitorSourceScanResults((prev) => {
+        const next = { ...prev };
+        delete next[source.id];
+        return next;
+      });
+      await logAdminAudit({
+        actionTaken: 'Remove competitor source',
+        aiRecommendation: 'Stop monitoring source',
+        finalDecision: 'Source removed',
+        context: { sourceId: source.id, sourceName: source.source_name },
+      }, { source: 'competitor_watch_remove_source' });
+      showToast('Competitor source removed');
+    } catch (error) {
+      setCompetitorUiError('Unable to remove source right now. Please try again.', error);
+      showToast('Unable to remove source right now. Please try again.', 'error');
+    }
+  }, [logAdminAudit, showToast, setCompetitorUiError]);
+
+  const genericCompetitorOpportunities = useMemo(
+    () => competitorOpportunities.filter((item) => isGenericOpportunityName(item.project_name) || isGenericSourceUrl(item.source_url)),
+    [competitorOpportunities]
+  );
+
+  const opportunityIntelligence = useMemo(() => {
+    return competitorOpportunities.map((opportunity) => {
+      const details = getOpportunityDiscoveryDetails(opportunity);
+      const normalized = normalizeProjectName(opportunity.project_name);
+      return { opportunity, details, normalized };
+    });
+  }, [competitorOpportunities]);
+
+  const sourceMentionsByProject = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    opportunityIntelligence.forEach((item) => {
+      const sourceSet = map.get(item.normalized) ?? new Set<string>();
+      sourceSet.add(item.opportunity.source_id);
+      map.set(item.normalized, sourceSet);
+    });
+    return map;
+  }, [opportunityIntelligence]);
+
+  const prioritizedCompetitorOpportunities = useMemo(() => {
+    const enriched = opportunityIntelligence.map((item) => {
+      const mentions = sourceMentionsByProject.get(item.normalized)?.size ?? item.details.sourceMentions;
+      const score = computeDiscoveryScore({
+        sourceReliability: item.details.sourceReliability,
+        sourceMentions: mentions,
+        hasDocs: Boolean(item.details.officialDocsUrl),
+        hasGithub: Boolean(item.details.githubUrl),
+        hasX: Boolean(item.details.officialXUrl),
+        hasDiscord: Boolean(item.details.officialDiscordUrl),
+        hasBlockchain: Boolean(item.opportunity.blockchain),
+        hasFunding: Boolean(item.details.fundingInfo),
+        hasTeam: Boolean(item.details.teamInfo),
+      });
+      return {
+        ...item,
+        dynamicMentions: mentions,
+        dynamicScore: score,
+        dynamicPriority: getDiscoveryPriority(score),
+      };
+    });
+
+    return enriched.sort((a, b) => {
+      if (b.dynamicScore !== a.dynamicScore) return b.dynamicScore - a.dynamicScore;
+      return new Date(b.opportunity.discovered_at).getTime() - new Date(a.opportunity.discovered_at).getTime();
+    });
+  }, [opportunityIntelligence, sourceMentionsByProject]);
+
+  const prioritizedPendingDiscoveryCandidates = useMemo(() => {
+    return [...pendingDiscoveryCandidates].sort((a, b) => {
+      if (b.discoveryScore !== a.discoveryScore) return b.discoveryScore - a.discoveryScore;
+      return new Date(b.checkedAt).getTime() - new Date(a.checkedAt).getTime();
+    });
+  }, [pendingDiscoveryCandidates]);
+
+  const sourceDashboardRows = useMemo(() => {
+    return competitorSources.map((source) => {
+      const scan = competitorSourceScanResults[source.id] ?? {
+        status: source.last_checked_at ? 'none_found' : 'never_scanned',
+        lastCheckedAt: source.last_checked_at,
+        totalScans: source.last_checked_at ? 1 : 0,
+        successfulScans: source.last_checked_at ? 1 : 0,
+        opportunitiesFound: 0,
+        newProjects: 0,
+        duplicateProjects: 0,
+        failedExtractions: 0,
+        durationMs: null,
+        lastSuccessfulScan: source.last_checked_at,
+        successRate: source.last_checked_at ? 1 : 0,
+        health: source.last_checked_at ? 'amber' : 'red',
+        note: source.last_checked_at ? 'No recent project opportunities recorded.' : 'No scan recorded yet.',
+      } satisfies CompetitorSourceScanResult;
+
+      const sourceItems = prioritizedCompetitorOpportunities.filter((item) => item.opportunity.source_id === source.id);
+      const discoveredCount = sourceItems.length;
+      const newCount = sourceItems.filter((item) => item.details.comparisonType === 'new_project').length;
+      const duplicateCount = sourceItems.filter((item) => item.details.comparisonType !== 'new_project').length;
+      const successRate = scan.totalScans > 0 ? scan.successfulScans / scan.totalScans : scan.successRate;
+      const health = getSourceHealthIndicator(successRate, scan.status);
+
+      return {
+        source,
+        scan: {
+          ...scan,
+          opportunitiesFound: Math.max(scan.opportunitiesFound, discoveredCount),
+          newProjects: Math.max(scan.newProjects, newCount),
+          duplicateProjects: Math.max(scan.duplicateProjects, duplicateCount),
+          successRate,
+          health,
+        },
+      };
+    });
+  }, [competitorSources, competitorSourceScanResults, prioritizedCompetitorOpportunities]);
+
+  const discoveryHistoryRows = useMemo(() => {
+    const map = new Map<string, {
+      projectName: string;
+      firstDiscovered: string;
+      discoveredBy: string;
+      sourceIds: Set<string>;
+      lastChecked: string;
+      status: CompetitorOpportunityStatus;
+    }>();
+
+    prioritizedCompetitorOpportunities.forEach(({ opportunity, details, normalized }) => {
+      const existing = map.get(normalized);
+      const firstDiscovered = details.firstDiscoveredAt || opportunity.discovered_at;
+      if (!existing) {
+        map.set(normalized, {
+          projectName: opportunity.project_name,
+          firstDiscovered,
+          discoveredBy: details.sourceLabel,
+          sourceIds: new Set([opportunity.source_id]),
+          lastChecked: opportunity.discovered_at,
+          status: opportunity.status,
+        });
+        return;
+      }
+
+      existing.sourceIds.add(opportunity.source_id);
+      if (new Date(opportunity.discovered_at).getTime() > new Date(existing.lastChecked).getTime()) {
+        existing.lastChecked = opportunity.discovered_at;
+        existing.status = opportunity.status;
+      }
+      if (new Date(firstDiscovered).getTime() < new Date(existing.firstDiscovered).getTime()) {
+        existing.firstDiscovered = firstDiscovered;
+        existing.discoveredBy = details.sourceLabel;
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => new Date(b.lastChecked).getTime() - new Date(a.lastChecked).getTime());
+  }, [prioritizedCompetitorOpportunities]);
+
+  const competitorAnalytics = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    const successfulScansToday = sourceDashboardRows.filter((row) => {
+      if (!row.scan.lastCheckedAt) return false;
+      return new Date(row.scan.lastCheckedAt).getTime() >= startOfToday && row.scan.status !== 'failed';
+    }).length;
+
+    const newProjectsFoundToday = prioritizedCompetitorOpportunities.filter((item) => {
+      return item.details.comparisonType === 'new_project' && new Date(item.opportunity.discovered_at).getTime() >= startOfToday;
+    }).length;
+
+    const projectsImported = competitorOpportunities.filter((item) => item.status === 'drafted').length;
+    const projectsIgnored = competitorOpportunities.filter((item) => item.status === 'ignored').length;
+    const duplicateDetectionsCount = prioritizedCompetitorOpportunities.filter((item) => item.details.comparisonType !== 'new_project').length;
+    const averageScanSuccess = sourceDashboardRows.length
+      ? sourceDashboardRows.reduce((sum, row) => sum + row.scan.successRate, 0) / sourceDashboardRows.length
+      : 0;
+
+    return {
+      sourcesMonitored: competitorSources.filter((source) => source.is_active).length,
+      successfulScansToday,
+      newProjectsFoundToday,
+      projectsImported,
+      projectsIgnored,
+      duplicateDetections: duplicateDetectionsCount,
+      averageScanSuccess,
+    };
+  }, [sourceDashboardRows, prioritizedCompetitorOpportunities, competitorOpportunities, competitorSources]);
+
+  const bulkIgnoreGenericCompetitorOpportunities = useCallback(async () => {
+    const ids = genericCompetitorOpportunities
+      .filter((item) => item.status !== 'ignored' && item.status !== 'drafted')
+      .map((item) => item.id);
+
+    if (ids.length === 0) {
+      showToast('No generic opportunities to ignore');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('competitor_opportunities')
+        .update({ status: 'ignored', updated_at: new Date().toISOString() })
+        .in('id', ids);
+
+      if (error) throw error;
+
+      setCompetitorOpportunities((prev) => prev.map((row) => (
+        ids.includes(row.id) ? { ...row, status: 'ignored' as CompetitorOpportunityStatus } : row
+      )));
+
+      await logAdminAudit({
+        actionTaken: 'Bulk ignore generic competitor opportunities',
+        aiRecommendation: 'Auto-identified generic search/feed noise',
+        finalDecision: 'Ignored',
+        context: { opportunityIds: ids, count: ids.length },
+      }, { source: 'competitor_watch_bulk_ignore_generic' });
+
+      showToast(`Ignored ${ids.length} generic opportunit${ids.length === 1 ? 'y' : 'ies'}`);
+    } catch (error) {
+      setCompetitorUiError('Unable to bulk-ignore generic opportunities right now.', error);
+      showToast('Unable to bulk-ignore generic opportunities right now.', 'error');
+    }
+  }, [genericCompetitorOpportunities, logAdminAudit, setCompetitorUiError, showToast]);
+
+  const bulkDeleteGenericCompetitorOpportunities = useCallback(async () => {
+    const ids = genericCompetitorOpportunities.map((item) => item.id);
+    if (ids.length === 0) {
+      showToast('No generic opportunities to delete');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('competitor_opportunities')
+        .delete()
+        .in('id', ids);
+
+      if (error) throw error;
+
+      setCompetitorOpportunities((prev) => prev.filter((row) => !ids.includes(row.id)));
+
+      await logAdminAudit({
+        actionTaken: 'Bulk delete generic competitor opportunities',
+        aiRecommendation: 'Remove generic search/feed noise from queue',
+        finalDecision: 'Deleted',
+        context: { opportunityIds: ids, count: ids.length },
+      }, { source: 'competitor_watch_bulk_delete_generic' });
+
+      showToast(`Deleted ${ids.length} generic opportunit${ids.length === 1 ? 'y' : 'ies'}`);
+    } catch (error) {
+      setCompetitorUiError('Unable to bulk-delete generic opportunities right now.', error);
+      showToast('Unable to bulk-delete generic opportunities right now.', 'error');
+    }
+  }, [genericCompetitorOpportunities, logAdminAudit, setCompetitorUiError, showToast]);
+
+  const checkCompetitorSourcesNow = useCallback(async () => {
+    setCheckingCompetitors(true);
+    setCompetitorError(null);
+    setCompetitorErrorDetails(null);
+    try {
+      const activeSources = competitorSources.filter((item) => item.is_active);
+      if (activeSources.length === 0) {
+        showToast('Add at least one active source first', 'error');
+        return;
+      }
+
+      let discoveredProjects = 0;
+      let duplicateDetections = 0;
+      let previewCandidatesAdded = 0;
+      let noProjectSources = 0;
+      let failedScans = 0;
+      const scanUpdates: Record<string, CompetitorSourceScanResult> = {};
+      const debugUpdates: Record<string, CompetitorScanDebugResult> = {};
+      const pendingAdds: PendingDiscoveryCandidate[] = [];
+      const existingKeys = new Set(
+        competitorOpportunities.map((item) => `${item.source_id}::${normalizeProjectName(item.project_name)}`)
+      );
+      const pendingKeys = new Set(
+        pendingDiscoveryCandidates.map((item) => `${item.sourceId}::${normalizeProjectName(item.candidate.projectName)}::${item.candidate.listingUrl}`)
+      );
+      const sourceMentionsMap = new Map<string, Set<string>>();
+      const firstDiscoveredMap = new Map<string, string>();
+
+      competitorOpportunities.forEach((item) => {
+        const normalized = normalizeProjectName(item.project_name);
+        const sourceSet = sourceMentionsMap.get(normalized) ?? new Set<string>();
+        sourceSet.add(item.source_id);
+        sourceMentionsMap.set(normalized, sourceSet);
+
+        const existing = firstDiscoveredMap.get(normalized);
+        if (!existing || new Date(item.discovered_at).getTime() < new Date(existing).getTime()) {
+          firstDiscoveredMap.set(normalized, item.discovered_at);
+        }
+      });
+
+      const invokePayload = {
+        sources: activeSources.map((source) => ({
+          id: source.id,
+          source_name: source.source_name,
+          source_url: source.source_url,
+        })),
+      };
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) {
+        throw new Error('Admin session expired. Please sign in again.');
+      }
+
+      const { data: scanData, error: scanError } = await supabase.functions.invoke('competitor-watch-scan', {
+        body: invokePayload,
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (scanError) {
+        const detailed = await describeFunctionInvokeErrorDetailed(scanError);
+        throw new Error(`Edge Function invoke failed: ${detailed}`);
+      }
+
+      const results = ((scanData as CompetitorWatchScanResponse | null)?.results ?? []) as CompetitorWatchScanResult[];
+      if (!scanData || !Array.isArray((scanData as CompetitorWatchScanResponse).results)) {
+        const serialized = (() => {
+          try {
+            return JSON.stringify(scanData);
+          } catch {
+            return String(scanData);
+          }
+        })();
+        throw new Error(`Invalid Edge Function response shape. body=${serialized}`);
+      }
+
+      for (const result of results) {
+        const source = activeSources.find((item) => item.id === result.sourceId);
+        if (!source) continue;
+
+        const scanStartedAt = Date.now();
+        const previousScan = competitorSourceScanResults[source.id];
+        const totalScans = (previousScan?.totalScans ?? 0) + 1;
+        const previousSuccessfulScans = previousScan?.successfulScans ?? 0;
+        const isFailedStatus = result.finalOutcome === 'blocked_by_cloudflare'
+          || result.finalOutcome === 'http_403'
+          || result.finalOutcome === 'http_429'
+          || result.finalOutcome === 'timeout'
+          || result.finalOutcome === 'fetch_failed';
+        const successfulScans = isFailedStatus ? previousSuccessfulScans : previousSuccessfulScans + 1;
+        const successRate = totalScans > 0 ? successfulScans / totalScans : 0;
+
+        await supabase
+          .from('competitor_sources')
+          .update({ last_checked_at: result.checkedAt })
+          .eq('id', source.id);
+
+        debugUpdates[source.id] = {
+          adapterUsed: result.adapterUsed,
+          pageFetched: result.sourceUrl,
+          fetchStatus: result.fetchStatus,
+          cardsFound: result.cardsFound,
+          candidatesRejected: result.candidatesRejected,
+          rejectionReasons: result.rejectionReasons,
+          rejectionSamples: result.rejectionSamples,
+          validCandidatesExtracted: result.candidatesExtracted.length,
+          outcomeReason: result.outcomeMessage,
+        };
+
+        if (result.candidatesExtracted.length === 0) {
+          if (isFailedStatus) failedScans += 1;
+          else noProjectSources += 1;
+
+          scanUpdates[source.id] = {
+            status: isFailedStatus ? 'failed' : 'none_found',
+            lastCheckedAt: result.checkedAt,
+            totalScans,
+            successfulScans,
+            opportunitiesFound: 0,
+            newProjects: 0,
+            duplicateProjects: 0,
+            failedExtractions: result.candidatesRejected,
+            durationMs: Date.now() - scanStartedAt,
+            lastSuccessfulScan: isFailedStatus ? previousScan?.lastSuccessfulScan || null : result.checkedAt,
+            successRate,
+            health: getSourceHealthIndicator(successRate, isFailedStatus ? 'failed' : 'none_found'),
+            note: `No projects extracted from this source. Reason: ${result.outcomeMessage}`,
+          };
+          continue;
+        }
+
+        let foundForSource = 0;
+        let sourceNewProjects = 0;
+        let sourceDuplicateProjects = 0;
+        const registerRejection = (localReasons: Record<string, number>, reason: string) => {
+          localReasons[reason] = (localReasons[reason] || 0) + 1;
+        };
+        const localRejections = { ...result.rejectionReasons };
+
+        for (const candidate of result.candidatesExtracted) {
+          const normalizedName = normalizeProjectName(candidate.projectName);
+          const key = `${source.id}::${normalizedName}`;
+          if (existingKeys.has(key)) {
+            registerRejection(localRejections, 'already_tracked');
+            continue;
+          }
+
+          const pendingKey = `${source.id}::${normalizedName}::${candidate.listingUrl}`;
+          if (pendingKeys.has(pendingKey)) {
+            registerRejection(localRejections, 'already_in_preview');
+            continue;
+          }
+
+          const sourceMentions = (() => {
+            const existingMentions = sourceMentionsMap.get(normalizedName) ?? new Set<string>();
+            return existingMentions.has(source.id) ? existingMentions.size : existingMentions.size + 1;
+          })();
+          const sourceReliability = getAdapterReliabilityScore(result.adapterUsed);
+          const comparison = compareCandidateAgainstAirdrops(candidate, airdrops);
+          const confidenceAdjustment = candidate.confidence === 'high' ? 6 : candidate.confidence === 'medium' ? 3 : 0;
+          const confidenceScore = Math.max(0, Math.min(100, comparison.confidenceScore + confidenceAdjustment));
+          const discoveryScore = computeDiscoveryScore({
+            sourceReliability,
+            sourceMentions,
+            hasDocs: Boolean(candidate.officialDocsUrl),
+            hasGithub: Boolean(candidate.githubUrl),
+            hasX: Boolean(candidate.officialXUrl),
+            hasDiscord: Boolean(candidate.officialDiscordUrl),
+            hasBlockchain: Boolean(candidate.blockchain),
+            hasFunding: Boolean(candidate.fundingInfo),
+            hasTeam: Boolean(candidate.teamInfo),
+          });
+          const discoveryPriority = getDiscoveryPriority(discoveryScore);
+          const compareMessage = comparison.comparison === 'exact_match'
+            ? `Exact match with existing listing ${comparison.matchedProject}`
+            : comparison.comparison === 'similar_project'
+            ? `Similar to existing listing ${comparison.matchedProject}`
+            : 'No existing AirdropGuard listing match found';
+          const nextStatus: CompetitorOpportunityStatus = comparison.comparison === 'new_project' ? 'new' : 'duplicate';
+          const firstDiscoveredAt = firstDiscoveredMap.get(normalizedName) || result.checkedAt;
+
+          const metadata = {
+            source: candidate.sourceLabel,
+            adapter_id: result.adapterUsed,
+            source_reliability: sourceReliability,
+            project_url: candidate.projectUrl,
+            listing_url: candidate.listingUrl,
+            short_description: candidate.shortDescription,
+            listing_date: candidate.listingDate,
+            official_docs_url: candidate.officialDocsUrl,
+            github_url: candidate.githubUrl,
+            official_x_url: candidate.officialXUrl,
+            official_discord_url: candidate.officialDiscordUrl,
+            funding_info: candidate.fundingInfo,
+            team_info: candidate.teamInfo,
+            compare: compareMessage,
+            comparison_type: comparison.comparison,
+            confidence_score: confidenceScore,
+            why_new: comparison.whyNew,
+            matched_project: comparison.matchedProject,
+            first_discovered_at: firstDiscoveredAt,
+            source_mentions: sourceMentions,
+            discovery_score: discoveryScore,
+            discovery_priority: discoveryPriority,
+          };
+
+          if (previewScanModeEnabled) {
+            const previewId = `${source.id}-${normalizedName}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            pendingAdds.push({
+              id: previewId,
+              sourceId: source.id,
+              sourceName: source.source_name,
+              checkedAt: result.checkedAt,
+              adapterId: result.adapterUsed || 'unknown',
+              candidate,
+              comparisonType: comparison.comparison,
+              confidenceScore,
+              whyNew: comparison.whyNew,
+              matchedProject: comparison.matchedProject,
+              compareMessage,
+              sourceReliability,
+              sourceMentions,
+              discoveryScore,
+              discoveryPriority,
+              firstDiscoveredAt,
+            });
+
+            pendingKeys.add(pendingKey);
+            foundForSource += 1;
+            previewCandidatesAdded += 1;
+            if (nextStatus === 'new') sourceNewProjects += 1;
+            else sourceDuplicateProjects += 1;
+            continue;
+          }
+
+          const { data: inserted, error } = await supabase
+            .from('competitor_opportunities')
+            .insert({
+              source_id: source.id,
+              project_name: candidate.projectName,
+              source_url: candidate.listingUrl,
+              discovered_at: result.checkedAt,
+              category: candidate.category,
+              blockchain: candidate.blockchain,
+              confidence_level: candidate.confidence,
+              why_matched: `Adapter ${candidate.sourceLabel} extracted project card. ${comparison.whyNew}`,
+              similarity_score: null,
+              status: nextStatus,
+              notes: JSON.stringify(metadata),
+            })
+            .select('id, source_id, project_name, source_url, discovered_at, category, blockchain, confidence_level, why_matched, similarity_score, status, notes, created_at')
+            .single();
+
+          if (error) throw error;
+          if (!inserted) continue;
+
+          existingKeys.add(key);
+          setCompetitorOpportunities((prev) => [inserted as CompetitorOpportunity, ...prev]);
+          foundForSource += 1;
+
+          const mentionSet = sourceMentionsMap.get(normalizedName) ?? new Set<string>();
+          mentionSet.add(source.id);
+          sourceMentionsMap.set(normalizedName, mentionSet);
+          firstDiscoveredMap.set(normalizedName, firstDiscoveredAt);
+
+          if (nextStatus === 'new') {
+            discoveredProjects += 1;
+            sourceNewProjects += 1;
+          } else {
+            duplicateDetections += 1;
+            sourceDuplicateProjects += 1;
+          }
+        }
+
+        if (foundForSource === 0) {
+          noProjectSources += 1;
+          const mergedRejected = result.candidatesRejected + (localRejections.already_tracked || 0) + (localRejections.already_in_preview || 0);
+          scanUpdates[source.id] = {
+            status: 'none_found',
+            lastCheckedAt: result.checkedAt,
+            totalScans,
+            successfulScans,
+            opportunitiesFound: 0,
+            newProjects: 0,
+            duplicateProjects: 0,
+            failedExtractions: mergedRejected,
+            durationMs: Date.now() - scanStartedAt,
+            lastSuccessfulScan: result.checkedAt,
+            successRate,
+            health: getSourceHealthIndicator(successRate, 'none_found'),
+            note: `No projects extracted from this source. Reason: ${result.outcomeMessage}`,
+          };
+
+          debugUpdates[source.id] = {
+            ...debugUpdates[source.id],
+            candidatesRejected: mergedRejected,
+            rejectionReasons: localRejections,
+          };
+          continue;
+        }
+
+        const mergedRejected = result.candidatesRejected + (localRejections.already_tracked || 0) + (localRejections.already_in_preview || 0);
+        scanUpdates[source.id] = {
+          status: 'found',
+          lastCheckedAt: result.checkedAt,
+          totalScans,
+          successfulScans,
+          opportunitiesFound: foundForSource,
+          newProjects: sourceNewProjects,
+          duplicateProjects: sourceDuplicateProjects,
+          failedExtractions: mergedRejected,
+          durationMs: Date.now() - scanStartedAt,
+          lastSuccessfulScan: result.checkedAt,
+          successRate,
+          health: getSourceHealthIndicator(successRate, 'found'),
+          note: previewScanModeEnabled
+            ? 'Preview candidates extracted. Awaiting manual approval.'
+            : 'Project opportunities found by source adapter.',
+        };
+
+        debugUpdates[source.id] = {
+          ...debugUpdates[source.id],
+          candidatesRejected: mergedRejected,
+          rejectionReasons: localRejections,
+          validCandidatesExtracted: foundForSource,
+        };
+      }
+
+      setCompetitorSourceScanResults((prev) => ({ ...prev, ...scanUpdates }));
+      setCompetitorScanDebugResults((prev) => ({ ...prev, ...debugUpdates }));
+      if (pendingAdds.length > 0) {
+        setPendingDiscoveryCandidates((prev) => [...pendingAdds, ...prev]);
+      }
+
+      if (!previewScanModeEnabled && discoveredProjects > 0) {
+        await createAdminNotification({
+          notification_type: 'competitor_detected',
+          title: 'New projects found',
+          message: `${discoveredProjects} project${discoveredProjects > 1 ? 's' : ''} added to discovery queue.`,
+          severity: 'info',
+          context: { discoveredProjects, duplicateDetections, noProjectSources },
+        });
+      }
+
+      if (noProjectSources > 0) {
+        await createAdminNotification({
+          notification_type: 'competitor_source_only',
+          title: 'No projects extracted',
+          message: `${noProjectSources} source${noProjectSources > 1 ? 's' : ''} produced no project opportunities.`,
+          severity: 'warning',
+          context: { noProjectSources },
+        });
+      }
+
+      if (failedScans > 0) {
+        await createAdminNotification({
+          notification_type: 'competitor_scan_failed',
+          title: 'Some source scans failed',
+          message: `${failedScans} source scan${failedScans > 1 ? 's' : ''} failed. Review source Last Scan Result notes.`,
+          severity: 'error',
+          context: { failedScans },
+        });
+      }
+
+      if (previewScanModeEnabled && previewCandidatesAdded > 0) {
+        showToast(`${previewCandidatesAdded} scan candidates extracted for manual approval.`);
+      } else if (discoveredProjects > 0 && noProjectSources > 0) {
+        showToast(`${discoveredProjects} new projects found. ${duplicateDetections} duplicate detections. ${noProjectSources} sources had no extractable projects.`);
+      } else if (discoveredProjects > 0) {
+        showToast(`${discoveredProjects} new projects found. ${duplicateDetections} duplicate detections.`);
+      } else if (noProjectSources > 0) {
+        showToast('No projects extracted from this source.');
+      } else if (failedScans > 0) {
+        showToast(`${failedScans} source scan${failedScans > 1 ? 's' : ''} failed. Review Last Scan Result.`,'error');
+      } else {
+        showToast('No projects extracted from this source.');
+      }
+    } catch (error) {
+      const exact = describeError(error);
+      setCompetitorUiError('Competitor check failed. Please retry in a moment.', error);
+      showToast('Competitor check failed. Please retry in a moment.', 'error');
+      await createAdminNotification({
+        notification_type: 'admin_error',
+        title: 'Competitor watch check failed',
+        message: 'Competitor watch check failed. Review admin debug details.',
+        severity: 'error',
+        context: { area: 'competitor_watch', details: exact },
+      });
+    } finally {
+      setCheckingCompetitors(false);
+    }
+  }, [competitorSources, competitorOpportunities, competitorSourceScanResults, pendingDiscoveryCandidates, previewScanModeEnabled, airdrops, showToast, describeError, describeFunctionInvokeErrorDetailed, logAdminAudit, createAdminNotification, setCompetitorUiError]);
+
+  const testCompetitorWatchEdgeFunction = useCallback(async () => {
+    setCompetitorError(null);
+    setCompetitorErrorDetails(null);
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (sessionError || !accessToken) {
+        throw new Error('Admin session expired. Please sign in again.');
+      }
+
+      const { data, error } = await supabase.functions.invoke('competitor-watch-scan', {
+        body: { dryRun: true },
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (error) {
+        const detailed = await describeFunctionInvokeErrorDetailed(error);
+        throw new Error(`Edge Function dry-run failed: ${detailed}`);
+      }
+
+      const payload = data as Record<string, unknown> | null;
+      if (!payload || payload.ok !== true) {
+        throw new Error(`Unexpected dry-run response: ${JSON.stringify(data)}`);
+      }
+
+      showToast('Edge Function dry-run passed (auth/admin/env/function OK)');
+    } catch (error) {
+      setCompetitorUiError('Edge Function dry-run failed. Check details.', error);
+      showToast('Edge Function dry-run failed. Check details.', 'error');
+    }
+  }, [describeFunctionInvokeErrorDetailed, setCompetitorUiError, showToast]);
+
+  const approvePendingDiscoveryCandidate = useCallback(async (pending: PendingDiscoveryCandidate) => {
+    const normalized = normalizeProjectName(pending.candidate.projectName);
+    const duplicateExisting = competitorOpportunities.some((item) => (
+      item.source_id === pending.sourceId && normalizeProjectName(item.project_name) === normalized
+    ));
+
+    if (duplicateExisting) {
+      setPendingDiscoveryCandidates((prev) => prev.filter((item) => item.id !== pending.id));
+      showToast('Candidate already exists in queue. Removed from preview.', 'error');
+      return;
+    }
+
+    const status: CompetitorOpportunityStatus = pending.comparisonType === 'new_project' ? 'new' : 'duplicate';
+    const metadata = {
+      source: pending.candidate.sourceLabel,
+      adapter_id: pending.adapterId,
+      source_reliability: pending.sourceReliability,
+      project_url: pending.candidate.projectUrl,
+      listing_url: pending.candidate.listingUrl,
+      short_description: pending.candidate.shortDescription,
+      listing_date: pending.candidate.listingDate,
+      official_docs_url: pending.candidate.officialDocsUrl,
+      github_url: pending.candidate.githubUrl,
+      official_x_url: pending.candidate.officialXUrl,
+      official_discord_url: pending.candidate.officialDiscordUrl,
+      funding_info: pending.candidate.fundingInfo,
+      team_info: pending.candidate.teamInfo,
+      compare: pending.compareMessage,
+      comparison_type: pending.comparisonType,
+      confidence_score: pending.confidenceScore,
+      why_new: pending.whyNew,
+      matched_project: pending.matchedProject,
+      first_discovered_at: pending.firstDiscoveredAt,
+      source_mentions: pending.sourceMentions,
+      discovery_score: pending.discoveryScore,
+      discovery_priority: pending.discoveryPriority,
+    };
+
+    try {
+      const { data, error } = await supabase
+        .from('competitor_opportunities')
+        .insert({
+          source_id: pending.sourceId,
+          project_name: pending.candidate.projectName,
+          source_url: pending.candidate.listingUrl,
+          discovered_at: pending.checkedAt,
+          category: pending.candidate.category,
+          blockchain: pending.candidate.blockchain,
+          confidence_level: pending.candidate.confidence,
+          why_matched: `Manual approval from preview scan. ${pending.whyNew}`,
+          similarity_score: null,
+          status,
+          notes: JSON.stringify(metadata),
+        })
+        .select('id, source_id, project_name, source_url, discovered_at, category, blockchain, confidence_level, why_matched, similarity_score, status, notes, created_at')
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setCompetitorOpportunities((prev) => [data as CompetitorOpportunity, ...prev]);
+      }
+      setPendingDiscoveryCandidates((prev) => prev.filter((item) => item.id !== pending.id));
+
+      await logAdminAudit({
+        actionTaken: 'Approve preview discovery candidate',
+        aiRecommendation: 'Candidate extracted from discovery preview mode',
+        finalDecision: 'Inserted to competitor opportunities',
+        context: {
+          sourceId: pending.sourceId,
+          sourceName: pending.sourceName,
+          projectName: pending.candidate.projectName,
+          listingUrl: pending.candidate.listingUrl,
+        },
+      }, { source: 'competitor_watch_preview_approve' });
+
+      showToast('Preview candidate approved and added to queue');
+    } catch (error) {
+      setCompetitorUiError('Unable to approve preview candidate right now.', error);
+      showToast('Unable to approve preview candidate right now.', 'error');
+    }
+  }, [competitorOpportunities, logAdminAudit, setCompetitorUiError, showToast]);
+
+  const rejectPendingDiscoveryCandidate = useCallback((pending: PendingDiscoveryCandidate) => {
+    setPendingDiscoveryCandidates((prev) => prev.filter((item) => item.id !== pending.id));
+    showToast('Preview candidate removed');
+  }, [showToast]);
+
+  const updateOpportunityStatus = useCallback(async (
+    opportunity: CompetitorOpportunity,
+    status: CompetitorOpportunityStatus,
+    actionTaken: string,
+    successMessage: string
+  ) => {
+    try {
+      const { data, error } = await supabase
+        .from('competitor_opportunities')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', opportunity.id)
+        .select('id, source_id, project_name, source_url, discovered_at, category, blockchain, confidence_level, why_matched, similarity_score, status, notes, created_at')
+        .single();
+
+      if (error) throw error;
+      setCompetitorOpportunities((prev) => prev.map((row) => row.id === opportunity.id ? (data as CompetitorOpportunity) : row));
+
+      await logAdminAudit({
+        actionTaken,
+        aiRecommendation: 'Competitor watch action requested by admin',
+        finalDecision: status,
+        context: {
+          opportunityId: opportunity.id,
+          projectName: opportunity.project_name,
+          sourceUrl: opportunity.source_url,
+        },
+      }, { source: 'competitor_watch_status_update' });
+
+      showToast(successMessage);
+    } catch (error) {
+      setCompetitorUiError('Unable to update opportunity right now. Please try again.', error);
+      showToast('Unable to update opportunity right now. Please try again.', 'error');
+    }
+  }, [logAdminAudit, showToast, setCompetitorUiError]);
+
+  const createDraftFromOpportunity = useCallback(async (opportunity: CompetitorOpportunity) => {
+    const details = getOpportunityDiscoveryDetails(opportunity);
+    const normalizedCategory = CATEGORY_OPTIONS.find((item) => item.toLowerCase() === String(opportunity.category || '').toLowerCase()) || 'Other';
+    setForm({
+      ...BLANK_FORM,
+      name: opportunity.project_name,
+      website_url: details.projectUrl || details.listingUrl,
+      docs_url: details.officialDocsUrl || '',
+      github_url: details.githubUrl || '',
+      twitter_url: details.officialXUrl || '',
+      discord_url: details.officialDiscordUrl || '',
+      funding_info: details.fundingInfo || '',
+      team_info: details.teamInfo || '',
+      category: [normalizedCategory],
+      blockchain: opportunity.blockchain ? [opportunity.blockchain as Blockchain] : [],
+      ai_summary: `Candidate discovered from ${details.sourceLabel}. Listing: ${details.listingUrl}`,
+      status: 'Active',
+      published: false,
+      is_featured: false,
+      is_trending: false,
+      is_sponsored: false,
+    });
+    setModalMode('add');
+
+    await updateOpportunityStatus(
+      opportunity,
+      'drafted',
+      'Create airdrop draft from competitor opportunity',
+      'Draft airdrop created'
+    );
+  }, [updateOpportunityStatus]);
 
   const openAdd = () => { setForm(BLANK_FORM); setEditingId(null); setModalMode('add'); };
 
@@ -2245,8 +4673,11 @@ export default function AdminPage() {
       fetchScamReports();
       fetchAuditLogs();
       fetchArticleTrustData();
+      fetchAIDrafts();
+      fetchCompetitorWatchData();
+      fetchAdminNotifications();
     }
-  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData]);
+  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -2606,7 +5037,7 @@ export default function AdminPage() {
               : <Brain className="w-4 h-4" />}
             {refreshingAll ? 'Analyzing…' : 'Refresh All AI'}
           </button>
-          <button onClick={() => { fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); }}
+          <button onClick={() => { fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); }}
             aria-label="Refresh admin data"
             className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
@@ -2633,7 +5064,69 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <section id="admin-needs-attention">
+      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="hidden lg:block">
+          <div className="sticky top-20 rounded-2xl border border-white/10 bg-dark-900/70 p-3 backdrop-blur-sm">
+            <p className="text-[11px] uppercase tracking-[0.13em] text-cyan-200">Admin Navigation</p>
+            <p className="mt-1 text-xs text-gray-400">Focused workspace sections with minimal scrolling.</p>
+
+            <div className="mt-3 space-y-1.5">
+              {adminNavItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setAdminView(item.id)}
+                  className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${adminView === item.id ? 'border-cyan-400/40 bg-cyan-500/12 text-cyan-100' : 'border-white/10 bg-dark-900/50 text-gray-300 hover:border-white/20 hover:text-white'}`}
+                >
+                  <p className="text-xs font-semibold">{item.label}</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{item.blurb}</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.11em] text-cyan-200">Unread Alerts</p>
+              <p className="mt-1 text-sm font-semibold text-white tabular-nums">
+                {notificationsLoading ? '…' : unreadNotificationsCount}
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        <div className="space-y-8 pb-24 lg:pb-0">
+          <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-4 space-y-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.13em] text-cyan-200">Current Workspace</p>
+                <h2 className="mt-1 text-lg font-bold text-white">{activeAdminNavItem.label}</h2>
+                <p className="text-xs text-gray-400 mt-1">{activeAdminNavItem.blurb}</p>
+              </div>
+              <div className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-dark-900/50 px-3 py-1.5 text-xs text-gray-300">
+                <Bell className="w-3.5 h-3.5 text-cyan-300" />
+                {notificationsLoading ? 'Loading alerts…' : `${unreadNotificationsCount} unread alert${unreadNotificationsCount === 1 ? '' : 's'}`}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-dark-900/40 p-3">
+              <p className="text-[11px] uppercase tracking-[0.12em] text-cyan-200">In-App Admin Notifications</p>
+              {adminNotifications.length === 0 ? (
+                <p className="mt-2 text-xs text-gray-500">No admin notifications yet.</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {adminNotifications.slice(0, 4).map((item) => (
+                    <div key={item.id} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-white">{item.title}</p>
+                        <p className="text-[10px] text-gray-500">{new Date(item.created_at).toLocaleString()}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-gray-400">{item.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section id="admin-needs-attention" className={canShowSection('overview') ? '' : 'hidden'}>
         <div className="rounded-2xl border border-white/10 bg-[linear-gradient(145deg,rgba(10,16,34,0.96),rgba(8,14,28,0.92))] p-4 mb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -2677,7 +5170,7 @@ export default function AdminPage() {
             status="Needs review"
             blurb="Approve, reject, or request more info."
             actionLabel="Review Submission"
-            onAction={() => jumpToSection('admin-submissions')}
+            onAction={() => { setAdminView('submissions'); jumpToSection('admin-submissions'); }}
           />
           <ActionCard
             title="Banner Enquiries"
@@ -2685,7 +5178,7 @@ export default function AdminPage() {
             status="Waiting for artwork"
             blurb="Activate and schedule campaigns quickly."
             actionLabel="Manage Banner"
-            onAction={() => jumpToSection('admin-advertising')}
+            onAction={() => { setAdminView('banners'); jumpToSection('admin-advertising'); }}
           />
           <ActionCard
             title="Scam Reports"
@@ -2693,7 +5186,7 @@ export default function AdminPage() {
             status="Needs triage"
             blurb="Review reports and protect user trust."
             actionLabel="Open Reports"
-            onAction={() => jumpToSection('admin-scam-reports')}
+            onAction={() => { setAdminView('submissions'); jumpToSection('admin-scam-reports'); }}
           />
           <ActionCard
             title="Expiring Listings"
@@ -2701,7 +5194,7 @@ export default function AdminPage() {
             status="Ending in 7 days"
             blurb="Renew, replace, or expire safely."
             actionLabel="Publish Project"
-            onAction={() => jumpToSection('admin-airdrops')}
+            onAction={() => { setAdminView('airdrops'); jumpToSection('admin-airdrops'); }}
           />
           <ActionCard
             title="Failed AI Analyses"
@@ -2709,7 +5202,7 @@ export default function AdminPage() {
             status="AI queue"
             blurb="Projects with no fresh analysis data."
             actionLabel="Refresh AI"
-            onAction={() => jumpToSection('admin-ai-control')}
+            onAction={() => { setAdminView('system-tools'); jumpToSection('admin-ai-control'); }}
           />
           <ActionCard
             title="Missing Project Information"
@@ -2717,7 +5210,7 @@ export default function AdminPage() {
             status="Content quality"
             blurb="Fill docs, GitHub, funding, and logos."
             actionLabel="Fix Project"
-            onAction={() => jumpToSection('admin-site-health')}
+            onAction={() => { setAdminView('system-tools'); jumpToSection('admin-site-health'); }}
           />
           <ActionCard
             title="Articles Awaiting Publication"
@@ -2726,9 +5219,26 @@ export default function AdminPage() {
             blurb="Draft and scheduled articles waiting to go live."
             actionLabel="Open Articles"
             onAction={() => {
+              setAdminView('content');
               setContentView('articles');
               jumpToSection('admin-content');
             }}
+          />
+          <ActionCard
+            title="Weekly AI Draft"
+            count={aiDrafts.filter((d) => d.status === 'ai_assisted_draft').length}
+            status="Awaiting review"
+            blurb="AI-assisted drafts waiting for human verification."
+            actionLabel="Open Drafts"
+            onAction={() => { setAdminView('ai-drafts'); jumpToSection('admin-ai-article-drafts'); }}
+          />
+          <ActionCard
+            title="Competitor Queue"
+            count={competitorOpportunities.filter((o) => o.status === 'new').length}
+            status="New projects found"
+            blurb="Candidates discovered externally but not listed yet."
+            actionLabel="Open Watch"
+            onAction={() => { setAdminView('competitor-watch'); jumpToSection('admin-competitor-watch'); }}
           />
           <ActionCard
             title="Today's Audit Entries"
@@ -2736,19 +5246,19 @@ export default function AdminPage() {
             status={auditNeedsAttentionStatus}
             blurb={auditNeedsAttentionBlurb}
             actionLabel="Open Audit Log"
-            onAction={() => jumpToSection('admin-audit-logs')}
+            onAction={() => { setAdminView('audit-logs'); jumpToSection('admin-audit-logs'); }}
           />
         </div>
       </section>
 
-      <section id="admin-content" className="rounded-2xl border border-sky-500/20 bg-sky-500/[0.05] p-4 space-y-4">
+      <section id="admin-content" className={`rounded-2xl border border-sky-500/20 bg-sky-500/[0.05] p-4 space-y-4 ${canShowSection('content') ? '' : 'hidden'}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-bold text-sky-200">CONTENT</h2>
             <p className="text-xs text-gray-300 mt-1">Run homepage and publishing from one place.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => { setContentView('airdrops'); jumpToSection('admin-airdrops'); }} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Manage Airdrops</button>
+            <button onClick={() => { setAdminView('airdrops'); setContentView('airdrops'); jumpToSection('admin-airdrops'); }} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Manage Airdrops</button>
             <button onClick={() => setContentView('articles')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Manage Articles</button>
             <button onClick={() => setContentView('hero')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Edit Homepage Hero</button>
             <button onClick={() => setContentView('featured')} className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200">Feature Project</button>
@@ -3098,7 +5608,453 @@ export default function AdminPage() {
         )}
       </section>
 
-      <section id="admin-ai-control" className="rounded-2xl border border-violet-500/20 bg-violet-500/[0.05] p-4 space-y-3">
+      <section id="admin-ai-article-drafts" className={`rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.05] p-4 space-y-3 ${canShowSection('ai-drafts') ? '' : 'hidden'}`}>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-indigo-200 flex items-center gap-2"><Newspaper className="w-4 h-4" /> AI Article Drafts</h2>
+            <p className="text-xs text-gray-400 mt-1">Generate one AI-assisted draft weekly. Admin review is always required before publication.</p>
+          </div>
+          <button
+            onClick={() => void generateWeeklyDraft()}
+            disabled={generatingDraft}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-indigo-400/30 bg-indigo-500/10 text-xs text-indigo-100 hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {generatingDraft ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {generatingDraft ? 'Generating...' : 'Generate Weekly Draft'}
+          </button>
+        </div>
+
+        {aiDraftsError && (
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">{aiDraftsError}</div>
+        )}
+
+        {aiDraftsLoading ? (
+          <div className="glass-card p-4 text-xs text-gray-400">Loading AI article drafts...</div>
+        ) : aiDrafts.length === 0 ? (
+          <div className="glass-card p-4 text-xs text-gray-500">No drafts yet. Generate the first weekly AI draft.</div>
+        ) : (
+          <div className="space-y-3">
+            {aiDrafts.map((draft) => (
+              <div key={draft.id} className="glass-card p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{draft.title}</p>
+                    <p className="text-[11px] text-gray-500">Week {draft.week_start} · {draft.slug}</p>
+                  </div>
+                  <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.08em] ${draft.status === 'verified_airdropguard' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' : draft.status === 'human_reviewed' ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200' : draft.status === 'published' ? 'border-violet-500/30 bg-violet-500/10 text-violet-200' : draft.status === 'rejected' ? 'border-rose-500/30 bg-rose-500/10 text-rose-200' : 'border-amber-500/30 bg-amber-500/10 text-amber-200'}`}>
+                    {draft.status.replace(/_/g, ' ')}
+                  </span>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <input
+                    value={draft.title}
+                    onChange={(event) => setAIDrafts((prev) => prev.map((row) => row.id === draft.id ? { ...row, title: event.target.value } : row))}
+                    className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                    placeholder="Draft title"
+                  />
+                  <input
+                    value={draft.slug}
+                    onChange={(event) => setAIDrafts((prev) => prev.map((row) => row.id === draft.id ? { ...row, slug: event.target.value } : row))}
+                    className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                    placeholder="draft-slug"
+                  />
+                  <input
+                    value={draft.meta_title}
+                    onChange={(event) => setAIDrafts((prev) => prev.map((row) => row.id === draft.id ? { ...row, meta_title: event.target.value } : row))}
+                    className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                    placeholder="Meta title"
+                  />
+                  <input
+                    value={draft.meta_description}
+                    onChange={(event) => setAIDrafts((prev) => prev.map((row) => row.id === draft.id ? { ...row, meta_description: event.target.value } : row))}
+                    className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                    placeholder="Meta description"
+                  />
+                </div>
+                <textarea
+                  value={draft.summary}
+                  onChange={(event) => setAIDrafts((prev) => prev.map((row) => row.id === draft.id ? { ...row, summary: event.target.value } : row))}
+                  rows={2}
+                  className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                  placeholder="Summary"
+                />
+                <textarea
+                  value={draft.body}
+                  onChange={(event) => setAIDrafts((prev) => prev.map((row) => row.id === draft.id ? { ...row, body: event.target.value } : row))}
+                  rows={6}
+                  className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                  placeholder="Draft body"
+                />
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button onClick={() => void updateDraft(draft.id, draft, 'Edit AI article draft')} className="px-3 py-1.5 rounded-lg border border-white/15 text-xs text-gray-200">Save Edits</button>
+                  <button onClick={() => void updateDraft(draft.id, { status: 'human_reviewed' }, 'Mark AI draft as Human Reviewed')} className="px-3 py-1.5 rounded-lg border border-cyan-500/25 bg-cyan-500/10 text-xs text-cyan-200">Mark Human Reviewed</button>
+                  <button onClick={() => void updateDraft(draft.id, { status: 'verified_airdropguard' }, 'Mark AI draft as Verified by AirdropGuard')} className="px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-200">Mark Verified</button>
+                  <button onClick={() => void updateDraft(draft.id, { status: 'published', published_at: new Date().toISOString() }, 'Publish AI article draft manually')} className="px-3 py-1.5 rounded-lg border border-violet-500/25 bg-violet-500/10 text-xs text-violet-200">Publish Manually</button>
+                  <button onClick={() => void updateDraft(draft.id, { status: 'rejected' }, 'Reject AI article draft')} className="px-3 py-1.5 rounded-lg border border-amber-500/25 bg-amber-500/10 text-xs text-amber-200">Reject</button>
+                  <button onClick={() => void deleteDraft(draft)} className="px-3 py-1.5 rounded-lg border border-rose-500/25 bg-rose-500/10 text-xs text-rose-200">Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section id="admin-competitor-watch" className={`rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/[0.05] p-4 space-y-3 ${canShowSection('competitor-watch') ? '' : 'hidden'}`}>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-fuchsia-200 flex items-center gap-2"><Radar className="w-4 h-4" /> Competitor Watch</h2>
+            <p className="text-xs text-gray-400 mt-1">Track external sources and queue new projects found for human review only.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-2.5 py-1 text-xs text-gray-300">
+              <input
+                type="checkbox"
+                checked={previewScanModeEnabled}
+                onChange={(event) => setPreviewScanModeEnabled(event.target.checked)}
+              />
+              Preview scan results mode
+            </label>
+            <button
+              onClick={() => void testCompetitorWatchEdgeFunction()}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/20 bg-white/[0.04] text-xs text-gray-200 hover:bg-white/[0.08]"
+            >
+              Test Edge Function
+            </button>
+            <button
+              onClick={() => void checkCompetitorSourcesNow()}
+              disabled={checkingCompetitors}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 text-xs text-fuchsia-100 hover:bg-fuchsia-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {checkingCompetitors ? <Loader2 className="w-4 h-4 animate-spin" /> : <Radar className="w-4 h-4" />}
+              {checkingCompetitors ? 'Checking...' : 'Check Sources Now'}
+            </button>
+          </div>
+        </div>
+
+        {competitorNotConfigured && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+            <p className="font-semibold text-amber-200">Competitor Watch is not configured yet.</p>
+            <p className="mt-1 text-amber-100/90">Apply migration 20260704174500_add_admin_growth_features.sql, refresh schema cache, then reload this section.</p>
+          </div>
+        )}
+
+        {competitorError && (
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+            <p className="font-semibold text-rose-200">{competitorError}</p>
+            {competitorErrorDetails && (
+              <details className="mt-2 text-[11px]">
+                <summary className="cursor-pointer text-rose-200/90">Debug details</summary>
+                <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-rose-500/20 bg-black/20 p-2 text-rose-100/90">{competitorErrorDetails}</pre>
+              </details>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+            <p className="text-[11px] text-gray-400">Sources monitored</p>
+            <p className="text-sm font-semibold text-white">{competitorAnalytics.sourcesMonitored}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+            <p className="text-[11px] text-gray-400">Successful scans today</p>
+            <p className="text-sm font-semibold text-white">{competitorAnalytics.successfulScansToday}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+            <p className="text-[11px] text-gray-400">New projects found today</p>
+            <p className="text-sm font-semibold text-white">{competitorAnalytics.newProjectsFoundToday}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+            <p className="text-[11px] text-gray-400">Average scan success</p>
+            <p className="text-sm font-semibold text-white">{Math.round(competitorAnalytics.averageScanSuccess * 100)}%</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+            <p className="text-[11px] text-gray-400">Projects imported</p>
+            <p className="text-sm font-semibold text-white">{competitorAnalytics.projectsImported}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+            <p className="text-[11px] text-gray-400">Projects ignored</p>
+            <p className="text-sm font-semibold text-white">{competitorAnalytics.projectsIgnored}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+            <p className="text-[11px] text-gray-400">Duplicate detections</p>
+            <p className="text-sm font-semibold text-white">{competitorAnalytics.duplicateDetections}</p>
+          </div>
+        </div>
+
+        <div className="glass-card p-3 space-y-2">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">Competitor Sources</p>
+          <div className="grid gap-2 md:grid-cols-3">
+            <input value={newSourceName} onChange={(event) => setNewSourceName(event.target.value)} className="bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" placeholder="Source name" />
+            <input value={newSourceUrl} onChange={(event) => setNewSourceUrl(event.target.value)} className="bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white md:col-span-2" placeholder="https://source-site.example" />
+          </div>
+          <button onClick={() => void addCompetitorSource()} className="px-3 py-1.5 rounded-lg border border-fuchsia-500/25 bg-fuchsia-500/10 text-xs text-fuchsia-200">Add Source</button>
+          <div className="space-y-2">
+            {sourceDashboardRows.map(({ source, scan }) => {
+              const scanMeta = COMPETITOR_SOURCE_SCAN_META[scan.status];
+              const healthMeta = SOURCE_HEALTH_META[scan.health];
+
+              return (
+                <div key={source.id} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-white font-medium">{source.source_name}</p>
+                      <p className="text-gray-500">{source.source_url}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${scanMeta.tone}`}>{scanMeta.label}</span>
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${healthMeta.tone}`}>Health: {healthMeta.label}</span>
+                      <button onClick={() => void removeCompetitorSource(source)} className="px-2 py-1 rounded border border-rose-500/25 text-rose-200">Remove</button>
+                    </div>
+                  </div>
+                  <div className="mt-2 grid gap-1 text-[11px] text-gray-400 md:grid-cols-5">
+                    <p>Last checked: {scan.lastCheckedAt ? new Date(scan.lastCheckedAt).toLocaleString() : 'Never scanned'}</p>
+                    <p>Scan duration: {scan.durationMs ? `${(scan.durationMs / 1000).toFixed(1)}s` : 'n/a'}</p>
+                    <p>Projects discovered: {scan.opportunitiesFound}</p>
+                    <p>New projects: {scan.newProjects}</p>
+                    <p>Duplicate projects: {scan.duplicateProjects}</p>
+                  </div>
+                  <div className="mt-1 grid gap-1 text-[11px] text-gray-500 md:grid-cols-4">
+                    <p>Failed extractions: {scan.failedExtractions}</p>
+                    <p>Last successful scan: {scan.lastSuccessfulScan ? new Date(scan.lastSuccessfulScan).toLocaleString() : 'None'}</p>
+                    <p>Success rate: {Math.round(scan.successRate * 100)}%</p>
+                    <p>Active: {source.is_active ? 'Yes' : 'No'}</p>
+                  </div>
+                  {competitorScanDebugResults[source.id] && (
+                    <details className="mt-2 rounded-lg border border-white/10 bg-black/20 p-2 text-[11px] text-gray-300">
+                      <summary className="cursor-pointer text-fuchsia-200">Debug scan output</summary>
+                      <div className="mt-2 grid gap-1 md:grid-cols-2">
+                        <p>Adapter used: {competitorScanDebugResults[source.id].adapterUsed || 'None'}</p>
+                        <p>Page fetched: {competitorScanDebugResults[source.id].pageFetched}</p>
+                        <p>Cards found: {competitorScanDebugResults[source.id].cardsFound}</p>
+                        <p>Valid candidates extracted: {competitorScanDebugResults[source.id].validCandidatesExtracted}</p>
+                        <p>Candidates rejected: {competitorScanDebugResults[source.id].candidatesRejected}</p>
+                        <p>Outcome reason: {competitorScanDebugResults[source.id].outcomeReason || 'n/a'}</p>
+                      </div>
+                      <p className="mt-1 text-gray-400">Rejection reasons: {Object.entries(competitorScanDebugResults[source.id].rejectionReasons).map(([reason, count]) => `${reason} (${count})`).join(', ') || 'None'}</p>
+                      {competitorScanDebugResults[source.id].rejectionSamples.length > 0 && (
+                        <p className="mt-1 text-gray-500">Samples: {competitorScanDebugResults[source.id].rejectionSamples.join(' | ')}</p>
+                      )}
+                    </details>
+                  )}
+                  <p className="mt-1 text-[11px] text-gray-500">Scan note: {scan.note}</p>
+                </div>
+              );
+            })}
+            {!competitorLoading && competitorSources.length === 0 && (
+              <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-gray-400">
+                <p className="font-semibold text-gray-200">Competitor Watch is not configured yet</p>
+                <p className="mt-1">Add your first source URL to begin discovering new projects.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="glass-card p-3 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">Preview Scan Results</p>
+            <span className="text-[11px] text-gray-400">Pending approvals: {prioritizedPendingDiscoveryCandidates.length}</span>
+          </div>
+          {prioritizedPendingDiscoveryCandidates.length === 0 ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-gray-400">
+              Run Check Sources Now to preview extracted candidates before inserting.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {prioritizedPendingDiscoveryCandidates.slice(0, 80).map((pending) => {
+                const priorityMeta = DISCOVERY_PRIORITY_META[pending.discoveryPriority];
+                const comparisonMeta = DISCOVERY_COMPARISON_META[pending.comparisonType];
+
+                return (
+                  <div key={pending.id} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium text-white">{pending.candidate.projectName}</p>
+                        <p className="text-[11px] text-gray-500">Source: {pending.sourceName} ({pending.adapterId})</p>
+                        <p className="text-[11px] text-gray-500">Listing: {pending.candidate.listingUrl}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${priorityMeta.tone}`}>{priorityMeta.label}</span>
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${comparisonMeta.tone}`}>{comparisonMeta.label}</span>
+                      </div>
+                    </div>
+                    <div className="mt-1 grid gap-1 text-[11px] text-gray-400 md:grid-cols-4">
+                      <p>Confidence score: {pending.confidenceScore}</p>
+                      <p>Discovery score: {pending.discoveryScore}</p>
+                      <p>Source mentions: {pending.sourceMentions}</p>
+                      <p>Checked: {new Date(pending.checkedAt).toLocaleString()}</p>
+                    </div>
+                    <p className="mt-1 text-[11px] text-gray-500">Why new: {pending.whyNew}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => void approvePendingDiscoveryCandidate(pending)}
+                        className="px-2.5 py-1 rounded border border-emerald-500/25 text-emerald-200 text-xs"
+                      >
+                        Approve Candidate
+                      </button>
+                      <button
+                        onClick={() => rejectPendingDiscoveryCandidate(pending)}
+                        className="px-2.5 py-1 rounded border border-white/20 text-gray-300 text-xs"
+                      >
+                        Reject Candidate
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="glass-card p-3 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">New Projects Found</p>
+            {genericCompetitorOpportunities.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] text-gray-500">Generic items: {genericCompetitorOpportunities.length}</span>
+                <button
+                  onClick={() => void bulkIgnoreGenericCompetitorOpportunities()}
+                  className="px-2.5 py-1 rounded border border-amber-500/25 text-amber-200 text-[11px]"
+                >
+                  Bulk Ignore Generic
+                </button>
+                <button
+                  onClick={() => void bulkDeleteGenericCompetitorOpportunities()}
+                  className="px-2.5 py-1 rounded border border-rose-500/25 text-rose-200 text-[11px]"
+                >
+                  Bulk Delete Generic
+                </button>
+              </div>
+            )}
+          </div>
+          {competitorLoading ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-gray-400">
+              Loading opportunities and source status...
+            </div>
+          ) : prioritizedCompetitorOpportunities.length === 0 ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-gray-400">
+              <p className="font-semibold text-gray-200">No valid project opportunities found. Try adding a direct airdrop listing page or a more specific source.</p>
+              <p className="mt-1">Run Check Sources Now after updating sources to re-scan for project-specific pages.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {prioritizedCompetitorOpportunities.slice(0, 50).map(({ opportunity, details, dynamicScore, dynamicPriority, dynamicMentions }) => {
+                const statusMeta = COMPETITOR_STATUS_META[opportunity.status];
+                const comparisonMeta = DISCOVERY_COMPARISON_META[details.comparisonType];
+                const priorityMeta = DISCOVERY_PRIORITY_META[dynamicPriority];
+                const canQueue = opportunity.status !== 'queued' && opportunity.status !== 'drafted';
+                const canIgnore = opportunity.status !== 'ignored' && opportunity.status !== 'drafted';
+                const canMarkDuplicate = opportunity.status !== 'duplicate' && opportunity.status !== 'drafted';
+                const canCreateDraft = opportunity.status !== 'drafted' && dynamicPriority === 'high';
+
+                return (
+                  <div key={opportunity.id} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium text-white">{opportunity.project_name}</p>
+                        <p className="text-[11px] text-gray-500">Source: {details.sourceLabel}</p>
+                        <p className="text-[11px] text-gray-500">Listing URL: {details.listingUrl}</p>
+                        {details.projectUrl && <p className="text-[11px] text-gray-500">Project URL: {details.projectUrl}</p>}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${priorityMeta.tone}`}>{priorityMeta.label}</span>
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${comparisonMeta.tone}`}>{comparisonMeta.label}</span>
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${statusMeta.tone}`}>{statusMeta.label}</span>
+                      </div>
+                    </div>
+                    <div className="mt-1 grid gap-1 text-[11px] text-gray-400 md:grid-cols-4">
+                      <p>Confidence: {getCompetitorConfidenceLabel(opportunity)}</p>
+                      <p>Confidence score: {details.confidenceScore}</p>
+                      <p>Discovery score: {dynamicScore}</p>
+                      <p>Sources mentioning: {dynamicMentions}</p>
+                    </div>
+                    <div className="mt-1 grid gap-1 text-[11px] text-gray-500 md:grid-cols-3">
+                      <p>Comparison: {details.compare}</p>
+                      <p>Why new: {details.whyNew}</p>
+                      <p>Discovered: {new Date(opportunity.discovered_at).toLocaleString()}</p>
+                    </div>
+                    {details.listingDate && <p className="mt-1 text-[11px] text-gray-400">Listing date: {details.listingDate}</p>}
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                      <span>Docs: {details.officialDocsUrl ? 'Yes' : 'No'}</span>
+                      <span>GitHub: {details.githubUrl ? 'Yes' : 'No'}</span>
+                      <span>X: {details.officialXUrl ? 'Yes' : 'No'}</span>
+                      <span>Discord: {details.officialDiscordUrl ? 'Yes' : 'No'}</span>
+                      <span>Blockchain: {opportunity.blockchain || 'Unknown'}</span>
+                    </div>
+                    {details.shortDescription && <p className="mt-1 text-xs text-gray-400">{details.shortDescription}</p>}
+                    <p className="mt-1 text-xs text-gray-400">Why matched: {opportunity.why_matched}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {canQueue && (
+                        <button
+                          onClick={() => void updateOpportunityStatus(opportunity, 'queued', 'Add competitor opportunity to review queue', 'Added to review queue')}
+                          className="px-2.5 py-1 rounded border border-cyan-500/25 text-cyan-200 text-xs"
+                        >
+                          Add to Review Queue
+                        </button>
+                      )}
+                      {canIgnore && (
+                        <button
+                          onClick={() => void updateOpportunityStatus(opportunity, 'ignored', 'Ignore competitor opportunity', 'Opportunity ignored')}
+                          className="px-2.5 py-1 rounded border border-white/20 text-gray-300 text-xs"
+                        >
+                          Ignore
+                        </button>
+                      )}
+                      {canMarkDuplicate && (
+                        <button
+                          onClick={() => void updateOpportunityStatus(opportunity, 'duplicate', 'Mark competitor opportunity as duplicate', 'Marked as duplicate')}
+                          className="px-2.5 py-1 rounded border border-amber-500/25 text-amber-200 text-xs"
+                        >
+                          Mark Duplicate
+                        </button>
+                      )}
+                      {canCreateDraft && (
+                        <button onClick={() => void createDraftFromOpportunity(opportunity)} className="px-2.5 py-1 rounded border border-emerald-500/25 text-emerald-200 text-xs">Create Draft Airdrop</button>
+                      )}
+                      {!canCreateDraft && dynamicPriority !== 'high' && (
+                        <span className="text-[11px] text-gray-500">Draft import enabled automatically for high-priority discoveries.</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="glass-card p-3 space-y-2">
+          <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">Discovery History</p>
+          {discoveryHistoryRows.length === 0 ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-gray-400">
+              No discovery history yet.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {discoveryHistoryRows.slice(0, 50).map((row) => {
+                const statusMeta = COMPETITOR_STATUS_META[row.status];
+                return (
+                  <div key={`${row.projectName}-${row.firstDiscovered}`} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-white">{row.projectName}</p>
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${statusMeta.tone}`}>{statusMeta.label}</span>
+                    </div>
+                    <div className="mt-1 grid gap-1 text-[11px] text-gray-400 md:grid-cols-5">
+                      <p>First discovered: {new Date(row.firstDiscovered).toLocaleString()}</p>
+                      <p>Discovered by: {row.discoveredBy}</p>
+                      <p>Sources mentioning: {row.sourceIds.size}</p>
+                      <p>Last checked: {new Date(row.lastChecked).toLocaleString()}</p>
+                      <p>Current status: {statusMeta.label}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section id="admin-ai-control" className={`rounded-2xl border border-violet-500/20 bg-violet-500/[0.05] p-4 space-y-3 ${canShowSection('system-tools') ? '' : 'hidden'}`}>
         <h2 className="text-sm font-bold text-violet-200">AI CONTROL</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           <button onClick={refreshAllAnalysis} className="px-3 py-2 rounded-xl border border-violet-400/25 bg-violet-500/10 text-xs text-violet-200">Refresh all projects</button>
@@ -3109,7 +6065,7 @@ export default function AdminPage() {
         <div className="text-xs text-gray-300">AI health: {stats?.analyzedAirdrops ?? 0}/{stats?.totalAirdrops ?? 0} projects analysed.</div>
       </section>
 
-      <section id="admin-ai-queue" className="glass-card p-4">
+      <section id="admin-ai-queue" className={`glass-card p-4 ${canShowSection('system-tools') ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs uppercase tracking-wider text-violet-300 font-semibold">Failed AI queue</h3>
           <span className="text-xs text-gray-400">{failedAiQueue.length} pending</span>
@@ -3125,7 +6081,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section id="admin-site-health" className="rounded-2xl border border-rose-500/20 bg-rose-500/[0.04] p-4 space-y-3">
+      <section id="admin-site-health" className={`rounded-2xl border border-rose-500/20 bg-rose-500/[0.04] p-4 space-y-3 ${canShowSection('system-tools') ? '' : 'hidden'}`}>
         <h2 className="text-sm font-bold text-rose-200">SITE HEALTH</h2>
         <div className="space-y-2 text-xs">
           {[
@@ -3149,7 +6105,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section id="admin-users" className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+      <section id="admin-users" className={`rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-3 ${canShowSection('users') ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-bold text-white">USERS</h2>
           <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search users" className="w-52 bg-dark-900/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white" />
@@ -3186,7 +6142,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section id="admin-revenue" className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.05] p-4 space-y-3">
+      <section id="admin-revenue" className={`rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.05] p-4 space-y-3 ${canShowSection('api') ? '' : 'hidden'}`}>
         <h2 className="text-sm font-bold text-emerald-200">REVENUE</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
           <div className="rounded-xl border border-emerald-500/20 px-3 py-2"><p className="text-emerald-100/80">Banner enquiries</p><p className="text-white font-semibold">{pendingBannerEnquiries}</p></div>
@@ -3202,7 +6158,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section id="admin-audit-logs" className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.04] p-4 space-y-3">
+      <section id="admin-audit-logs" className={`rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.04] p-4 space-y-3 ${canShowSection('audit-logs') ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-bold text-cyan-200">ADMIN AUDIT LOG</h2>
@@ -3345,7 +6301,7 @@ export default function AdminPage() {
       </section>
 
       {/* ── Airdrop table ──────────────────────────────────────────────────── */}
-      <section id="admin-advertising">
+      <section id="admin-advertising" className={canShowSection('banners') ? '' : 'hidden'}>
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
@@ -3558,7 +6514,7 @@ export default function AdminPage() {
         })()}
       </section>
 
-      <section id="admin-airdrops">
+      <section id="admin-airdrops" className={canShowSection('airdrops') ? '' : 'hidden'}>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Airdrops</h2>
         <div className="glass-card overflow-x-auto">
           <table className="w-full text-sm min-w-[680px]">
@@ -3712,7 +6668,7 @@ export default function AdminPage() {
       </section>
 
       {/* ── Scam report review ─────────────────────────────────────────────── */}
-      <section id="admin-scam-reports">
+      <section id="admin-scam-reports" className={canShowSection('submissions') ? '' : 'hidden'}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -3898,7 +6854,7 @@ export default function AdminPage() {
       </section>
 
       {/* ── Submissions table ──────────────────────────────────────────────── */}
-      <section id="admin-submissions">
+      <section id="admin-submissions" className={canShowSection('submissions') ? '' : 'hidden'}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
             <FileText className="w-3.5 h-3.5" />
@@ -4098,6 +7054,25 @@ export default function AdminPage() {
           </div>
         )}
       </section>
+
+        </div>
+      </div>
+
+      <div className="lg:hidden fixed bottom-3 inset-x-3 z-40">
+        <div className="rounded-2xl border border-white/10 bg-dark-900/90 backdrop-blur-md p-2 shadow-xl">
+          <div className="flex gap-2 overflow-x-auto pb-0.5">
+            {adminNavItems.map((item) => (
+              <button
+                key={`mobile-nav-${item.id}`}
+                onClick={() => setAdminView(item.id)}
+                className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors min-h-[42px] ${adminView === item.id ? 'border-cyan-400/40 bg-cyan-500/12 text-cyan-100' : 'border-white/10 bg-dark-900/60 text-gray-300 hover:border-white/20 hover:text-white'}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
       {bannerModalMode && (
