@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, useCallback, useMemo } from 'react';
+import { Fragment, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -13,6 +13,15 @@ import {
 } from 'lucide-react';
 import type { Airdrop, Blockchain, Category } from '../lib/types';
 import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
+import {
+  DEFAULT_ARTICLE_CHECKLIST,
+  DEFAULT_ARTICLE_TRUST_PROFILES,
+  type ArticleReviewChecklist,
+  type ArticleTrustProfile,
+  type VerificationStatus,
+  verificationStatusLabel,
+  verificationStatusTone,
+} from '../lib/articleTrust';
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +45,65 @@ function ToastBar({ toast, onDismiss }: { toast: Toast; onDismiss: () => void })
       <button onClick={onDismiss} aria-label="Dismiss notification" className="ml-1 opacity-60 hover:opacity-100 transition-opacity">
         <X className="w-3.5 h-3.5" />
       </button>
+    </div>
+  );
+}
+
+function VerificationNotesModal({
+  open,
+  actionLabel,
+  notes,
+  onNotesChange,
+  onCancel,
+  onConfirm,
+  saving,
+}: {
+  open: boolean;
+  actionLabel: string;
+  notes: string;
+  onNotesChange: (value: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+  saving: boolean;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm px-4 py-8 overflow-y-auto" role="dialog" aria-modal="true" aria-label="Verification audit notes">
+      <div className="max-w-lg mx-auto rounded-2xl border border-white/10 bg-dark-900/95 shadow-2xl p-5 sm:p-6">
+        <p className="text-[11px] uppercase tracking-[0.14em] text-sky-200">Human Verification Required</p>
+        <h3 className="mt-2 text-lg font-bold text-white">Save Verification</h3>
+        <p className="mt-2 text-xs text-gray-400 leading-relaxed">{actionLabel}</p>
+
+        <label className="mt-4 block space-y-1.5">
+          <span className="text-[11px] text-gray-300">Audit Notes <span className="text-rose-300">(required)</span></span>
+          <textarea
+            value={notes}
+            onChange={(event) => onNotesChange(event.target.value)}
+            rows={4}
+            placeholder="Explain why this verification decision was approved."
+            className="w-full bg-dark-800/70 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-sky-400/40 resize-none"
+          />
+        </label>
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            onClick={onCancel}
+            disabled={saving}
+            className="px-4 py-2 rounded-xl border border-white/15 text-sm text-gray-300 hover:text-white hover:border-white/30 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={saving || !notes.trim()}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-sky-400/30 bg-sky-500/15 text-sm font-medium text-sky-100 hover:bg-sky-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Save Verification
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -204,7 +272,9 @@ type ContentView = 'airdrops' | 'articles' | 'hero' | 'featured' | 'trending' | 
 
 interface ControlArticle {
   id: string;
+  articleKey: string;
   title: string;
+  urlPath: string;
   status: 'draft' | 'scheduled' | 'published';
   updatedAt: string;
 }
@@ -228,6 +298,7 @@ type AdminAuditPayload = {
 type AdminAuditLog = {
   id: string;
   action_at: string;
+  created_at: string;
   admin_user_id: string | null;
   admin_identifier: string;
   action_taken: string;
@@ -973,21 +1044,77 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
+  const verificationNotesResolverRef = useRef<((notes: string | null) => void) | null>(null);
+  const [verificationModalOpen, setVerificationModalOpen] = useState(false);
+  const [verificationModalActionLabel, setVerificationModalActionLabel] = useState('');
+  const [verificationModalNotes, setVerificationModalNotes] = useState('');
+  const [verificationModalSaving, setVerificationModalSaving] = useState(false);
 
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
   }, []);
 
-  const promptHumanVerificationNotes = useCallback((actionLabel: string) => {
-    const input = window.prompt(`Human verification required for: ${actionLabel}\n\nAdd reviewer notes (required):`, '');
-    if (input === null) return null;
-    const notes = input.trim();
-    if (!notes) {
-      showToast('Human verification notes are required for publish actions.', 'error');
-      return null;
+  const formatSupabaseError = useCallback((error: unknown) => {
+    const err = error as {
+      code?: string;
+      message?: string;
+      details?: string | null;
+      hint?: string | null;
+    };
+
+    return [err?.code, err?.message, err?.details, err?.hint]
+      .filter((part) => Boolean(part && String(part).trim()))
+      .join(' | ');
+  }, []);
+
+  const dismissVerificationModal = useCallback((result: string | null) => {
+    verificationNotesResolverRef.current?.(result);
+    verificationNotesResolverRef.current = null;
+    setVerificationModalSaving(false);
+    setVerificationModalNotes('');
+    setVerificationModalActionLabel('');
+    setVerificationModalOpen(false);
+  }, []);
+
+  const cancelVerificationModal = useCallback(() => {
+    console.info('[Admin][ArticleTrust] Verification notes modal cancelled');
+    showToast('Save cancelled. Audit Notes are required.', 'error');
+    dismissVerificationModal(null);
+  }, [dismissVerificationModal, showToast]);
+
+  const confirmVerificationModal = useCallback(() => {
+    const trimmedNotes = verificationModalNotes.trim();
+    if (!trimmedNotes) {
+      showToast('Audit Notes are required.', 'error');
+      return;
     }
-    return notes;
-  }, [showToast]);
+    setVerificationModalSaving(true);
+    dismissVerificationModal(trimmedNotes);
+  }, [verificationModalNotes, dismissVerificationModal, showToast]);
+
+  const promptHumanVerificationNotes = useCallback((actionLabel: string): Promise<string | null> => {
+    if (verificationModalOpen) {
+      showToast('Finish the current verification modal first.', 'error');
+      return Promise.resolve(null);
+    }
+
+    console.info('[Admin][ArticleTrust] Opening verification notes modal', { actionLabel });
+    setVerificationModalActionLabel(actionLabel);
+    setVerificationModalNotes('');
+    setVerificationModalSaving(false);
+    setVerificationModalOpen(true);
+
+    return new Promise((resolve) => {
+      verificationNotesResolverRef.current = resolve;
+    });
+  }, [verificationModalOpen, showToast]);
+
+  useEffect(() => () => {
+    if (verificationNotesResolverRef.current) {
+      verificationNotesResolverRef.current(null);
+      verificationNotesResolverRef.current = null;
+    }
+  }, []);
 
   const logAdminAudit = useCallback(async ({
     actionTaken,
@@ -998,7 +1125,7 @@ export default function AdminPage() {
   }: AdminAuditPayload) => {
     const adminIdentifier = (user as { email?: string } | null)?.email || user?.id || 'admin';
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('admin_audit_logs')
       .insert({
         admin_user_id: user?.id ?? null,
@@ -1008,10 +1135,25 @@ export default function AdminPage() {
         final_decision: finalDecision,
         notes: notes ?? null,
         context: context ?? {},
-      });
+      })
+      .select('*')
+      .single();
 
     if (error) {
-      console.warn('admin_audit_logs unavailable or insert failed', error);
+      console.warn('admin_audit_logs insert failed', {
+        code: (error as { code?: string }).code,
+        message: error.message,
+        details: (error as { details?: string | null }).details ?? null,
+        hint: (error as { hint?: string | null }).hint ?? null,
+      });
+      return;
+    }
+
+    if (data) {
+      setAuditLogs((prev) => {
+        if (prev.some((row) => row.id === data.id)) return prev;
+        return [data as AdminAuditLog, ...prev];
+      });
     }
   }, [user]);
 
@@ -1079,10 +1221,25 @@ export default function AdminPage() {
   const [previewBannerId, setPreviewBannerId] = useState<string | null>(null);
   const [contentView, setContentView] = useState<ContentView>('airdrops');
   const [controlArticles, setControlArticles] = useState<ControlArticle[]>([
-    { id: 'article-1', title: 'How to avoid fake airdrop clones', status: 'draft', updatedAt: new Date().toISOString() },
-    { id: 'article-2', title: 'Layer 2 airdrop playbook 2026', status: 'scheduled', updatedAt: new Date().toISOString() },
-    { id: 'article-3', title: 'Wallet hygiene checklist', status: 'published', updatedAt: new Date().toISOString() },
+    {
+      id: 'article-layer2',
+      articleKey: 'layer-2-airdrops-2026',
+      title: 'Ethereum Layer 2 Airdrops in 2026: Security, ROI and Risk Framework',
+      urlPath: '/articles/layer-2-airdrops-2026',
+      status: 'published',
+      updatedAt: new Date().toISOString(),
+    },
   ]);
+  const [articleTrustProfiles, setArticleTrustProfiles] = useState<Record<string, ArticleTrustProfile>>(() => {
+    const entries = DEFAULT_ARTICLE_TRUST_PROFILES.map((profile) => [profile.articleKey, profile] as const);
+    return Object.fromEntries(entries);
+  });
+  const [articleReviewInternal, setArticleReviewInternal] = useState<Record<string, ArticleReviewChecklist>>({
+    'layer-2-airdrops-2026': DEFAULT_ARTICLE_CHECKLIST,
+  });
+  const [selectedArticleKey, setSelectedArticleKey] = useState('layer-2-airdrops-2026');
+  const [articleTrustLoading, setArticleTrustLoading] = useState(false);
+  const [articleTrustSaving, setArticleTrustSaving] = useState(false);
   const [homepageHeroTitle, setHomepageHeroTitle] = useState('Discover safer airdrops before you connect');
   const [homepageHeroSubtext, setHomepageHeroSubtext] = useState('AI-assisted intelligence with human-reviewed trust signals.');
   const [featuredProjectId, setFeaturedProjectId] = useState<string>('');
@@ -1249,6 +1406,25 @@ export default function AdminPage() {
     ? 'Audit log fetch failed. Open section to retry safely.'
     : 'Trace publish, reject, approve, feature, banner and article decisions.';
 
+  const selectedControlArticle = useMemo(
+    () => controlArticles.find((article) => article.articleKey === selectedArticleKey) ?? controlArticles[0] ?? null,
+    [controlArticles, selectedArticleKey]
+  );
+
+  const selectedArticleProfile = useMemo(() => {
+    if (!selectedControlArticle) return null;
+    return (
+      articleTrustProfiles[selectedControlArticle.articleKey] ||
+      DEFAULT_ARTICLE_TRUST_PROFILES.find((profile) => profile.articleKey === selectedControlArticle.articleKey) ||
+      null
+    );
+  }, [selectedControlArticle, articleTrustProfiles]);
+
+  const selectedArticleChecklist = useMemo(() => {
+    if (!selectedControlArticle) return DEFAULT_ARTICLE_CHECKLIST;
+    return articleReviewInternal[selectedControlArticle.articleKey] || DEFAULT_ARTICLE_CHECKLIST;
+  }, [selectedControlArticle, articleReviewInternal]);
+
   const newUsersCount = useMemo(() => {
     const last7 = Date.now() - 7 * 86_400_000;
     return opsUsers.filter((u) => new Date(u.createdAt).getTime() >= last7).length;
@@ -1327,6 +1503,123 @@ export default function AdminPage() {
     }
   }, [submissions]);
 
+  const fetchArticleTrustData = useCallback(async () => {
+    setArticleTrustLoading(true);
+
+    try {
+      const [profileRes, internalRes] = await Promise.all([
+        supabase
+          .from('article_verification_profiles')
+          .select('article_key, title, url_path, publication_status, verification_status, reviewed_by, reviewed_at, last_updated_at, estimated_read_minutes, official_docs_url, official_github_url, official_website_url, official_x_url, official_blog_url, updated_at')
+          .order('updated_at', { ascending: false }),
+        supabase
+          .from('article_review_internal')
+          .select('article_key, facts_checked, sources_verified, links_tested, scam_guidance_reviewed, security_advice_reviewed, grammar_checked, internal_review_notes'),
+      ]);
+
+      if (profileRes.error) {
+        const code = (profileRes.error as { code?: string }).code;
+        if (code === 'PGRST205') {
+          showToast('Article trust table missing in Supabase. Apply migration 20260704113000_add_article_trust_verification_tables.sql.', 'error');
+        } else if (code === '42501') {
+          showToast('No permission to load article trust data. Confirm admin user mapping in admin_users.', 'error');
+        }
+      }
+
+      if (!profileRes.error && profileRes.data) {
+        const byKey: Record<string, ArticleTrustProfile> = {};
+        const controlRows: ControlArticle[] = [];
+
+        profileRes.data.forEach((row) => {
+          const profile: ArticleTrustProfile = {
+            articleKey: String(row.article_key),
+            title: String(row.title),
+            urlPath: String(row.url_path),
+            publicationStatus: row.publication_status,
+            verificationStatus: row.verification_status,
+            reviewedBy: String(row.reviewed_by || 'AirdropGuard Team'),
+            reviewedAt: row.reviewed_at,
+            lastUpdatedAt: row.last_updated_at,
+            estimatedReadMinutes: Number(row.estimated_read_minutes || 8),
+            sources: {
+              officialDocsUrl: row.official_docs_url,
+              githubUrl: row.official_github_url,
+              officialWebsiteUrl: row.official_website_url,
+              officialXUrl: row.official_x_url,
+              officialBlogUrl: row.official_blog_url,
+            },
+          };
+
+          byKey[profile.articleKey] = profile;
+          controlRows.push({
+            id: `article-${profile.articleKey}`,
+            articleKey: profile.articleKey,
+            title: profile.title,
+            urlPath: profile.urlPath,
+            status: profile.publicationStatus,
+            updatedAt: profile.lastUpdatedAt || new Date().toISOString(),
+          });
+        });
+
+        if (Object.keys(byKey).length > 0) {
+          setArticleTrustProfiles(byKey);
+          setControlArticles(controlRows);
+          setSelectedArticleKey(controlRows[0]?.articleKey || 'layer-2-airdrops-2026');
+        }
+      }
+
+      if (!internalRes.error && internalRes.data) {
+        const checklistByKey: Record<string, ArticleReviewChecklist> = {};
+        internalRes.data.forEach((row) => {
+          checklistByKey[String(row.article_key)] = {
+            factsChecked: Boolean(row.facts_checked),
+            sourcesVerified: Boolean(row.sources_verified),
+            linksTested: Boolean(row.links_tested),
+            scamGuidanceReviewed: Boolean(row.scam_guidance_reviewed),
+            securityAdviceReviewed: Boolean(row.security_advice_reviewed),
+            grammarChecked: Boolean(row.grammar_checked),
+            internalReviewNotes: String(row.internal_review_notes || ''),
+          };
+        });
+        setArticleReviewInternal((prev) => ({ ...prev, ...checklistByKey }));
+      }
+    } finally {
+      setArticleTrustLoading(false);
+    }
+  }, [showToast]);
+
+  const updateSelectedArticleProfile = useCallback((patch: Partial<ArticleTrustProfile>) => {
+    if (!selectedControlArticle) return;
+    setArticleTrustProfiles((prev) => {
+      const existing = prev[selectedControlArticle.articleKey] || DEFAULT_ARTICLE_TRUST_PROFILES[0];
+      return {
+        ...prev,
+        [selectedControlArticle.articleKey]: {
+          ...existing,
+          ...patch,
+          sources: {
+            ...existing.sources,
+            ...(patch.sources || {}),
+          },
+        },
+      };
+    });
+  }, [selectedControlArticle]);
+
+  const updateSelectedArticleChecklist = useCallback((patch: Partial<ArticleReviewChecklist>) => {
+    if (!selectedControlArticle) return;
+    setArticleReviewInternal((prev) => {
+      const existing = prev[selectedControlArticle.articleKey] || DEFAULT_ARTICLE_CHECKLIST;
+      return {
+        ...prev,
+        [selectedControlArticle.articleKey]: {
+          ...existing,
+          ...patch,
+        },
+      };
+    });
+  }, [selectedControlArticle]);
+
   const openAdd = () => { setForm(BLANK_FORM); setEditingId(null); setModalMode('add'); };
 
   const openAddBanner = () => {
@@ -1360,7 +1653,7 @@ export default function AdminPage() {
   const saveBannerForm = async () => {
     const resolvedStatus = deriveBannerStatus(bannerForm.status, bannerForm.startDate, bannerForm.endDate);
     const requiresPublishReview = resolvedStatus === 'Live';
-    const reviewNotes = requiresPublishReview ? promptHumanVerificationNotes(`Publish banner for ${bannerForm.advertiserName || 'unknown advertiser'}`) : '';
+    const reviewNotes = requiresPublishReview ? await promptHumanVerificationNotes(`Publish banner for ${bannerForm.advertiserName || 'unknown advertiser'}`) : '';
     if (requiresPublishReview && !reviewNotes) return;
 
     if (bannerModalMode === 'add') {
@@ -1529,7 +1822,7 @@ export default function AdminPage() {
       const existing = editingId ? airdrops.find((row) => row.id === editingId) : null;
       const publishingNow = form.published && !existing?.published;
       const reviewNotes = publishingNow
-        ? promptHumanVerificationNotes(`Publish airdrop ${form.name.trim()}`)
+        ? await promptHumanVerificationNotes(`Publish airdrop ${form.name.trim()}`)
         : '';
 
       if (publishingNow && !reviewNotes) {
@@ -1775,7 +2068,7 @@ export default function AdminPage() {
     try {
       const { data, error } = await supabase
         .from('admin_audit_logs')
-        .select('*')
+        .select('id, action_at, created_at, admin_user_id, admin_identifier, action_taken, ai_recommendation, final_decision, notes, context')
         .order('action_at', { ascending: false })
         .limit(500);
 
@@ -1783,7 +2076,30 @@ export default function AdminPage() {
       setAuditLogs((data ?? []) as AdminAuditLog[]);
     } catch (error) {
       setAuditLogs([]);
-      setAuditError(error instanceof Error ? error.message : 'Unable to load admin audit logs.');
+      const supabaseError = error as {
+        code?: string;
+        message?: string;
+        details?: string | null;
+        hint?: string | null;
+      };
+
+      console.error('admin_audit_logs fetch failed', {
+        code: supabaseError?.code,
+        message: supabaseError?.message,
+        details: supabaseError?.details,
+        hint: supabaseError?.hint,
+      });
+
+      if (supabaseError?.code === 'PGRST205') {
+        setAuditError('Audit log table is not initialized in the current Supabase project. Apply migration 20260704093000_add_admin_audit_logs.sql.');
+      } else if (supabaseError?.code === '42501') {
+        setAuditError('Permission denied reading admin audit logs. Confirm admin account exists in admin_users and RLS policies are applied.');
+      } else {
+        const details = [supabaseError?.message, supabaseError?.details, supabaseError?.hint]
+          .filter(Boolean)
+          .join(' | ');
+        setAuditError(details || 'Unable to load admin audit logs.');
+      }
     } finally {
       setAuditLoading(false);
     }
@@ -1796,8 +2112,9 @@ export default function AdminPage() {
       fetchSubmissions();
       fetchScamReports();
       fetchAuditLogs();
+      fetchArticleTrustData();
     }
-  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs]);
+  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -1903,6 +2220,151 @@ export default function AdminPage() {
     await supabase.from('airdrop_submissions').update({ admin_notes: subNotes[id] ?? '' }).eq('id', id);
     setSubmissions(prev => prev.map(s => s.id === id ? { ...s, admin_notes: subNotes[id] ?? '' } : s));
   };
+
+  const setArticlePublicationStatus = useCallback((articleId: string, status: ControlArticle['status']) => {
+    setControlArticles((prev) => prev.map((row) => {
+      if (row.id !== articleId) return row;
+      return { ...row, status, updatedAt: new Date().toISOString() };
+    }));
+  }, []);
+
+  const saveArticleTrustChanges = useCallback(async () => {
+    console.info('[Admin][ArticleTrust] Save requested', {
+      hasSelectedArticle: Boolean(selectedControlArticle),
+      articleKey: selectedControlArticle?.articleKey ?? null,
+      hasProfile: Boolean(selectedArticleProfile),
+      isSaving: articleTrustSaving,
+    });
+
+    if (articleTrustSaving) {
+      console.warn('[Admin][ArticleTrust] Save ignored because save is already in progress');
+      showToast('Save already in progress. Please wait...');
+      return;
+    }
+
+    if (!selectedControlArticle || !selectedArticleProfile) {
+      console.warn('[Admin][ArticleTrust] Save aborted due to missing selected article/profile', {
+        selectedControlArticle,
+        selectedArticleProfile,
+      });
+      showToast('Unable to save: no article is selected.', 'error');
+      return;
+    }
+
+    const reviewNotes = await promptHumanVerificationNotes(`Update trust verification for article \"${selectedControlArticle.title}\"`);
+    if (!reviewNotes) {
+      console.warn('[Admin][ArticleTrust] Save aborted because verification notes were not provided');
+      return;
+    }
+
+    setArticleTrustSaving(true);
+
+    try {
+      console.info('[Admin][ArticleTrust] Save started', {
+        articleKey: selectedControlArticle.articleKey,
+        publicationStatus: selectedControlArticle.status,
+        verificationStatus: selectedArticleProfile.verificationStatus,
+      });
+
+      const checklist = selectedArticleChecklist;
+      const reviewedAtValue = selectedArticleProfile.reviewedAt
+        ? selectedArticleProfile.reviewedAt
+        : new Date().toISOString().split('T')[0];
+
+      const profilePayload = {
+        article_key: selectedControlArticle.articleKey,
+        title: selectedControlArticle.title,
+        url_path: selectedControlArticle.urlPath,
+        publication_status: selectedControlArticle.status,
+        verification_status: selectedArticleProfile.verificationStatus,
+        reviewed_by: selectedArticleProfile.reviewedBy || 'AirdropGuard Team',
+        reviewed_at: reviewedAtValue,
+        last_updated_at: selectedArticleProfile.lastUpdatedAt || new Date().toISOString(),
+        estimated_read_minutes: Math.max(1, Number(selectedArticleProfile.estimatedReadMinutes || 8)),
+        official_docs_url: selectedArticleProfile.sources.officialDocsUrl || null,
+        official_github_url: selectedArticleProfile.sources.githubUrl || null,
+        official_website_url: selectedArticleProfile.sources.officialWebsiteUrl || null,
+        official_x_url: selectedArticleProfile.sources.officialXUrl || null,
+        official_blog_url: selectedArticleProfile.sources.officialBlogUrl || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const internalPayload = {
+        article_key: selectedControlArticle.articleKey,
+        facts_checked: checklist.factsChecked,
+        sources_verified: checklist.sourcesVerified,
+        links_tested: checklist.linksTested,
+        scam_guidance_reviewed: checklist.scamGuidanceReviewed,
+        security_advice_reviewed: checklist.securityAdviceReviewed,
+        grammar_checked: checklist.grammarChecked,
+        internal_review_notes: checklist.internalReviewNotes || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.debug('[Admin][ArticleTrust] Upsert payloads prepared', {
+        articleKey: selectedControlArticle.articleKey,
+        profilePayload,
+        internalPayload,
+      });
+
+      const [profileRes, internalRes] = await Promise.all([
+        supabase.from('article_verification_profiles').upsert(profilePayload, { onConflict: 'article_key' }),
+        supabase.from('article_review_internal').upsert(internalPayload, { onConflict: 'article_key' }),
+      ]);
+
+      console.info('[Admin][ArticleTrust] Upsert responses received', {
+        profileError: profileRes.error,
+        internalError: internalRes.error,
+      });
+
+      if (profileRes.error) throw profileRes.error;
+      if (internalRes.error) throw internalRes.error;
+
+      await logAdminAudit({
+        actionTaken: 'Update article trust verification',
+        aiRecommendation: `Status ${verificationStatusLabel(selectedArticleProfile.verificationStatus)} | Publication ${selectedControlArticle.status}`,
+        finalDecision: 'Human verified metadata updated',
+        notes: reviewNotes,
+        context: {
+          articleId: selectedControlArticle.articleKey,
+          title: selectedControlArticle.title,
+          verificationStatus: selectedArticleProfile.verificationStatus,
+          publicationStatus: selectedControlArticle.status,
+          checklist,
+        },
+      });
+
+      console.info('[Admin][ArticleTrust] Save succeeded', {
+        articleKey: selectedControlArticle.articleKey,
+      });
+
+      showToast('Verification metadata saved');
+      await fetchArticleTrustData();
+    } catch (error) {
+      const exactError = formatSupabaseError(error) || (error instanceof Error ? error.message : 'Unknown error');
+      console.error('[Admin][ArticleTrust] Save failed', {
+        articleKey: selectedControlArticle.articleKey,
+        error,
+        exactError,
+      });
+      showToast(`Unable to save article trust changes: ${exactError}`, 'error');
+    } finally {
+      setArticleTrustSaving(false);
+      console.info('[Admin][ArticleTrust] Save finished', {
+        articleKey: selectedControlArticle.articleKey,
+      });
+    }
+  }, [
+    articleTrustSaving,
+    selectedControlArticle,
+    selectedArticleProfile,
+    selectedArticleChecklist,
+    formatSupabaseError,
+    promptHumanVerificationNotes,
+    logAdminAudit,
+    showToast,
+    fetchArticleTrustData,
+  ]);
 
   const analyzeSubmission = async (sub: Submission) => {
     setAnalyzingSub(sub.id);
@@ -2040,6 +2502,38 @@ export default function AdminPage() {
       </div>
 
       <section id="admin-needs-attention">
+        <div className="rounded-2xl border border-white/10 bg-[linear-gradient(145deg,rgba(10,16,34,0.96),rgba(8,14,28,0.92))] p-4 mb-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.14em] text-cyan-200">Platform Overview</p>
+              <h2 className="mt-1 text-xl font-bold text-white">AirdropGuard Admin Control Centre</h2>
+              <p className="mt-1 text-xs text-gray-400">Human-verified operations across listings, submissions, content, banners, API access and audit history.</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[11px] text-gray-500">Recent Activity</p>
+              <p className="text-lg font-semibold text-cyan-200">{auditLoading ? '…' : auditEntriesTodayCount} audit entries today</p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+            {[
+              { label: 'Total Users', value: usersLoading ? '…' : String(opsUsers.length) },
+              { label: 'Total Airdrops', value: String(stats?.totalAirdrops ?? 0) },
+              { label: 'Pending Reviews', value: String(stats?.pendingSubmissions ?? 0) },
+              { label: 'Approved Airdrops', value: String(stats?.publishedAirdrops ?? 0) },
+              { label: 'Featured Airdrops', value: String(airdrops.filter((a) => a.is_featured).length) },
+              { label: 'Active API Keys', value: String(stats?.activeKeys ?? 0) },
+              { label: 'Revenue', value: `$${estimatedRevenuePipeline}` },
+              { label: 'Recent Activity', value: auditLoading ? '…' : String(auditEntriesTodayCount) },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <p className="text-[10px] uppercase tracking-[0.1em] text-gray-500">{item.label}</p>
+                <p className="mt-1 text-sm font-semibold text-white tabular-nums">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold text-amber-300">🚨 Needs Attention Today</h2>
           {statsLoading && <Loader2 className="w-3 h-3 text-gray-600 animate-spin" />}
@@ -2133,43 +2627,243 @@ export default function AdminPage() {
         </div>
 
         {contentView === 'articles' && (
-          <div className="glass-card p-4">
-            <p className="text-xs uppercase tracking-wider text-sky-200 mb-2">Articles</p>
-            <div className="space-y-2">
-              {controlArticles.map((article) => (
-                <div key={article.id} className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2 text-xs">
-                  <div>
-                    <p className="text-white font-medium">{article.title}</p>
-                    <p className="text-gray-500">{article.status}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setControlArticles((prev) => prev.map((row) => row.id === article.id ? { ...row, status: 'draft', updatedAt: new Date().toISOString() } : row))}
-                      className="px-2.5 py-1 rounded-lg border border-white/15 text-gray-300"
-                    >Draft</button>
-                    <button
-                      onClick={async () => {
-                        const reviewNotes = promptHumanVerificationNotes(`Publish article \"${article.title}\"`);
-                        if (!reviewNotes) return;
-
-                        setControlArticles((prev) => prev.map((row) => row.id === article.id ? { ...row, status: 'published', updatedAt: new Date().toISOString() } : row));
-                        await logAdminAudit({
-                          actionTaken: 'Publish article',
-                          aiRecommendation: 'Draft article prepared by AI-assisted workflow',
-                          finalDecision: 'Published',
-                          notes: reviewNotes,
-                          context: {
-                            articleId: article.id,
-                            title: article.title,
-                          },
-                        });
-                      }}
-                      className="px-2.5 py-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
-                    >Publish</button>
-                  </div>
-                </div>
-              ))}
+          <div className="glass-card p-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-sky-200">Article Trust & Verification</p>
+                <p className="text-[11px] text-gray-400 mt-1">AI discovers content opportunities. Human reviewers verify and publish.</p>
+              </div>
+              <button
+                onClick={() => void fetchArticleTrustData()}
+                className="px-2.5 py-1 rounded-lg border border-white/15 text-[11px] text-gray-300 hover:border-sky-300/30 hover:text-white"
+              >
+                Refresh
+              </button>
             </div>
+
+            {articleTrustLoading ? (
+              <div className="rounded-xl border border-white/10 bg-dark-900/40 p-4 text-xs text-gray-400">Loading article verification data...</div>
+            ) : (
+              <>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {controlArticles.map((article) => {
+                    const profile = articleTrustProfiles[article.articleKey];
+                    const verificationStatus = profile?.verificationStatus || 'ai_assisted_draft';
+
+                    return (
+                      <button
+                        key={article.id}
+                        onClick={() => setSelectedArticleKey(article.articleKey)}
+                        className={`rounded-xl border px-3 py-2 text-left transition-colors ${selectedArticleKey === article.articleKey ? 'border-sky-400/40 bg-sky-500/10' : 'border-white/10 bg-dark-900/30 hover:border-white/20'}`}
+                      >
+                        <p className="text-sm font-semibold text-white">{article.title}</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                          <span className="rounded-full border border-white/15 bg-white/[0.04] px-2 py-0.5 text-gray-300">{article.status}</span>
+                          <span className={`rounded-full border px-2 py-0.5 ${verificationStatusTone(verificationStatus)}`}>
+                            {verificationStatusLabel(verificationStatus as VerificationStatus)}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedControlArticle && selectedArticleProfile && (
+                  <div className="rounded-xl border border-white/10 bg-dark-900/35 p-4 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{selectedControlArticle.title}</p>
+                        <p className="text-[11px] text-gray-400">{selectedControlArticle.urlPath}</p>
+                      </div>
+                      <span className={`rounded-full border px-2.5 py-1 text-[11px] ${verificationStatusTone(selectedArticleProfile.verificationStatus)}`}>
+                        {verificationStatusLabel(selectedArticleProfile.verificationStatus)}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Publication Status</span>
+                        <select
+                          value={selectedControlArticle.status}
+                          onChange={(event) => setArticlePublicationStatus(selectedControlArticle.id, event.target.value as ControlArticle['status'])}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        >
+                          <option value="draft">Draft</option>
+                          <option value="scheduled">Scheduled</option>
+                          <option value="published">Published</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Verification Status</span>
+                        <select
+                          value={selectedArticleProfile.verificationStatus}
+                          onChange={(event) => updateSelectedArticleProfile({ verificationStatus: event.target.value as VerificationStatus })}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        >
+                          <option value="ai_assisted_draft">AI-Assisted Draft</option>
+                          <option value="human_reviewed">Human Reviewed</option>
+                          <option value="verified_airdropguard">Verified by AirdropGuard</option>
+                        </select>
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Estimated Reading Time (minutes)</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={selectedArticleProfile.estimatedReadMinutes}
+                          onChange={(event) => updateSelectedArticleProfile({ estimatedReadMinutes: Number(event.target.value) || 1 })}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Reviewed By</span>
+                        <input
+                          value={selectedArticleProfile.reviewedBy}
+                          onChange={(event) => updateSelectedArticleProfile({ reviewedBy: event.target.value })}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Reviewed Date</span>
+                        <input
+                          type="date"
+                          value={selectedArticleProfile.reviewedAt || ''}
+                          onChange={(event) => updateSelectedArticleProfile({ reviewedAt: event.target.value || null })}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Official Documentation URL</span>
+                        <input
+                          value={selectedArticleProfile.sources.officialDocsUrl || ''}
+                          onChange={(event) => updateSelectedArticleProfile({ sources: { officialDocsUrl: event.target.value } })}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          placeholder="https://project.org/docs"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Official GitHub URL</span>
+                        <input
+                          value={selectedArticleProfile.sources.githubUrl || ''}
+                          onChange={(event) => updateSelectedArticleProfile({ sources: { githubUrl: event.target.value } })}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          placeholder="https://github.com/org/repo"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Official Website URL</span>
+                        <input
+                          value={selectedArticleProfile.sources.officialWebsiteUrl || ''}
+                          onChange={(event) => updateSelectedArticleProfile({ sources: { officialWebsiteUrl: event.target.value } })}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          placeholder="https://project.org"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Official X URL</span>
+                        <input
+                          value={selectedArticleProfile.sources.officialXUrl || ''}
+                          onChange={(event) => updateSelectedArticleProfile({ sources: { officialXUrl: event.target.value } })}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          placeholder="https://x.com/project"
+                        />
+                      </label>
+                      <label className="space-y-1 md:col-span-2">
+                        <span className="text-[11px] text-gray-400">Official Blog URL</span>
+                        <input
+                          value={selectedArticleProfile.sources.officialBlogUrl || ''}
+                          onChange={(event) => updateSelectedArticleProfile({ sources: { officialBlogUrl: event.target.value } })}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          placeholder="https://project.org/blog"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-sky-200">Human Verification Checklist</p>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2 text-xs text-gray-300">
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={selectedArticleChecklist.factsChecked} onChange={(event) => updateSelectedArticleChecklist({ factsChecked: event.target.checked })} /> Facts checked</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={selectedArticleChecklist.sourcesVerified} onChange={(event) => updateSelectedArticleChecklist({ sourcesVerified: event.target.checked })} /> Sources verified</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={selectedArticleChecklist.linksTested} onChange={(event) => updateSelectedArticleChecklist({ linksTested: event.target.checked })} /> Links tested</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={selectedArticleChecklist.scamGuidanceReviewed} onChange={(event) => updateSelectedArticleChecklist({ scamGuidanceReviewed: event.target.checked })} /> Scam guidance reviewed</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={selectedArticleChecklist.securityAdviceReviewed} onChange={(event) => updateSelectedArticleChecklist({ securityAdviceReviewed: event.target.checked })} /> Security advice reviewed</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={selectedArticleChecklist.grammarChecked} onChange={(event) => updateSelectedArticleChecklist({ grammarChecked: event.target.checked })} /> Grammar checked</label>
+                      </div>
+                      <label className="mt-3 block space-y-1">
+                        <span className="text-[11px] text-gray-400">Internal Review Notes (Admin only)</span>
+                        <textarea
+                          rows={3}
+                          value={selectedArticleChecklist.internalReviewNotes}
+                          onChange={(event) => updateSelectedArticleChecklist({ internalReviewNotes: event.target.value })}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={async () => {
+                          setArticlePublicationStatus(selectedControlArticle.id, 'draft');
+                          updateSelectedArticleProfile({ lastUpdatedAt: new Date().toISOString() });
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-white/15 text-xs text-gray-300"
+                      >
+                        Mark Draft
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const reviewNotes = await promptHumanVerificationNotes(`Publish article \"${selectedControlArticle.title}\"`);
+                          if (!reviewNotes) return;
+
+                          setArticlePublicationStatus(selectedControlArticle.id, 'published');
+                          updateSelectedArticleProfile({
+                            verificationStatus: 'human_reviewed',
+                            lastUpdatedAt: new Date().toISOString(),
+                            reviewedAt: new Date().toISOString().split('T')[0],
+                          });
+
+                          await logAdminAudit({
+                            actionTaken: 'Publish article',
+                            aiRecommendation: 'Draft article prepared by AI-assisted workflow',
+                            finalDecision: 'Published',
+                            notes: reviewNotes,
+                            context: {
+                              articleId: selectedControlArticle.articleKey,
+                              title: selectedControlArticle.title,
+                            },
+                          });
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-300"
+                      >
+                        Publish
+                      </button>
+                      <button
+                        onClick={() => {
+                          console.info('[Admin][ArticleTrust] Save button clicked');
+                          void saveArticleTrustChanges();
+                        }}
+                        disabled={articleTrustSaving || !selectedControlArticle || !selectedArticleProfile}
+                        title={!selectedControlArticle || !selectedArticleProfile ? 'Select an article first' : undefined}
+                        className="px-3 py-1.5 rounded-lg border border-sky-400/25 bg-sky-500/10 text-xs text-sky-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {articleTrustSaving ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Saving...
+                          </span>
+                        ) : 'Save Verification Metadata'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -2200,7 +2894,7 @@ export default function AdminPage() {
                   showToast('Selected project not found', 'error');
                   return;
                 }
-                const reviewNotes = promptHumanVerificationNotes(`Approve featured project: ${project.name}`);
+                const reviewNotes = await promptHumanVerificationNotes(`Approve featured project: ${project.name}`);
                 if (!reviewNotes) return;
 
                 await logAdminAudit({
@@ -2236,7 +2930,7 @@ export default function AdminPage() {
                   showToast('No matching project found', 'error');
                   return;
                 }
-                const reviewNotes = promptHumanVerificationNotes('Approve homepage trending recommendations');
+                const reviewNotes = await promptHumanVerificationNotes('Approve homepage trending recommendations');
                 if (!reviewNotes) return;
 
                 await logAdminAudit({
@@ -2445,7 +3139,8 @@ export default function AdminPage() {
 
         {!auditLoading && auditError && (
           <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            <p>Unable to load audit logs: {auditError}</p>
+            <p>{auditError}</p>
+            <p className="mt-1 text-xs text-rose-100/80">Use Refresh Logs after applying schema or permission fixes.</p>
           </div>
         )}
 
@@ -2472,7 +3167,7 @@ export default function AdminPage() {
                     <p className="mt-1 text-gray-400">Decision: {log.final_decision}</p>
                     {log.ai_recommendation && <p className="mt-1 text-gray-500">AI: {truncateText(log.ai_recommendation, 120)}</p>}
                     {log.notes && <p className="mt-1 text-gray-500">Notes: {truncateText(log.notes, 120)}</p>}
-                    <p className="mt-1 text-gray-600">Created at: {formatDateTime(log.action_at)}</p>
+                    <p className="mt-1 text-gray-600">Created at: {formatDateTime(log.created_at || log.action_at)}</p>
                   </article>
                 );
               })}
@@ -2506,7 +3201,7 @@ export default function AdminPage() {
                         <td className="px-3 py-2 text-gray-400">{log.ai_recommendation ? truncateText(log.ai_recommendation, 130) : '—'}</td>
                         <td className="px-3 py-2 text-emerald-300">{log.final_decision}</td>
                         <td className="px-3 py-2 text-gray-400">{log.notes ? truncateText(log.notes, 130) : '—'}</td>
-                        <td className="px-3 py-2 text-gray-500">{formatDateTime(log.action_at)}</td>
+                        <td className="px-3 py-2 text-gray-500">{formatDateTime(log.created_at || log.action_at)}</td>
                       </tr>
                     );
                   })}
@@ -2797,7 +3492,7 @@ export default function AdminPage() {
                           onClick={async () => {
                             const nextPublished = !a.published;
                             const reviewNotes = nextPublished
-                              ? promptHumanVerificationNotes(`Publish airdrop ${a.name}`)
+                              ? await promptHumanVerificationNotes(`Publish airdrop ${a.name}`)
                               : '';
                             if (nextPublished && !reviewNotes) return;
 
@@ -3274,6 +3969,16 @@ export default function AdminPage() {
           deleting={deleting}
         />
       )}
+
+      <VerificationNotesModal
+        open={verificationModalOpen}
+        actionLabel={verificationModalActionLabel}
+        notes={verificationModalNotes}
+        onNotesChange={setVerificationModalNotes}
+        onCancel={cancelVerificationModal}
+        onConfirm={confirmVerificationModal}
+        saving={verificationModalSaving}
+      />
 
       {toast && <ToastBar toast={toast} onDismiss={() => setToast(null)} />}
     </div>

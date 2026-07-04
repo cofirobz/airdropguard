@@ -1,3 +1,19 @@
+import { useEffect, useMemo, useState } from 'react';
+import { BadgeCheck, Bot, CalendarClock, Link as LinkIcon, ShieldCheck, UserCheck } from 'lucide-react';
+import SEO from '../components/SEO';
+import { supabase } from '../lib/supabase';
+import {
+  DEFAULT_ARTICLE_TRUST_PROFILES,
+  estimateReadMinutesFromBlocks,
+  findArticleProfile,
+  formatCompactDate,
+  sourceLinks,
+  type ArticleTrustProfile,
+  type VerificationStatus,
+  verificationStatusLabel,
+  verificationStatusTone,
+} from '../lib/articleTrust';
+
 const articleBlocks = [
   {
     "type": "p",
@@ -289,27 +305,150 @@ const articleBlocks = [
   }
 ];
 
+function VerificationIcon({ status }: { status: VerificationStatus }) {
+  if (status === 'verified_airdropguard') return <BadgeCheck className="h-3.5 w-3.5" />;
+  if (status === 'human_reviewed') return <UserCheck className="h-3.5 w-3.5" />;
+  return <Bot className="h-3.5 w-3.5" />;
+}
+
 export default function Layer2page() {
+  const [profiles, setProfiles] = useState<ArticleTrustProfile[]>(DEFAULT_ARTICLE_TRUST_PROFILES);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadProfiles = async () => {
+      const { data, error } = await supabase
+        .from('article_verification_profiles')
+        .select('article_key, title, url_path, publication_status, verification_status, reviewed_by, reviewed_at, last_updated_at, estimated_read_minutes, official_docs_url, official_github_url, official_website_url, official_x_url, official_blog_url')
+        .eq('article_key', 'layer-2-airdrops-2026')
+        .maybeSingle();
+
+      if (error || !data || cancelled) return;
+
+      setProfiles([
+        {
+          articleKey: data.article_key,
+          title: data.title,
+          urlPath: data.url_path,
+          publicationStatus: data.publication_status,
+          verificationStatus: data.verification_status,
+          reviewedBy: data.reviewed_by || 'AirdropGuard Team',
+          reviewedAt: data.reviewed_at,
+          lastUpdatedAt: data.last_updated_at,
+          estimatedReadMinutes: data.estimated_read_minutes,
+          sources: {
+            officialDocsUrl: data.official_docs_url,
+            githubUrl: data.official_github_url,
+            officialWebsiteUrl: data.official_website_url,
+            officialXUrl: data.official_x_url,
+            officialBlogUrl: data.official_blog_url,
+          },
+        },
+      ]);
+    };
+
+    void loadProfiles();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const profile = findArticleProfile('layer-2-airdrops-2026', profiles);
+  const readingTime = profile.estimatedReadMinutes || estimateReadMinutesFromBlocks(articleBlocks, 16);
+  const officialSources = sourceLinks(profile);
+
+  const articleSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: profile.title,
+    description: 'Security-first framework for evaluating Ethereum Layer 2 airdrops in 2026 with transparent trust and verification metadata.',
+    author: {
+      '@type': 'Organization',
+      name: 'AirdropGuard Team',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'AirdropGuard',
+    },
+    dateModified: profile.lastUpdatedAt || undefined,
+    datePublished: profile.reviewedAt || undefined,
+    url: 'https://airdropguard.com/articles/layer-2-airdrops-2026',
+  }), [profile]);
+
   return (
-    <main className="min-h-screen bg-slate-950 text-white px-6 py-12">
-      <article className="max-w-4xl mx-auto">
-        <a href="/articles" className="text-blue-400 hover:text-blue-300">
+    <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-6 lg:px-8">
+      <SEO
+        title={profile.title}
+        description="Security-first strategy guide for Ethereum Layer 2 airdrops in 2026, with transparent verification and review provenance."
+        canonical="https://airdropguard.com/articles/layer-2-airdrops-2026"
+        type="article"
+        schema={articleSchema}
+      />
+
+      <article className="mx-auto max-w-4xl">
+        <a href="/articles" className="text-sm text-cyan-300 hover:text-cyan-200">
           ← Back to Articles
         </a>
 
-        <header className="mt-8 mb-10 border-b border-slate-800 pb-8">
-          <p className="text-blue-400 font-semibold mb-3">AirdropGuard Security Guide</p>
-          <h1 className="text-4xl md:text-5xl font-bold leading-tight">
+        <header className="mt-6 mb-8 rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-200">AirdropGuard Security Guide</p>
+          <h1 className="text-3xl font-black leading-tight text-white sm:text-4xl md:text-5xl">
             Ethereum Layer 2 Airdrops in 2026: Security, ROI and Risk Framework
           </h1>
-          <p className="text-slate-400 mt-4">Published by AirdropGuard</p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-gray-300">
+            <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${verificationStatusTone(profile.verificationStatus)}`}>
+              <VerificationIcon status={profile.verificationStatus} />
+              {verificationStatusLabel(profile.verificationStatus)}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1">
+              <UserCheck className="h-3 w-3" />
+              Reviewed by {profile.reviewedBy || 'AirdropGuard Team'}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1">
+              <CalendarClock className="h-3 w-3" />
+              Last reviewed {formatCompactDate(profile.reviewedAt)}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1">{readingTime} min read</span>
+            <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1">Updated {formatCompactDate(profile.lastUpdatedAt)}</span>
+          </div>
+
+          {officialSources.length > 0 && (
+            <div className="mt-4 rounded-xl border border-cyan-500/20 bg-cyan-500/[0.08] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-cyan-200">Official Sources</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {officialSources.map((source) => (
+                  <a
+                    key={source.label}
+                    href={source.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full border border-cyan-300/25 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-100 hover:bg-cyan-500/20"
+                  >
+                    <LinkIcon className="h-3 w-3" />
+                    {source.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {profile.verificationStatus === 'verified_airdropguard' && (
+            <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+              <p className="inline-flex items-center gap-1 font-semibold"><ShieldCheck className="h-4 w-4" /> Trust & Verification</p>
+              <p className="mt-1 text-emerald-50/90">
+                This article has been reviewed by the AirdropGuard team using official project documentation and security best practices. While we strive for accuracy, always conduct your own research before interacting with any crypto project.
+              </p>
+            </div>
+          )}
         </header>
 
-        <div className="space-y-6 text-slate-300 leading-8">
+        <div className="space-y-5 text-[17px] leading-8 text-slate-300">
           {articleBlocks.map((block, index) => {
             if (block.type === 'h2') {
               return (
-                <h2 key={index} className="text-3xl font-bold text-white pt-10">
+                <h2 key={index} className="pt-8 text-2xl font-bold text-white sm:text-3xl">
                   {block.text}
                 </h2>
               );
@@ -317,7 +456,7 @@ export default function Layer2page() {
 
             if (block.type === 'h3') {
               return (
-                <h3 key={index} className="text-2xl font-semibold text-white pt-6">
+                <h3 key={index} className="pt-5 text-xl font-semibold text-white sm:text-2xl">
                   {block.text}
                 </h3>
               );
@@ -325,14 +464,14 @@ export default function Layer2page() {
 
             if (block.type === 'li') {
               return (
-                <div key={index} className="flex gap-3 rounded-lg border border-slate-800 bg-slate-900/50 p-4">
-                  <span className="text-blue-400">•</span>
+                <div key={index} className="flex gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                  <span className="text-cyan-300">•</span>
                   <p>{block.text}</p>
                 </div>
               );
             }
 
-            return <p key={index}>{block.text}</p>;
+            return <p key={index} className="text-slate-300">{block.text}</p>;
           })}
         </div>
       </article>

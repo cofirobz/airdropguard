@@ -250,6 +250,54 @@
 			],
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "verify-prod-build",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-prod-build-after-save-fix",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-prod-build-after-diagnostics",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "verify-prod-build-after-modal-replacement",
+			"type": "shell",
+			"command": "C:\\Program Files\\nodejs\\npm.cmd",
+			"args": [
+				"--prefix",
+				"project",
+				"run",
+				"build"
+			],
+			"isBackground": false
 		}
 	]
 }

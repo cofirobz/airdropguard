@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.admin_audit_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   action_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now(),
   admin_user_id uuid,
   admin_identifier text NOT NULL,
   action_taken text NOT NULL,
