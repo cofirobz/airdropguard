@@ -1067,6 +1067,19 @@ export default function AdminPage() {
       .join(' | ');
   }, []);
 
+  const describeError = useCallback((error: unknown) => {
+    const supabaseText = formatSupabaseError(error);
+    if (supabaseText) return supabaseText;
+    if (error instanceof Error && error.message) return error.message;
+    if (typeof error === 'string' && error.trim()) return error;
+    try {
+      const serialized = JSON.stringify(error);
+      return serialized && serialized !== '{}' ? serialized : 'Unexpected non-standard error object';
+    } catch {
+      return 'Unexpected non-standard error object';
+    }
+  }, [formatSupabaseError]);
+
   const dismissVerificationModal = useCallback((result: string | null) => {
     verificationNotesResolverRef.current?.(result);
     verificationNotesResolverRef.current = null;
@@ -1088,9 +1101,13 @@ export default function AdminPage() {
       showToast('Audit Notes are required.', 'error');
       return;
     }
+    console.info('[Admin][VerificationModal] Saving audit notes', {
+      actionLabel: verificationModalActionLabel,
+      notesLength: trimmedNotes.length,
+    });
     setVerificationModalSaving(true);
     dismissVerificationModal(trimmedNotes);
-  }, [verificationModalNotes, dismissVerificationModal, showToast]);
+  }, [verificationModalNotes, verificationModalActionLabel, dismissVerificationModal, showToast]);
 
   const promptHumanVerificationNotes = useCallback((actionLabel: string): Promise<string | null> => {
     if (verificationModalOpen) {
@@ -1798,15 +1815,29 @@ export default function AdminPage() {
   };
 
   const saveTasksForAirdrop = async (airdropId: string, tasksText: string) => {
+    console.info('[Admin][AirdropSave] Updating tasks', {
+      airdropId,
+      rawTaskLines: tasksText.split('\n').length,
+    });
+
     const taskRows = tasksText
       .split('\n')
       .map(t => t.trim())
       .filter(Boolean);
 
-    await supabase
+    const { error: deleteError } = await supabase
       .from('airdrop_tasks')
       .delete()
       .eq('airdrop_id', airdropId);
+
+    if (deleteError) {
+      console.error('[Admin][AirdropSave] Failed deleting existing tasks', {
+        airdropId,
+        error: deleteError,
+        exactError: describeError(deleteError),
+      });
+      throw deleteError;
+    }
 
     if (taskRows.length === 0) return 0;
 
@@ -1821,7 +1852,20 @@ export default function AdminPage() {
         }))
       );
 
-    if (error) throw error;
+    if (error) {
+      console.error('[Admin][AirdropSave] Failed inserting tasks', {
+        airdropId,
+        taskCount: taskRows.length,
+        error,
+        exactError: describeError(error),
+      });
+      throw error;
+    }
+
+    console.info('[Admin][AirdropSave] Tasks updated successfully', {
+      airdropId,
+      taskCount: taskRows.length,
+    });
     return taskRows.length;
   };
 
@@ -1829,18 +1873,38 @@ export default function AdminPage() {
     if (!form.name.trim()) return;
     setSaving(true);
 
+    let currentStep = 'init';
+
     try {
+      console.info('[Admin][AirdropSave] Save requested', {
+        modalMode,
+        editingId,
+        name: form.name.trim(),
+      });
+
       const existing = editingId ? airdrops.find((row) => row.id === editingId) : null;
       const publishingNow = form.published && !existing?.published;
+
+      currentStep = 'collect_verification_notes';
       const reviewNotes = publishingNow
         ? await promptHumanVerificationNotes(`Publish airdrop ${form.name.trim()}`)
         : '';
+
+      console.info('[Admin][AirdropSave] Verification notes resolved', {
+        publishingNow,
+        hasReviewNotes: Boolean(reviewNotes),
+      });
 
       if (publishingNow && !reviewNotes) {
         setSaving(false);
         return;
       }
 
+      if (modalMode !== 'add' && !editingId) {
+        throw new Error('Missing airdrop ID for edit save.');
+      }
+
+      currentStep = 'prepare_payload';
       const payload = {
         name: form.name.trim(),
         ticker: form.ticker.trim(),
@@ -1872,9 +1936,21 @@ export default function AdminPage() {
         is_sponsored: form.is_sponsored,
       };
 
+      console.info('[Admin][AirdropSave] Payload prepared', {
+        mode: modalMode,
+        editingId,
+        published: payload.published,
+        isFeatured: payload.is_featured,
+        isTrending: payload.is_trending,
+        isSponsored: payload.is_sponsored,
+      });
+
       if (modalMode === 'add') {
+        currentStep = 'insert_airdrop';
         const base = form.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const slug = `${base}-${Date.now().toString(36)}`;
+
+        console.info('[Admin][AirdropSave] Inserting new airdrop', { slug });
 
         const { data: newAirdrop, error } = await supabase
           .from('airdrops')
@@ -1889,6 +1965,7 @@ export default function AdminPage() {
 
         if (error) throw error;
 
+        currentStep = 'update_airdrop_tasks';
         const taskCount = newAirdrop ? await saveTasksForAirdrop(newAirdrop.id, form.tasks_text) : 0;
 
         if (newAirdrop) {
@@ -1904,6 +1981,7 @@ export default function AdminPage() {
           }
 
           if (form.published) {
+            currentStep = 'write_publish_audit_log';
             try {
               await logAdminAudit({
                 actionTaken: 'Publish airdrop',
@@ -1917,7 +1995,7 @@ export default function AdminPage() {
                 },
               }, { throwOnError: true, source: 'airdrop_form_add_publish' });
             } catch (auditErr) {
-              const auditError = formatSupabaseError(auditErr) || (auditErr instanceof Error ? auditErr.message : 'Unknown audit error');
+              const auditError = describeError(auditErr);
               showToast(`Airdrop published, but audit log failed: ${auditError}`, 'error');
             }
           }
@@ -1926,6 +2004,8 @@ export default function AdminPage() {
         showToast(`${form.name} added successfully${taskCount ? ` with ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''} and AI enrichment started`);
         fetchStats();
       } else {
+        currentStep = 'update_airdrop';
+        console.info('[Admin][AirdropSave] Updating airdrop', { editingId });
         const { error } = await supabase
           .from('airdrops')
           .update(payload)
@@ -1933,10 +2013,18 @@ export default function AdminPage() {
 
         if (error) throw error;
 
+        console.info('[Admin][AirdropSave] Airdrop updated', {
+          editingId,
+          published: payload.published,
+          isFeatured: payload.is_featured,
+          isTrending: payload.is_trending,
+        });
+
         const becamePublished = Boolean(payload.published && existing && !existing.published);
         const becameUnpublished = Boolean(existing?.published && !payload.published);
 
         if (becamePublished) {
+          currentStep = 'write_publish_audit_log';
           try {
             await logAdminAudit({
               actionTaken: 'Publish airdrop',
@@ -1950,12 +2038,13 @@ export default function AdminPage() {
               },
             }, { throwOnError: true, source: 'airdrop_form_edit_publish' });
           } catch (auditErr) {
-            const auditError = formatSupabaseError(auditErr) || (auditErr instanceof Error ? auditErr.message : 'Unknown audit error');
+            const auditError = describeError(auditErr);
             showToast(`Airdrop published, but audit log failed: ${auditError}`, 'error');
           }
         }
 
         if (becameUnpublished) {
+          currentStep = 'write_unpublish_audit_log';
           try {
             await logAdminAudit({
               actionTaken: 'Unpublish airdrop',
@@ -1968,20 +2057,37 @@ export default function AdminPage() {
               },
             }, { throwOnError: true, source: 'airdrop_form_edit_unpublish' });
           } catch (auditErr) {
-            const auditError = formatSupabaseError(auditErr) || (auditErr instanceof Error ? auditErr.message : 'Unknown audit error');
+            const auditError = describeError(auditErr);
             showToast(`Airdrop unpublished, but audit log failed: ${auditError}`, 'error');
           }
         }
 
+        currentStep = 'update_airdrop_tasks';
         const taskCount = await saveTasksForAirdrop(editingId!, form.tasks_text);
         showToast(`${form.name} updated${taskCount ? ` with ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''}`);
       }
+
+      currentStep = 'finalize_success';
+      console.info('[Admin][AirdropSave] Final success', {
+        modalMode,
+        editingId,
+        name: form.name.trim(),
+      });
 
       setModalMode(null);
       fetchAirdrops();
       fetchStats();
     } catch (e) {
-      showToast(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
+      const exactError = describeError(e);
+      console.error('[Admin][AirdropSave] Step failed', {
+        step: currentStep,
+        modalMode,
+        editingId,
+        name: form.name.trim(),
+        error: e,
+        exactError,
+      });
+      showToast(`Airdrop save failed at ${currentStep}: ${exactError}`, 'error');
     } finally {
       setSaving(false);
     }
@@ -3564,7 +3670,7 @@ export default function AdminPage() {
 
                               showToast(`Airdrop ${nextPublished ? 'published' : 'unpublished'} and audit logged`);
                             } catch (auditErr) {
-                              const exactAuditError = formatSupabaseError(auditErr) || (auditErr instanceof Error ? auditErr.message : 'Unknown audit error');
+                              const exactAuditError = describeError(auditErr);
                               console.error('[Admin][AirdropPublish] Audit insert failed after successful airdrop update', {
                                 airdropId: a.id,
                                 nextPublished,
