@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import type { MouseEvent } from 'react';
-import { Clock, Zap, ShieldAlert, Bookmark, BookmarkCheck, AlertTriangle, ShieldCheck, ChevronDown } from 'lucide-react';
+import { ArrowRight, Clock, Zap, ShieldAlert, Bookmark, BookmarkCheck, AlertTriangle, ShieldCheck, ChevronDown } from 'lucide-react';
 import type { Airdrop } from '../lib/types';
 import {
   cn,
@@ -22,6 +22,7 @@ import {
 interface Props {
   airdrop: Airdrop;
   priority?: boolean;
+  nextAirdropSlug?: string | null;
 }
 
 function LightweightTrustScoreBadge({ score }: { score: number | null }) {
@@ -42,7 +43,7 @@ function LightweightTrustScoreBadge({ score }: { score: number | null }) {
   );
 }
 
-export default function AirdropCard({ airdrop, priority = false }: Props) {
+export default function AirdropCard({ airdrop, priority = false, nextAirdropSlug = null }: Props) {
   const [imgError, setImgError] = useState(false);
   const [bookmarked, setBookmarked] = useState(() => isBookmarked(airdrop.id));
   const opportunityType = getOpportunityType(airdrop);
@@ -69,11 +70,12 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
   }
 
   return (
-    <Link
-      to={`/airdrop/${airdrop.slug}`}
-      className="glass-card group flex h-full min-w-0 flex-col rounded-[26px] p-3.5 transition-colors duration-200 hover:border-white/10 sm:rounded-2xl sm:p-5"
-      aria-label={`Open ${airdrop.name} project intelligence report`}
-    >
+    <div className="glass-card group flex h-full min-w-0 flex-col rounded-[26px] p-3.5 transition-colors duration-200 hover:border-white/10 sm:rounded-2xl sm:p-5">
+      <Link
+        to={`/airdrop/${airdrop.slug}`}
+        className="block"
+        aria-label={`Open ${airdrop.name} project intelligence report`}
+      >
       <div className="mb-3 flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-neon-purple/20 to-neon-blue/20 sm:h-12 sm:w-12">
           {airdrop.logo_url && !imgError ? (
@@ -342,24 +344,42 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
         </div>
       </div>
 
+      </Link>
+
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-white/5 pt-3">
         <div className="min-w-0">
-          <span className="inline-flex min-h-[36px] items-center rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-semibold text-cyan-200">
+          <Link
+            to={`/airdrop/${airdrop.slug}`}
+            className="inline-flex min-h-[36px] items-center rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/15"
+            aria-label={`View ${airdrop.name}`}
+          >
             {isScamAlert ? 'View scam alert' : isSpeculativeToken ? 'Analyze token' : 'View airdrop'}
-          </span>
+          </Link>
         </div>
 
-        {days !== null && days > 0 ? (
-          <div className="flex shrink-0 items-center gap-1 rounded-full border border-white/5 bg-white/[0.03] px-2 py-1 text-[10px] text-gray-500">
-            <Clock className="h-3 w-3" />
-            {days}d left
-          </div>
-        ) : (
-          <span className="shrink-0 rounded-full border border-white/5 bg-white/[0.03] px-2 py-1 text-[10px] text-gray-600">
-            No deadline
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {nextAirdropSlug && nextAirdropSlug !== airdrop.slug && (
+            <Link
+              to={`/airdrop/${nextAirdropSlug}`}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-semibold text-gray-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              aria-label={`Go to next airdrop after ${airdrop.name}`}
+            >
+              Next airdrop <ArrowRight className="h-3 w-3" />
+            </Link>
+          )}
+
+          {days !== null && days > 0 ? (
+            <div className="flex shrink-0 items-center gap-1 rounded-full border border-white/5 bg-white/[0.03] px-2 py-1 text-[10px] text-gray-500">
+              <Clock className="h-3 w-3" />
+              {days}d left
+            </div>
+          ) : (
+            <span className="shrink-0 rounded-full border border-white/5 bg-white/[0.03] px-2 py-1 text-[10px] text-gray-600">
+              No deadline
+            </span>
+          )}
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }

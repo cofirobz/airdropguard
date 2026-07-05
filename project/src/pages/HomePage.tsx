@@ -1594,6 +1594,11 @@ export default function HomePage() {
     [filtered, visibleCount],
   );
 
+  const getNextAirdropSlug = useCallback((list: Airdrop[], index: number) => {
+    const nextItem = list[index + 1] ?? null;
+    return nextItem?.slug ?? null;
+  }, []);
+
   const hasMoreAirdrops = visibleCount < filtered.length;
 
   const homepageSchema = {
@@ -1838,10 +1843,11 @@ export default function HomePage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
               {visibleAirdrops.map((airdrop, index) => {
                 const desktopOnlyInitially = visibleCount === INITIAL_VISIBLE_AIRDROPS && index >= 3 && index < INITIAL_VISIBLE_AIRDROPS;
+                const nextAirdropSlug = getNextAirdropSlug(visibleAirdrops, index);
 
                 return (
                   <div key={airdrop.id} className={desktopOnlyInitially ? 'hidden sm:block' : ''}>
-                    <AirdropCard airdrop={airdrop} />
+                    <AirdropCard airdrop={airdrop} nextAirdropSlug={nextAirdropSlug} />
                   </div>
                 );
               })}
@@ -1887,8 +1893,8 @@ export default function HomePage() {
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-              {speculativeTokens.slice(0, 6).map((token) => (
-                <AirdropCard key={token.id} airdrop={token} />
+              {speculativeTokens.slice(0, 6).map((token, index, list) => (
+                <AirdropCard key={token.id} airdrop={token} nextAirdropSlug={getNextAirdropSlug(list, index)} />
               ))}
             </div>
           </div>

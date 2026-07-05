@@ -1,0 +1,15 @@
+# AirdropGuard
+
+AirdropGuard is an AI-assisted platform for discovering verified crypto airdrops, checking wallet safety signals, and learning safer airdrop workflows.
+
+## Important Pages
+- [Home](/)
+- [API Documentation](/api-docs)
+- [Learn](/learn)
+- [Scam Alerts](/scam-alerts)
+- [Wallet Checker](/wallet-checker)
+- [Submit Airdrop](/submit)
+- [Pricing](/pricing)
+- [Articles](/articles)
+- [Risk Disclosure](/risk-disclosure)
+- [Terms](/terms)

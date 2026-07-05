@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Loader2, Brain, CheckCircle2,
   Eye, EyeOff,
-  Database, Shield, Activity, Mail, Users, Key, Zap, RefreshCw, Download,
+  Database, Shield, Activity, Mail, Users, Key, Zap, RefreshCw,
   Inbox, CheckCheck, XCircle, ChevronDown, ChevronUp, ExternalLink,
   FileText, Plus, X, Pencil, Trash2, AlertTriangle, LogOut, ShieldCheck, Gift,
   ImagePlus, Monitor, CalendarClock, BadgeCheck, Bell, Newspaper, Radar, Sparkles,
@@ -406,10 +406,17 @@ type CompetitorSource = {
   id: string;
   source_name: string;
   source_url: string;
+  source_type: DiscoverySourceType;
+  trust_level: DiscoveryTrustLevel;
+  notes: string | null;
   is_active: boolean;
   last_checked_at: string | null;
   created_at: string;
 };
+
+type DiscoverySourceType = 'airdrop_directory' | 'ecosystem_blog' | 'foundation_announcement' | 'testnet_campaign' | 'quest_platform' | 'research_news';
+type DiscoveryTrustLevel = 'high' | 'medium' | 'low';
+type DiscoveryAIClassification = 'airdrop' | 'speculative_token' | 'testnet' | 'quest_campaign' | 'ecosystem_incentive' | 'unknown';
 
 type CompetitorOpportunityStatus = 'new' | 'queued' | 'ignored' | 'duplicate' | 'drafted';
 
@@ -470,6 +477,11 @@ type DiscoveryCandidate = {
   fundingInfo: string | null;
   teamInfo: string | null;
   riskLevel?: 'Low' | 'Medium' | 'High';
+  aiClassification?: DiscoveryAIClassification;
+  aiSummary?: string;
+  riskNotes?: string;
+  suggestedStatus?: 'new' | 'queued' | 'needs_review' | 'ignored';
+  aiConfidence?: 'low' | 'medium' | 'high';
   officialSourcesFound?: number;
   estimatedQuality?: 'High' | 'Medium' | 'Low';
   estimatedDifficulty?: 'Easy' | 'Moderate' | 'Hard';
@@ -491,6 +503,9 @@ type PendingDiscoveryCandidate = {
   id: string;
   sourceId: string;
   sourceName: string;
+  sourceType: DiscoverySourceType;
+  sourceTrustLevel: DiscoveryTrustLevel;
+  sourceNotes: string | null;
   checkedAt: string;
   adapterId: string;
   candidate: DiscoveryCandidate;
@@ -575,6 +590,17 @@ type AuditTargetType = 'airdrop' | 'article' | 'banner' | 'submission' | 'scam_r
 const GENERIC_COMPETITOR_NAMES = new Set([
   'airdrop',
   'airdrops',
+  'spaces',
+  'quests',
+  'tasks',
+  'campaigns',
+  'rewards',
+  'dashboard',
+  'explore',
+  'learn',
+  'docs',
+  'blog',
+  'events',
   'crypto',
   'search',
   'browse',
@@ -632,6 +658,91 @@ const GENERIC_SOURCE_URL_PATTERNS = [
   '/new',
   '/latest',
 ];
+
+const DISCOVERY_SOURCE_TYPE_OPTIONS: Array<{ value: DiscoverySourceType; label: string }> = [
+  { value: 'airdrop_directory', label: 'Airdrop directory' },
+  { value: 'ecosystem_blog', label: 'Ecosystem blog' },
+  { value: 'foundation_announcement', label: 'Foundation announcement' },
+  { value: 'testnet_campaign', label: 'Testnet campaign' },
+  { value: 'quest_platform', label: 'Quest platform' },
+  { value: 'research_news', label: 'Crypto research/news' },
+];
+
+const DISCOVERY_TRUST_LEVEL_OPTIONS: Array<{ value: DiscoveryTrustLevel; label: string }> = [
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+];
+
+const DEFAULT_COMPETITOR_SOURCES: Array<Omit<CompetitorSource, 'id' | 'is_active' | 'last_checked_at' | 'created_at'>> = [
+  {
+    source_name: 'AirdropAlert Airdrops',
+    source_url: 'https://airdropalert.com/airdrops/',
+    source_type: 'airdrop_directory',
+    trust_level: 'medium',
+    notes: 'Trusted public airdrop directory with direct listing coverage.',
+  },
+  {
+    source_name: 'Airdrops.io',
+    source_url: 'https://airdrops.io/',
+    source_type: 'airdrop_directory',
+    trust_level: 'medium',
+    notes: 'Public airdrop directory and research source.',
+  },
+  {
+    source_name: 'Galxe Quests',
+    source_url: 'https://galxe.com/quest',
+    source_type: 'quest_platform',
+    trust_level: 'high',
+    notes: 'Major quest platform with campaign and reward programs.',
+  },
+  {
+    source_name: 'Layer3 Quests',
+    source_url: 'https://layer3.xyz/quests',
+    source_type: 'quest_platform',
+    trust_level: 'high',
+    notes: 'Quest platform for ecosystem incentives and campaigns.',
+  },
+  {
+    source_name: 'Base Blog',
+    source_url: 'https://blog.base.org/',
+    source_type: 'ecosystem_blog',
+    trust_level: 'high',
+    notes: 'Official ecosystem blog for launch and incentive announcements.',
+  },
+  {
+    source_name: 'Arbitrum Blog',
+    source_url: 'https://blog.arbitrum.io/',
+    source_type: 'foundation_announcement',
+    trust_level: 'high',
+    notes: 'Official ecosystem announcement channel.',
+  },
+  {
+    source_name: 'CoinMarketCap Airdrops',
+    source_url: 'https://coinmarketcap.com/airdrop/',
+    source_type: 'research_news',
+    trust_level: 'medium',
+    notes: 'Research and listing source for public airdrop discovery.',
+  },
+];
+
+const MAX_DISCOVERY_SOURCES_PER_SCAN = 10;
+
+function getSourceTrustRank(level: DiscoveryTrustLevel): number {
+  return level === 'high' ? 3 : level === 'medium' ? 2 : 1;
+}
+
+function normalizeSourceType(value: string | null | undefined): DiscoverySourceType {
+  const lowered = String(value ?? '').trim().toLowerCase();
+  if (DISCOVERY_SOURCE_TYPE_OPTIONS.some((option) => option.value === lowered)) return lowered as DiscoverySourceType;
+  return 'airdrop_directory';
+}
+
+function normalizeSourceTrustLevel(value: string | null | undefined): DiscoveryTrustLevel {
+  const lowered = String(value ?? '').trim().toLowerCase();
+  if (lowered === 'high' || lowered === 'medium' || lowered === 'low') return lowered;
+  return 'medium';
+}
 
 const DISCOVERY_SOURCE_ADAPTERS: SourceAdapter[] = [
   {
@@ -972,6 +1083,12 @@ function isGenericOpportunityName(name: string): boolean {
   if (!cleaned) return true;
   const lowered = cleaned.toLowerCase();
   return GENERIC_COMPETITOR_NAMES.has(lowered);
+}
+
+function shouldCleanupDiscoveryAirdrop(airdrop: Airdrop): boolean {
+  const source = String((airdrop as Airdrop & { source?: string | null }).source ?? '').toLowerCase().trim();
+  if (!['galxe', 'airdropalert_rss'].includes(source)) return false;
+  return isGenericOpportunityName(airdrop.name);
 }
 
 function normalizeProjectName(name: string): string {
@@ -2822,6 +2939,9 @@ export default function AdminPage() {
   const [checkingCompetitors, setCheckingCompetitors] = useState(false);
   const [newSourceName, setNewSourceName] = useState('');
   const [newSourceUrl, setNewSourceUrl] = useState('');
+  const [newSourceType, setNewSourceType] = useState<DiscoverySourceType>('airdrop_directory');
+  const [newSourceTrustLevel, setNewSourceTrustLevel] = useState<DiscoveryTrustLevel>('medium');
+  const [newSourceNotes, setNewSourceNotes] = useState('');
 
   const [adminNotifications, setAdminNotifications] = useState<AdminNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -3403,7 +3523,7 @@ export default function AdminPage() {
       const [sourceRes, oppRes] = await Promise.all([
         supabase
           .from('competitor_sources')
-          .select('id, source_name, source_url, is_active, last_checked_at, created_at')
+          .select('id, source_name, source_url, source_type, trust_level, notes, is_active, last_checked_at, created_at')
           .order('created_at', { ascending: false }),
         supabase
           .from('competitor_opportunities')
@@ -3848,9 +3968,12 @@ export default function AdminPage() {
         .insert({
           source_name: name,
           source_url: url,
+          source_type: newSourceType,
+          trust_level: newSourceTrustLevel,
+          notes: newSourceNotes.trim() || null,
           is_active: true,
         })
-        .select('id, source_name, source_url, is_active, last_checked_at, created_at')
+        .select('id, source_name, source_url, source_type, trust_level, notes, is_active, last_checked_at, created_at')
         .single();
 
       if (error) throw error;
@@ -3878,6 +4001,9 @@ export default function AdminPage() {
       }
       setNewSourceName('');
       setNewSourceUrl('');
+      setNewSourceType('airdrop_directory');
+      setNewSourceTrustLevel('medium');
+      setNewSourceNotes('');
 
       await logAdminAudit({
         actionTaken: 'Add competitor source',
@@ -3891,7 +4017,33 @@ export default function AdminPage() {
       setCompetitorUiError('Unable to add source right now. Please try again.', error);
       showToast('Unable to add source right now. Please try again.', 'error');
     }
-  }, [newSourceName, newSourceUrl, showToast, logAdminAudit, setCompetitorUiError]);
+  }, [newSourceName, newSourceNotes, newSourceTrustLevel, newSourceType, newSourceUrl, showToast, logAdminAudit, setCompetitorUiError]);
+
+  const loadStarterCompetitorSources = useCallback(async () => {
+    try {
+      const { error } = await supabase
+        .from('competitor_sources')
+        .upsert(DEFAULT_COMPETITOR_SOURCES.map((source) => ({
+          ...source,
+          is_active: true,
+        })), { onConflict: 'source_url' });
+
+      if (error) throw error;
+
+      await logAdminAudit({
+        actionTaken: 'Load starter competitor sources',
+        aiRecommendation: 'Seed trusted discovery sources for watch coverage',
+        finalDecision: 'Sources loaded',
+        context: { sourceCount: DEFAULT_COMPETITOR_SOURCES.length },
+      }, { source: 'competitor_watch_seed_sources' });
+
+      showToast('Starter discovery sources loaded');
+      await fetchCompetitorWatchData();
+    } catch (error) {
+      setCompetitorUiError('Unable to load starter sources right now.', error);
+      showToast('Unable to load starter sources right now.', 'error');
+    }
+  }, [fetchCompetitorWatchData, logAdminAudit, setCompetitorUiError, showToast]);
 
   const removeCompetitorSource = useCallback(async (source: CompetitorSource) => {
     try {
@@ -3915,6 +4067,32 @@ export default function AdminPage() {
       showToast('Unable to remove source right now. Please try again.', 'error');
     }
   }, [logAdminAudit, showToast, setCompetitorUiError]);
+
+  const toggleCompetitorSourceEnabled = useCallback(async (source: CompetitorSource) => {
+    try {
+      const nextEnabled = !source.is_active;
+      const { error } = await supabase
+        .from('competitor_sources')
+        .update({ is_active: nextEnabled })
+        .eq('id', source.id);
+
+      if (error) throw error;
+
+      setCompetitorSources((prev) => prev.map((row) => (row.id === source.id ? { ...row, is_active: nextEnabled } : row)));
+
+      await logAdminAudit({
+        actionTaken: nextEnabled ? 'Enable competitor source' : 'Disable competitor source',
+        aiRecommendation: 'Keep discovery sources curated',
+        finalDecision: nextEnabled ? 'Enabled' : 'Disabled',
+        context: { sourceId: source.id, sourceName: source.source_name, sourceUrl: source.source_url },
+      }, { source: 'competitor_watch_toggle_source' });
+
+      showToast(nextEnabled ? 'Competitor source enabled' : 'Competitor source disabled');
+    } catch (error) {
+      setCompetitorUiError('Unable to update source state right now.', error);
+      showToast('Unable to update source state right now.', 'error');
+    }
+  }, [logAdminAudit, setCompetitorUiError, showToast]);
 
   const genericCompetitorOpportunities = useMemo(
     () => competitorOpportunities.filter((item) => isGenericOpportunityName(item.project_name) || isGenericSourceUrl(item.source_url)),
@@ -4155,10 +4333,17 @@ export default function AdminPage() {
     setCompetitorError(null);
     setCompetitorErrorDetails(null);
     try {
-      const activeSources = competitorSources.filter((item) => item.is_active);
+      const activeSources = competitorSources
+        .filter((item) => item.is_active)
+        .sort((a, b) => getSourceTrustRank(b.trust_level) - getSourceTrustRank(a.trust_level) || a.source_name.localeCompare(b.source_name));
+      const sourcesToScan = activeSources.slice(0, MAX_DISCOVERY_SOURCES_PER_SCAN);
       if (activeSources.length === 0) {
         showToast('Add at least one active source first', 'error');
         return;
+      }
+
+      if (activeSources.length > sourcesToScan.length) {
+        showToast(`Scanning ${sourcesToScan.length} of ${activeSources.length} active sources to keep discovery fast.`);
       }
 
       let discoveredProjects = 0;
@@ -4191,10 +4376,13 @@ export default function AdminPage() {
       });
 
       const invokePayload = {
-        sources: activeSources.map((source) => ({
+        sources: sourcesToScan.map((source) => ({
           id: source.id,
           source_name: source.source_name,
           source_url: source.source_url,
+          source_type: source.source_type,
+          trust_level: source.trust_level,
+          notes: source.notes,
         })),
       };
 
@@ -4354,6 +4542,9 @@ export default function AdminPage() {
 
           const metadata = {
             source: candidate.sourceLabel,
+            source_type: source.source_type,
+            source_trust_level: source.trust_level,
+            source_notes: source.notes,
             adapter_id: result.adapterUsed,
             source_reliability: sourceReliability,
             project_url: candidate.projectUrl,
@@ -4370,6 +4561,11 @@ export default function AdminPage() {
             funding_info: candidate.fundingInfo,
             team_info: candidate.teamInfo,
             risk_level: candidate.riskLevel,
+            ai_classification: candidate.aiClassification,
+            ai_summary: candidate.aiSummary,
+            risk_notes: candidate.riskNotes,
+            suggested_status: candidate.suggestedStatus,
+            ai_confidence: candidate.aiConfidence,
             official_sources_found: candidate.officialSourcesFound,
             estimated_quality: candidate.estimatedQuality,
             estimated_difficulty: candidate.estimatedDifficulty,
@@ -4395,6 +4591,9 @@ export default function AdminPage() {
               id: previewId,
               sourceId: source.id,
               sourceName: source.source_name,
+                sourceType: source.source_type,
+                sourceTrustLevel: source.trust_level,
+                sourceNotes: source.notes,
               checkedAt: result.checkedAt,
               adapterId: result.adapterUsed || 'unknown',
               candidate,
@@ -4624,6 +4823,9 @@ export default function AdminPage() {
     const status: CompetitorOpportunityStatus = pending.comparisonType === 'new_project' ? 'new' : 'duplicate';
     const metadata = {
       source: pending.candidate.sourceLabel,
+      source_type: pending.sourceType,
+      source_trust_level: pending.sourceTrustLevel,
+      source_notes: pending.sourceNotes,
       adapter_id: pending.adapterId,
       source_reliability: pending.sourceReliability,
       project_url: pending.candidate.projectUrl,
@@ -4640,6 +4842,11 @@ export default function AdminPage() {
       funding_info: pending.candidate.fundingInfo,
       team_info: pending.candidate.teamInfo,
       risk_level: pending.candidate.riskLevel,
+      ai_classification: pending.candidate.aiClassification,
+      ai_summary: pending.candidate.aiSummary,
+      risk_notes: pending.candidate.riskNotes,
+      suggested_status: pending.candidate.suggestedStatus,
+      ai_confidence: pending.candidate.aiConfidence,
       official_sources_found: pending.candidate.officialSourcesFound,
       estimated_quality: pending.candidate.estimatedQuality,
       estimated_difficulty: pending.candidate.estimatedDifficulty,
@@ -5667,7 +5874,27 @@ export default function AdminPage() {
   // ── Fetch airdrops ─────────────────────────────────────────────────────────
   const fetchAirdrops = useCallback(async () => {
     const { data } = await supabase.from('airdrops').select('*').eq('is_demo', false).not('review_status', 'eq', 'replaced_demo').order('sort_order', { ascending: true });
-    if (data) setAirdrops(data as Airdrop[]);
+    const rows = (data ?? []) as Airdrop[];
+    if (rows.length > 0) {
+      const cleanupIds = rows.filter(shouldCleanupDiscoveryAirdrop).map((row) => row.id);
+      if (cleanupIds.length > 0) {
+        const { error } = await supabase
+          .from('airdrops')
+          .update({ published: false, human_verified: false, review_status: 'rejected' })
+          .in('id', cleanupIds);
+
+        if (!error) {
+          rows.forEach((row) => {
+            if (cleanupIds.includes(row.id)) {
+              row.published = false;
+              row.human_verified = false;
+            }
+          });
+        }
+      }
+    }
+
+    if (rows.length > 0) setAirdrops(rows);
     setLoading(false);
   }, []);
 
@@ -6659,10 +6886,6 @@ export default function AdminPage() {
             className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-neon-purple/10 border border-neon-purple/25 text-neon-purple hover:bg-neon-purple/20 transition-colors text-sm font-medium">
             <Plus className="w-4 h-4" /> Add Airdrop
           </button>
-          <Link to="/admin/airdrop-import"
-            className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-neon-blue/10 border border-neon-blue/25 text-neon-blue hover:bg-neon-blue/20 transition-colors text-sm font-medium">
-            <Download className="w-4 h-4" /> Import
-          </Link>
           <button
             onClick={refreshAllAnalysis}
             disabled={refreshingAll || airdrops.length === 0}
@@ -7878,11 +8101,26 @@ export default function AdminPage() {
 
         <div className="glass-card p-3 space-y-2">
           <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">Discovery Sources</p>
-          <div className="grid gap-2 md:grid-cols-3">
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             <input value={newSourceName} onChange={(event) => setNewSourceName(event.target.value)} className="bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" placeholder="Source name" />
-            <input value={newSourceUrl} onChange={(event) => setNewSourceUrl(event.target.value)} className="bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white md:col-span-2" placeholder="https://source-site.example" />
+            <input value={newSourceUrl} onChange={(event) => setNewSourceUrl(event.target.value)} className="bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white xl:col-span-2" placeholder="https://source-site.example" />
+            <select value={newSourceType} onChange={(event) => setNewSourceType(normalizeSourceType(event.target.value))} className="bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+              {DISCOVERY_SOURCE_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <select value={newSourceTrustLevel} onChange={(event) => setNewSourceTrustLevel(normalizeSourceTrustLevel(event.target.value))} className="bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+              {DISCOVERY_TRUST_LEVEL_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            <textarea value={newSourceNotes} onChange={(event) => setNewSourceNotes(event.target.value)} className="bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white md:col-span-2 xl:col-span-4" placeholder="Notes for admins: source quality, crawl caveats, or why it is trusted" rows={2} />
           </div>
-          <button onClick={() => void addCompetitorSource()} className="px-3 py-1.5 rounded-lg border border-fuchsia-500/25 bg-fuchsia-500/10 text-xs text-fuchsia-200">Add Source</button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => void addCompetitorSource()} className="px-3 py-1.5 rounded-lg border border-fuchsia-500/25 bg-fuchsia-500/10 text-xs text-fuchsia-200">Add Source</button>
+            <button onClick={() => void loadStarterCompetitorSources()} className="px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.03] text-xs text-gray-200">Load Starter Sources</button>
+            <span className="text-[11px] text-gray-500">Starter set: {DEFAULT_COMPETITOR_SOURCES.length} sources</span>
+          </div>
           <div className="space-y-2">
             {sourceDashboardRows.map(({ source, scan }) => {
               const scanStatusMetaMap = COMPETITOR_SOURCE_SCAN_META as Record<string, { label: string; tone: string }>;
@@ -7898,10 +8136,18 @@ export default function AdminPage() {
                     <div>
                       <p className="text-white font-medium">{source.source_name}</p>
                       <p className="text-gray-500">{source.source_url}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-[0.08em]">
+                        <span className="rounded-full border border-white/15 bg-white/[0.04] px-2 py-0.5 text-gray-200">{source.source_type.replace(/_/g, ' ')}</span>
+                        <span className={`rounded-full border px-2 py-0.5 ${source.trust_level === 'high' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' : source.trust_level === 'medium' ? 'border-amber-500/30 bg-amber-500/10 text-amber-200' : 'border-rose-500/30 bg-rose-500/10 text-rose-200'}`}>Trust: {source.trust_level}</span>
+                        <span className={`rounded-full border px-2 py-0.5 ${source.is_active ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200' : 'border-white/15 bg-white/[0.04] text-gray-300'}`}>{source.is_active ? 'Enabled' : 'Disabled'}</span>
+                      </div>
+                      {source.notes && <p className="mt-1 max-w-3xl text-[11px] text-gray-400">{source.notes}</p>}
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${scanMeta.tone}`}>{scanMeta.label}</span>
                       <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${healthMeta.tone}`}>Health: {healthMeta.label}</span>
+                      <a href={source.source_url} target="_blank" rel="noreferrer" className="px-2 py-1 rounded border border-white/20 text-gray-200 hover:bg-white/5">View</a>
+                      <button onClick={() => void toggleCompetitorSourceEnabled(source)} className="px-2 py-1 rounded border border-cyan-500/25 text-cyan-200">{source.is_active ? 'Disable' : 'Enable'}</button>
                       <button onClick={() => void removeCompetitorSource(source)} className="px-2 py-1 rounded border border-rose-500/25 text-rose-200">Remove</button>
                     </div>
                   </div>
@@ -7955,6 +8201,7 @@ export default function AdminPage() {
                         <p className="text-sm font-medium text-white">{pending.candidate.projectName}</p>
                         <p className="text-[11px] text-gray-500">Source: {pending.sourceName} ({pending.adapterId})</p>
                         <p className="text-[11px] text-gray-500">Listing: {pending.candidate.listingUrl}</p>
+                        <p className="text-[11px] text-gray-500">AI: {pending.candidate.aiClassification ?? 'unknown'} · Suggested status: {pending.candidate.suggestedStatus ?? 'needs_review'}</p>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${priorityMeta.tone}`}>{priorityMeta.label}</span>

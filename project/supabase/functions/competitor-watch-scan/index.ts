@@ -5,6 +5,9 @@ type SourceInput = {
   id: string;
   source_name: string;
   source_url: string;
+  source_type?: "airdrop_directory" | "ecosystem_blog" | "foundation_announcement" | "testnet_campaign" | "quest_platform" | "research_news";
+  trust_level?: "high" | "medium" | "low";
+  notes?: string | null;
 };
 
 type SourceAdapter = {
@@ -34,6 +37,11 @@ type DiscoveryCandidate = {
   fundingInfo: string | null;
   teamInfo: string | null;
   riskLevel: "Low" | "Medium" | "High";
+  aiClassification?: "airdrop" | "speculative_token" | "testnet" | "quest_campaign" | "ecosystem_incentive" | "unknown";
+  aiSummary?: string;
+  riskNotes?: string;
+  suggestedStatus?: "new" | "queued" | "needs_review" | "ignored";
+  aiConfidence?: "low" | "medium" | "high";
   officialSourcesFound: number;
   estimatedQuality: "High" | "Medium" | "Low";
   estimatedDifficulty: "Easy" | "Moderate" | "Hard";
@@ -198,6 +206,17 @@ const DISCOVERY_SOURCE_ADAPTERS: SourceAdapter[] = [
 const GENERIC_COMPETITOR_NAMES = new Set([
   "airdrop",
   "airdrops",
+  "spaces",
+  "quests",
+  "tasks",
+  "campaigns",
+  "rewards",
+  "dashboard",
+  "explore",
+  "learn",
+  "docs",
+  "blog",
+  "events",
   "search",
   "browse",
   "category",
@@ -432,6 +451,33 @@ function sanitizeProjectCandidate(raw: string | null | undefined): string | null
   return toTitleCase(normalized);
 }
 
+function hasReasonableProjectName(name: string): boolean {
+  const cleaned = normalizeProjectName(name);
+  if (!cleaned) return false;
+  if (cleaned.length < 3 || cleaned.length > 60) return false;
+  if (/^\d+$/.test(cleaned)) return false;
+
+  const tokens = cleaned.split(" ").filter(Boolean);
+  if (tokens.length === 0) return false;
+  if (tokens.every((token) => GENERIC_COMPETITOR_NAMES.has(token))) return false;
+  if (tokens.length === 1 && tokens[0].length < 4 && !/\d/.test(tokens[0])) return false;
+
+  return true;
+}
+
+function hasDiscoveryIdentitySupport(candidate: DiscoveryCandidate): boolean {
+  if (candidate.projectUrl || candidate.officialDocsUrl || candidate.githubUrl || candidate.officialXUrl || candidate.officialDiscordUrl) {
+    return true;
+  }
+
+  const meaningfulAlias = (candidate.knownAliases ?? []).some((alias) => {
+    const normalized = normalizeProjectName(alias);
+    return hasReasonableProjectName(alias) && !GENERIC_COMPETITOR_NAMES.has(normalized);
+  });
+
+  return Boolean(candidate.contractAddress || meaningfulAlias);
+}
+
 function isGenericSourceUrl(rawUrl: string): boolean {
   try {
     const parsed = new URL(rawUrl);
@@ -609,6 +655,50 @@ function inferEstimatedTime(text: string, difficulty: "Easy" | "Moderate" | "Har
   return "10-30 minutes";
 }
 
+function classifyDiscoveryCandidate(input: {
+  combinedText: string;
+  opportunityType: "Verified Airdrop" | "Testnet" | "Points Program" | "Speculative Token" | "Scam Alert";
+  sourceType?: SourceInput["source_type"];
+  trustLevel?: SourceInput["trust_level"];
+  shortDescription: string | null;
+  projectName: string;
+}): {
+  aiClassification: NonNullable<DiscoveryCandidate["aiClassification"]>;
+  aiSummary: string;
+  riskNotes: string;
+  suggestedStatus: NonNullable<DiscoveryCandidate["suggestedStatus"]>;
+  aiConfidence: NonNullable<DiscoveryCandidate["aiConfidence"]>;
+} {
+  const lowered = input.combinedText.toLowerCase();
+  const sourceTrustBoost = input.trustLevel === "high" ? 1 : input.trustLevel === "low" ? -1 : 0;
+
+  const baseClassification: NonNullable<DiscoveryCandidate["aiClassification"]> = (() => {
+    if (input.opportunityType === "Scam Alert" || /scam|phishing|drainer|fake claim|exploit/i.test(lowered)) return "unknown";
+    if (input.opportunityType === "Speculative Token" || /token launch|memecoin|dex pair|liquidity pool/i.test(lowered)) return "speculative_token";
+    if (input.opportunityType === "Testnet" || /testnet|devnet|alpha|beta network/i.test(lowered)) return "testnet";
+    if (/quest|campaign|missions|tasks|points|xp|leaderboard|questboard/i.test(lowered)) return "quest_campaign";
+    if (/incentive|airdrop|reward|rewards|retroactive|grant|ecosystem/i.test(lowered)) return "ecosystem_incentive";
+    return "airdrop";
+  })();
+
+  const aiConfidence = input.shortDescription ? (sourceTrustBoost >= 0 ? "medium" : "low") : "low";
+  const suggestedStatus: NonNullable<DiscoveryCandidate["suggestedStatus"]> = baseClassification === "unknown" ? "needs_review" : "queued";
+  const aiSummary = `${input.projectName} was classified as ${baseClassification.replace(/_/g, ' ')} from public source signals and listing context.`;
+  const riskNotes = input.opportunityType === "Scam Alert"
+    ? 'Risk elevated: the source signals suggest scam or impersonation language.'
+    : sourceTrustBoost < 0
+    ? 'Source trust is low, so confidence should remain conservative.'
+    : 'No immediate scam indicators detected from the current source signals.';
+
+  return {
+    aiClassification: baseClassification,
+    aiSummary,
+    riskNotes,
+    suggestedStatus,
+    aiConfidence,
+  };
+}
+
 function buildAnalystSummary(projectName: string, opportunityType: string, officialSourcesFound: number, riskLevel: string, detectedKeywords: string[]): string {
   const keywordText = detectedKeywords.length ? detectedKeywords.slice(0, 4).join(", ") : "limited keyword evidence";
   return `${projectName} was detected as a ${opportunityType.toLowerCase()} because scan signals matched ${keywordText}. ${officialSourcesFound} official or semi-official source${officialSourcesFound === 1 ? " was" : "s were"} found, and the current risk profile is ${riskLevel.toLowerCase()}.`;
@@ -736,6 +826,11 @@ function extractDiscoveryCandidatesFromHtml(html: string, source: SourceInput, a
       continue;
     }
 
+    if (!hasReasonableProjectName(projectName)) {
+      reject("invalid_project_name", projectName);
+      continue;
+    }
+
     if (isGenericOpportunityName(projectName)) {
       reject("generic_project_name", projectName);
       continue;
@@ -799,15 +894,16 @@ function extractDiscoveryCandidatesFromHtml(html: string, source: SourceInput, a
     const detectedKeywords = detectKeywordsFromText(`${projectName} ${shortDescription || ""} ${fullCardText}`);
     const knownAliases = extractKnownAliases(projectName, listingUrl, projectUrl);
     const analystSummary = buildAnalystSummary(projectName, opportunityType, officialSourcesFound, riskLevel, detectedKeywords);
+    const aiSignals = classifyDiscoveryCandidate({
+      combinedText,
+      opportunityType,
+      sourceType: source.source_type,
+      trustLevel: source.trust_level,
+      shortDescription,
+      projectName,
+    });
 
-    const dedupeKey = `${normalizeProjectName(projectName)}::${listingUrl}`;
-    if (dedupe.has(dedupeKey)) {
-      reject("duplicate_candidate", projectName);
-      continue;
-    }
-    dedupe.add(dedupeKey);
-
-    found.push({
+    const candidate: DiscoveryCandidate = {
       projectName,
       projectUrl,
       listingUrl,
@@ -827,6 +923,11 @@ function extractDiscoveryCandidatesFromHtml(html: string, source: SourceInput, a
       fundingInfo,
       teamInfo,
       riskLevel,
+      aiClassification: aiSignals.aiClassification,
+      aiSummary: aiSignals.aiSummary,
+      riskNotes: aiSignals.riskNotes,
+      suggestedStatus: aiSignals.suggestedStatus,
+      aiConfidence: aiSignals.aiConfidence,
       officialSourcesFound,
       estimatedQuality,
       estimatedDifficulty,
@@ -834,7 +935,21 @@ function extractDiscoveryCandidatesFromHtml(html: string, source: SourceInput, a
       analystSummary,
       detectedKeywords,
       reasonDetected: `Matched listing link pattern from ${adapter.label} adapter and extracted project card signals.`,
-    });
+    };
+
+    if (!hasDiscoveryIdentitySupport(candidate)) {
+      reject("insufficient_identity_signal", projectName);
+      continue;
+    }
+
+    const dedupeKey = `${normalizeProjectName(projectName)}::${listingUrl}`;
+    if (dedupe.has(dedupeKey)) {
+      reject("duplicate_candidate", projectName);
+      continue;
+    }
+    dedupe.add(dedupeKey);
+
+    found.push(candidate);
   }
 
   return {
@@ -908,6 +1023,10 @@ function extractFallbackCandidatesFromHtml(html: string, source: SourceInput, ad
       reject("fallback_invalid_name", input.rawName);
       return;
     }
+    if (!hasReasonableProjectName(projectName)) {
+      reject("fallback_invalid_name", projectName);
+      return;
+    }
     if (isGenericOpportunityName(projectName)) {
       reject("fallback_generic_name", projectName);
       return;
@@ -931,8 +1050,16 @@ function extractFallbackCandidatesFromHtml(html: string, source: SourceInput, ad
     const estimatedTime = inferEstimatedTime(fullText, estimatedDifficulty);
     const knownAliases = extractKnownAliases(projectName, input.listingUrl, input.projectUrl);
     const analystSummary = buildAnalystSummary(projectName, opportunityType, officialSourcesFound, riskLevel, detectedKeywords);
+    const aiSignals = classifyDiscoveryCandidate({
+      combinedText: fullText,
+      opportunityType,
+      sourceType: source.source_type,
+      trustLevel: source.trust_level,
+      shortDescription: input.shortDescription || null,
+      projectName,
+    });
 
-    found.push({
+    const candidate: DiscoveryCandidate = {
       projectName,
       projectUrl: input.projectUrl,
       listingUrl: input.listingUrl,
@@ -952,6 +1079,11 @@ function extractFallbackCandidatesFromHtml(html: string, source: SourceInput, ad
       fundingInfo: inferFundingFromText(fullText),
       teamInfo: inferTeamFromText(fullText),
       riskLevel,
+      aiClassification: aiSignals.aiClassification,
+      aiSummary: aiSignals.aiSummary,
+      riskNotes: aiSignals.riskNotes,
+      suggestedStatus: aiSignals.suggestedStatus,
+      aiConfidence: aiSignals.aiConfidence,
       officialSourcesFound,
       estimatedQuality,
       estimatedDifficulty,
@@ -959,7 +1091,14 @@ function extractFallbackCandidatesFromHtml(html: string, source: SourceInput, ad
       analystSummary,
       detectedKeywords,
       reasonDetected: input.reasonDetected,
-    });
+    };
+
+    if (!hasDiscoveryIdentitySupport(candidate)) {
+      reject("fallback_insufficient_identity_signal", projectName);
+      return;
+    }
+
+    found.push(candidate);
   };
 
   const pageTitle = html.match(/<title[^>]*>([\s\S]{0,300}?)<\/title>/i)?.[1] ? stripHtml(html.match(/<title[^>]*>([\s\S]{0,300}?)<\/title>/i)?.[1] || "") : "";
@@ -1123,6 +1262,14 @@ function extractDiscoveryCandidatesFromXml(xml: string, source: SourceInput, ada
       addRejection('invalid_project_name', rawName || listingUrl);
       return;
     }
+    if (!hasReasonableProjectName(safeName)) {
+      addRejection('invalid_project_name', safeName);
+      return;
+    }
+    if (isGenericOpportunityName(safeName)) {
+      addRejection('generic_project_name', safeName);
+      return;
+    }
     const fullText = `${safeName} ${description || ''}`;
     const blockchain = inferBlockchainFromText(fullText);
     const category = inferCategoryFromText(fullText);
@@ -1136,8 +1283,16 @@ function extractDiscoveryCandidatesFromXml(xml: string, source: SourceInput, ada
     const estimatedDifficulty = inferEstimatedDifficulty(fullText, opportunityType);
     const estimatedTime = inferEstimatedTime(fullText, estimatedDifficulty);
     const analystSummary = buildAnalystSummary(safeName, opportunityType, officialSourcesFound, riskLevel, detectedKeywords);
+    const aiSignals = classifyDiscoveryCandidate({
+      combinedText: fullText,
+      opportunityType,
+      sourceType: source.source_type,
+      trustLevel: source.trust_level,
+      shortDescription: description,
+      projectName: safeName,
+    });
 
-    candidates.push({
+    const candidate: DiscoveryCandidate = {
       projectName: safeName,
       projectUrl: listingUrl,
       listingUrl,
@@ -1157,6 +1312,11 @@ function extractDiscoveryCandidatesFromXml(xml: string, source: SourceInput, ada
       fundingInfo: inferFundingFromText(fullText),
       teamInfo: inferTeamFromText(fullText),
       riskLevel,
+      aiClassification: aiSignals.aiClassification,
+      aiSummary: aiSignals.aiSummary,
+      riskNotes: aiSignals.riskNotes,
+      suggestedStatus: aiSignals.suggestedStatus,
+      aiConfidence: aiSignals.aiConfidence,
       officialSourcesFound,
       estimatedQuality,
       estimatedDifficulty,
@@ -1164,7 +1324,14 @@ function extractDiscoveryCandidatesFromXml(xml: string, source: SourceInput, ada
       analystSummary,
       detectedKeywords,
       reasonDetected: `Detected from ${adapter.label} feed or sitemap extraction.`,
-    });
+    };
+
+    if (!hasDiscoveryIdentitySupport(candidate)) {
+      addRejection('insufficient_identity_signal', safeName);
+      return;
+    }
+
+    candidates.push(candidate);
   };
 
   if (entryMatches.length > 0) {

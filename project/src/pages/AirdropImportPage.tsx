@@ -71,6 +71,59 @@ const SOURCE_COLORS: Record<string, string> = {
   galxe_rejected: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
 };
 
+const GENERIC_DISCOVERY_NAMES = new Set([
+  'spaces',
+  'quests',
+  'tasks',
+  'campaigns',
+  'rewards',
+  'dashboard',
+  'explore',
+  'learn',
+  'docs',
+  'blog',
+  'events',
+  'airdrop',
+  'airdrops',
+  'search',
+  'browse',
+  'category',
+  'new',
+  'latest',
+]);
+
+function normalizeDiscoveryName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasReasonableDiscoveryName(value: string): boolean {
+  const cleaned = normalizeDiscoveryName(value);
+  if (!cleaned || cleaned.length < 3 || cleaned.length > 60) return false;
+  if (/^\d+$/.test(cleaned)) return false;
+
+  const tokens = cleaned.split(' ').filter(Boolean);
+  if (tokens.length === 0) return false;
+  if (tokens.every((token) => GENERIC_DISCOVERY_NAMES.has(token))) return false;
+  if (tokens.length === 1 && tokens[0].length < 4 && !/\d/.test(tokens[0])) return false;
+
+  return true;
+}
+
+function hasDiscoveryIdentitySupport(item: Pick<ScrapedAirdrop, 'website_url' | 'twitter_url' | 'discord_url' | 'telegram_url' | 'source_url'>): boolean {
+  return Boolean(item.website_url || item.twitter_url || item.discord_url || item.telegram_url || item.source_url);
+}
+
+function shouldRejectScrapedAirdrop(item: ScrapedAirdrop): boolean {
+  const cleanedName = normalizeDiscoveryName(item.name);
+  if (!hasReasonableDiscoveryName(item.name)) return true;
+  if (GENERIC_DISCOVERY_NAMES.has(cleanedName)) return true;
+  return !hasDiscoveryIdentitySupport(item);
+}
+
 interface PendingAirdrop {
   id: string;
   name: string;
@@ -329,7 +382,7 @@ export default function AirdropImportPage() {
     setImportedUrls(new Set((data ?? []).map((r: { source_url: string | null }) => r.source_url ?? '')));
   }, []);
 
-  // ── Load pending (server-side paginated + filtered) ───────────────────────
+  // ── Load approved imports (server-side paginated + filtered) ──────────────
 
   const loadPending = useCallback(async (
     page: number,
@@ -353,11 +406,11 @@ export default function AirdropImportPage() {
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    // Review status filter — default to pending + rejected unless specific choice
+    // Review status filter — default to approved unless specific choice
     if (status) {
       q = q.eq('review_status', status);
     } else {
-      q = q.in('review_status', ['pending', 'rejected']);
+      q = q.eq('review_status', 'approved');
     }
 
     if (search.trim()) q = q.ilike('name', `%${search.trim()}%`);
@@ -373,7 +426,7 @@ export default function AirdropImportPage() {
   useEffect(() => {
     if (!authChecked) return;
     loadImportedUrls();
-    loadPending(1, '', '', '', '');
+    loadPending(1, '', '', 'approved', '');
   }, [authChecked, loadImportedUrls, loadPending]);
 
   // Re-fetch when filters or page change
@@ -387,7 +440,7 @@ export default function AirdropImportPage() {
   const resetFilters = () => {
     setPendingSearch('');
     setPendingSource('');
-    setPendingStatus('');
+    setPendingStatus('approved');
     setPendingVerdict('');
     setPendingPage(1);
   };
@@ -449,6 +502,11 @@ export default function AirdropImportPage() {
   const importScraped = async (item: ScrapedAirdrop) => {
     setImportingId(item.id);
     try {
+      if (shouldRejectScrapedAirdrop(item)) {
+        showToast(`${item.name} skipped because it does not look like a real project`, 'error');
+        return;
+      }
+
       const record = mapScrapedToInsert(item);
       const { error } = await supabase.from('airdrops').insert(record);
       if (error) throw new Error(error.message);
@@ -1009,7 +1067,7 @@ export default function AirdropImportPage() {
             onChange={e => handleFilterChange(() => setPendingStatus(e.target.value))}
             className="bg-dark-700/60 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-neon-blue/40"
           >
-            <option value="">Pending + Rejected</option>
+            <option value="approved">Approved only</option>
             <option value="pending">Pending only</option>
             <option value="rejected">Rejected only</option>
           </select>
@@ -1048,7 +1106,7 @@ export default function AirdropImportPage() {
           <p className="text-sm text-gray-600 text-center py-6">
             {hasActiveFilters
               ? 'No results match your filters.'
-              : 'No pending imports. Fetch from AirdropAlert or add manually above.'}
+              : 'No approved imports yet. Approved airdrops will appear here after review.'}
           </p>
         )}
 

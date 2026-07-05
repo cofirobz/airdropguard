@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS public.competitor_sources (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   source_name text NOT NULL,
   source_url text NOT NULL UNIQUE,
+  source_type text NOT NULL DEFAULT 'airdrop_directory' CHECK (source_type IN ('airdrop_directory', 'ecosystem_blog', 'foundation_announcement', 'testnet_campaign', 'quest_platform', 'research_news')),
+  trust_level text NOT NULL DEFAULT 'medium' CHECK (trust_level IN ('high', 'medium', 'low')),
+  notes text,
   is_active boolean NOT NULL DEFAULT true,
   last_checked_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -79,6 +82,17 @@ CREATE POLICY "competitor_sources_admin_delete"
   ON public.competitor_sources FOR DELETE
   TO authenticated
   USING (EXISTS (SELECT 1 FROM public.admin_users WHERE id = auth.uid()));
+
+INSERT INTO public.competitor_sources (source_name, source_url, source_type, trust_level, notes, is_active)
+VALUES
+  ('AirdropAlert Airdrops', 'https://airdropalert.com/airdrops/', 'airdrop_directory', 'medium', 'Trusted airdrop directory with campaign and listing coverage.', true),
+  ('Airdrops.io', 'https://airdrops.io/', 'airdrop_directory', 'medium', 'High-visibility public airdrop directory.', true),
+  ('Galxe Quests', 'https://galxe.com/quest', 'quest_platform', 'high', 'Major quest platform with campaign and reward programs.', true),
+  ('Layer3 Quests', 'https://layer3.xyz/quests', 'quest_platform', 'high', 'Quest platform for campaign-based ecosystem incentives.', true),
+  ('Base Blog', 'https://blog.base.org/', 'ecosystem_blog', 'high', 'Official ecosystem blog for launch and incentive announcements.', true),
+  ('Arbitrum Blog', 'https://blog.arbitrum.io/', 'foundation_announcement', 'high', 'Official announcement channel for ecosystem and foundation updates.', true),
+  ('CoinMarketCap Airdrops', 'https://coinmarketcap.com/airdrop/', 'research_news', 'medium', 'Public research and listing source for airdrop discovery.', true)
+ON CONFLICT (source_url) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS public.competitor_opportunities (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
