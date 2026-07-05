@@ -17,6 +17,7 @@ import {
   getCompletions, toggleCompletion, getCompletionPercent,
   getOpportunityScore, getAirdropRecommendation, getRecommendationMeta,
   getShouldIBotherSummary, getWhyWeLikeIt, getThingsToConsider,
+  getOpportunityType, getOpportunityTypeTone,
 } from '../lib/utils';
 import { TrustScoreBadge } from '../components/TrustScoreSection';
 import CommunityResults from '../components/CommunityResults';
@@ -1375,32 +1376,93 @@ function getReadingTime(airdrop: AirdropWithTasks): string {
   return `${minutes} min read`;
 }
 
+function isSpeculativeTokenProject(airdrop: AirdropWithTasks): boolean {
+  return airdrop.category.includes('Speculative Token');
+}
+
+function getDexScreenerUrl(airdrop: AirdropWithTasks): string | null {
+  if (!airdrop.contract_address) return null;
+  const chain = airdrop.blockchain[0]?.toLowerCase().replace(/\s+/g, '');
+  if (chain) return `https://dexscreener.com/${chain}/${airdrop.contract_address}`;
+  return `https://dexscreener.com/search?q=${airdrop.contract_address}`;
+}
+
+function getRugCheckUrl(airdrop: AirdropWithTasks): string | null {
+  if (!airdrop.contract_address) return null;
+  return `https://rugcheck.xyz/tokens/${airdrop.contract_address}`;
+}
+
+function getSolscanUrl(airdrop: AirdropWithTasks): string | null {
+  if (!airdrop.contract_address) return null;
+  return `https://solscan.io/token/${airdrop.contract_address}`;
+}
+
+function safeExternalUrl(url: string | null | undefined, fallback: string): string {
+  if (!url) return fallback;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.toString();
+  } catch {
+    // Ignore malformed URLs and safely fall back.
+  }
+  return fallback;
+}
+
+function getTeamProfileLabel(airdrop: AirdropWithTasks): string {
+  if (!airdrop.team_info || /anon/i.test(airdrop.team_info)) return 'Community Funded / Anonymous';
+  return 'Known Team / Public';
+}
+
+function getTradingSinceLabel(airdrop: AirdropWithTasks): string {
+  const anyAirdrop = airdrop as AnyAirdrop;
+  const rawDate = anyAirdrop.created_at || anyAirdrop.updated_at;
+  if (!rawDate) return 'Unverified';
+  return new Date(rawDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
 function KeyFactsBar({
   airdrop,
   days,
   oppScore,
   completionPct,
+  isSpeculativeToken,
 }: {
   airdrop: AirdropWithTasks;
   days: number | null;
   oppScore: number;
   completionPct: number;
+  isSpeculativeToken: boolean;
 }) {
   const metrics = getDisplayAgieMetrics(airdrop, oppScore);
   const anyAirdrop = airdrop as AnyAirdrop;
   const updated = getReadableDate(anyAirdrop.updated_at || anyAirdrop.last_reviewed_at || anyAirdrop.created_at);
   const deadline = days !== null && days > 0 ? `${days}d left` : airdrop.expiry_date ? formatDate(airdrop.expiry_date) : 'Open';
 
-  const facts = [
+  const baseFacts = [
     { label: 'AI Rating', value: `${metrics.overall}/100`, tone: scoreClass(metrics.overall), sub: scoreTone(metrics.overall).label },
     { label: 'Opportunity', value: `${oppScore}/100`, tone: oppScore >= 68 ? 'text-emerald-400' : oppScore >= 45 ? 'text-amber-400' : 'text-rose-400', sub: 'Airdrop priority' },
     { label: 'Risk', value: airdrop.risk_level, tone: airdrop.risk_level === 'Low' ? 'text-emerald-400' : airdrop.risk_level === 'Medium' ? 'text-amber-400' : 'text-rose-400', sub: 'User exposure' },
     { label: 'Difficulty', value: airdrop.difficulty, tone: 'text-sky-300', sub: 'Task effort' },
-    { label: 'Reward', value: airdrop.estimated_reward || 'TBA', tone: 'text-neon-green', sub: airdrop.reward_potential },
     { label: 'Deadline', value: deadline, tone: days !== null && days <= 7 && days > 0 ? 'text-orange-400' : 'text-gray-300', sub: 'Timing' },
-    { label: 'Task Progress', value: `${completionPct}%`, tone: completionPct === 100 ? 'text-emerald-400' : 'text-neon-purple', sub: `${airdrop.tasks.length} task${airdrop.tasks.length !== 1 ? 's' : ''}` },
     { label: 'Last Updated', value: updated, tone: 'text-gray-300', sub: getReadingTime(airdrop) },
   ];
+
+  const speculativeFacts = [
+    { label: 'Team Profile', value: getTeamProfileLabel(airdrop), tone: 'text-amber-200', sub: 'Ownership transparency' },
+    { label: 'DEX Listed', value: airdrop.contract_address ? 'Yes' : 'Unknown', tone: 'text-sky-300', sub: 'Market access' },
+    { label: 'Trading Since', value: getTradingSinceLabel(airdrop), tone: 'text-gray-300', sub: 'Listing age' },
+    { label: 'Contract', value: airdrop.contract_address ? `${airdrop.contract_address.slice(0, 6)}...${airdrop.contract_address.slice(-4)}` : 'Missing', tone: airdrop.contract_address ? 'text-emerald-300' : 'text-rose-300', sub: 'On-chain identifier' },
+  ];
+
+  const facts = isSpeculativeToken
+    ? [...baseFacts, ...speculativeFacts]
+    : [
+      ...baseFacts.slice(0, 4),
+      { label: 'Reward', value: airdrop.estimated_reward || 'TBA', tone: 'text-neon-green', sub: airdrop.reward_potential },
+      ...baseFacts.slice(4, 5),
+      { label: 'Task Progress', value: `${completionPct}%`, tone: completionPct === 100 ? 'text-emerald-400' : 'text-neon-purple', sub: `${airdrop.tasks.length} task${airdrop.tasks.length !== 1 ? 's' : ''}` },
+      ...baseFacts.slice(5),
+    ];
 
   return (
     <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.025] p-3 sm:p-4">
@@ -1433,11 +1495,13 @@ function ResearchTabNav({
   activeTab,
   setActiveTab,
   completionPct,
+  showProgress = true,
 }: {
   tabs: { key: Tab; label: string; icon: React.ReactNode }[];
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
   completionPct: number;
+  showProgress?: boolean;
 }) {
   return (
     <div id="airdrop-tabs" className="sticky top-20 z-30 mb-8 rounded-3xl border border-white/10 bg-dark-950/95 p-2 shadow-lg shadow-black/20 backdrop-blur-md">
@@ -1459,7 +1523,8 @@ function ResearchTabNav({
           </button>
         ))}
 
-        <div className="ml-auto hidden shrink-0 items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-2 lg:flex">
+        {showProgress && (
+          <div className="ml-auto hidden shrink-0 items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-2 lg:flex">
           <div className="text-right">
             <div className="text-[9px] uppercase tracking-wider text-gray-600">Research progress</div>
             <div className="text-xs font-bold text-gray-300">{completionPct}% tasks complete</div>
@@ -1467,7 +1532,8 @@ function ResearchTabNav({
           <div className="h-2 w-24 overflow-hidden rounded-full bg-dark-700">
             <div className="h-full rounded-full bg-gradient-to-r from-neon-purple to-neon-blue" style={{ width: `${completionPct}%` }} />
           </div>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1517,6 +1583,8 @@ function MobileAirdropActionBar({
   bookmarked,
   onBookmark,
   onTasksClick,
+  isSpeculativeToken,
+  externalPrimaryUrl,
 }: {
   airdrop: AirdropWithTasks;
   days: number | null;
@@ -1524,33 +1592,49 @@ function MobileAirdropActionBar({
   bookmarked: boolean;
   onBookmark: () => void;
   onTasksClick: () => void;
+  isSpeculativeToken: boolean;
+  externalPrimaryUrl: string | null;
 }) {
   const scoreTone = oppScore >= 68 ? 'text-emerald-400' : oppScore >= 45 ? 'text-amber-400' : 'text-rose-400';
 
+  const safePrimaryUrl = safeExternalUrl(externalPrimaryUrl, 'https://dexscreener.com');
+
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-dark-950/95 px-3 py-3 shadow-2xl shadow-black/80 backdrop-blur-xl lg:hidden">
-      <div className="mx-auto flex max-w-lg items-center gap-2">
-        <div className="min-w-[74px] rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-center">
+      <div className="mx-auto flex max-w-lg items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="min-w-[68px] shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] px-2.5 py-2 text-center">
           <div className={cn('text-lg font-black tabular-nums leading-none', scoreTone)}>{oppScore}</div>
           <div className="mt-0.5 text-[9px] uppercase tracking-wider text-gray-600">Score</div>
         </div>
 
-        <button
-          type="button"
-          onClick={onTasksClick}
-          className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl bg-neon-purple px-4 py-3 text-sm font-bold text-white shadow-lg shadow-neon-purple/15"
-        >
-          <ListChecks className="h-4 w-4" />
-          Tasks
-          {airdrop.tasks.length > 0 && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px]">{airdrop.tasks.length}</span>}
-        </button>
+        {isSpeculativeToken ? (
+          <a
+            href={safePrimaryUrl}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="flex min-h-[48px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-neon-purple px-3 py-3 text-sm font-bold text-white shadow-lg shadow-neon-purple/15"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Analyze Token
+          </a>
+        ) : (
+          <button
+            type="button"
+            onClick={onTasksClick}
+            className="flex min-h-[48px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-neon-purple px-3 py-3 text-sm font-bold text-white shadow-lg shadow-neon-purple/15"
+          >
+            <ListChecks className="h-4 w-4" />
+            Tasks
+            {airdrop.tasks.length > 0 && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px]">{airdrop.tasks.length}</span>}
+          </button>
+        )}
 
         {airdrop.website_url ? (
           <a
             href={airdrop.website_url}
             target="_blank"
             rel="noopener noreferrer nofollow"
-            className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-sm font-bold text-sky-300"
+            className="flex min-h-[48px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-3 py-3 text-sm font-bold text-sky-300"
           >
             <ExternalLink className="h-4 w-4" />
             Site
@@ -1558,7 +1642,7 @@ function MobileAirdropActionBar({
         ) : (
           <Link
             to="/wallet-checker"
-            className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-sm font-bold text-sky-300"
+            className="flex min-h-[48px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-3 py-3 text-sm font-bold text-sky-300"
           >
             <ShieldAlert className="h-4 w-4" />
             Wallet
@@ -1577,6 +1661,289 @@ function MobileAirdropActionBar({
       <div className="mx-auto mt-2 max-w-lg text-center text-[10px] text-gray-600">
         {days !== null && days > 0 ? `${days} days left` : 'Check official links before connecting'} • Never share seed phrases
       </div>
+    </div>
+  );
+}
+
+function SpeculativeTokenIntelligenceDashboard({
+  airdrop,
+  securityScore,
+  dexScreenerUrl,
+  rugCheckUrl,
+  solscanUrl,
+  onViewFullReport,
+}: {
+  airdrop: AirdropWithTasks;
+  securityScore: number;
+  dexScreenerUrl: string | null;
+  rugCheckUrl: string | null;
+  solscanUrl: string | null;
+  onViewFullReport: () => void;
+}) {
+  const anyAirdrop = airdrop as AnyAirdrop;
+  const [copied, setCopied] = useState(false);
+  const [marketData, setMarketData] = useState<MarketData | null>(null);
+  const [loadingMarket, setLoadingMarket] = useState(Boolean(airdrop.contract_address));
+  const contractAddress = (airdrop.contract_address ?? '').trim();
+
+  useEffect(() => {
+    if (!airdrop.contract_address) {
+      setMarketData(null);
+      setLoadingMarket(false);
+      return;
+    }
+
+    setLoadingMarket(true);
+    fetchMarketData(airdrop.contract_address, airdrop.blockchain as string[], airdrop.ticker ?? null, airdrop.name)
+      .then((data) => {
+        setMarketData(data);
+      })
+      .finally(() => {
+        setLoadingMarket(false);
+      });
+  }, [airdrop.contract_address, (airdrop.blockchain as string[]).join(','), airdrop.ticker, airdrop.name]);
+
+  const confidence = typeof anyAirdrop.ai_confidence === 'number'
+    ? `${Math.round(anyAirdrop.ai_confidence)}%`
+    : securityScore >= 75
+    ? 'High'
+    : securityScore >= 50
+    ? 'Medium'
+    : 'Low';
+  const lastUpdated = airdrop.last_analyzed_at || airdrop.updated_at || airdrop.created_at || null;
+  const chain = (airdrop.blockchain?.[0] ?? '').toLowerCase();
+  const explorerBase =
+    chain.includes('solana') ? 'https://solscan.io/token/' :
+    chain.includes('base') ? 'https://basescan.org/token/' :
+    chain.includes('arbitrum') ? 'https://arbiscan.io/token/' :
+    chain.includes('optimism') ? 'https://optimistic.etherscan.io/token/' :
+    chain.includes('polygon') ? 'https://polygonscan.com/token/' :
+    chain.includes('avalanche') ? 'https://snowtrace.io/token/' :
+    chain.includes('bsc') || chain.includes('binance') ? 'https://bscscan.com/token/' :
+    chain.includes('ethereum') ? 'https://etherscan.io/token/' :
+    null;
+  const explorerUrl = contractAddress && explorerBase ? `${explorerBase}${contractAddress}` : null;
+
+  const riskCandidates = (airdrop.score_reasons ?? [])
+    .filter((reason) => /risk|warning|concern|unclear|missing|volatile/i.test(reason))
+    .slice(0, 4);
+  const positiveCandidates = [
+    ...(airdrop.human_verified ? ['Manual moderator review completed'] : []),
+    ...(airdrop.contract_address ? ['Contract address published for independent verification'] : []),
+    ...(airdrop.website_url ? ['Official website listed'] : []),
+    ...(airdrop.github_url ? ['Public development repository available'] : []),
+    ...(airdrop.trust_score != null && airdrop.trust_score >= 60 ? [`Trust score currently ${airdrop.trust_score}/100`] : []),
+  ].slice(0, 4);
+  const precautions = [
+    'Use a burner wallet for first interaction and keep trading limits small.',
+    'Verify contract and socials from multiple independent sources before any swap.',
+    'Monitor holder concentration and liquidity lock status before entry.',
+  ];
+
+  const holders =
+    typeof anyAirdrop.holders === 'number' ? anyAirdrop.holders :
+    typeof anyAirdrop.holder_count === 'number' ? anyAirdrop.holder_count :
+    null;
+  const holderConcentration =
+    typeof anyAirdrop.holder_concentration === 'string' ? anyAirdrop.holder_concentration :
+    typeof anyAirdrop.top_holder_percent === 'number' ? `${anyAirdrop.top_holder_percent}% top holder` :
+    'Unknown';
+  const liquidityValue =
+    typeof anyAirdrop.liquidity_usd === 'number' ? fmt(anyAirdrop.liquidity_usd) :
+    typeof anyAirdrop.liquidity === 'number' ? fmt(anyAirdrop.liquidity) :
+    'Unknown';
+  const safeDexScreenerUrl = safeExternalUrl(dexScreenerUrl, 'https://dexscreener.com');
+  const safeRugCheckUrl = safeExternalUrl(rugCheckUrl, 'https://rugcheck.xyz');
+  const safeSolscanUrl = safeExternalUrl(solscanUrl, 'https://solscan.io');
+
+  async function handleCopyContract() {
+    if (!contractAddress || !navigator?.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(contractAddress);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  const healthItems: Array<{ label: string; value: string; tone?: string }> = [
+    { label: 'Liquidity Status', value: liquidityValue === 'Unknown' ? 'Unknown' : 'Present', tone: liquidityValue === 'Unknown' ? 'text-amber-300' : 'text-emerald-300' },
+    { label: 'Contract Verification', value: contractAddress ? 'Address published' : 'Missing', tone: contractAddress ? 'text-emerald-300' : 'text-rose-300' },
+    { label: 'Mint Authority', value: typeof anyAirdrop.mint_authority === 'string' ? anyAirdrop.mint_authority : 'Unknown' },
+    { label: 'Freeze Authority', value: typeof anyAirdrop.freeze_authority === 'string' ? anyAirdrop.freeze_authority : 'Unknown' },
+    { label: 'Holder Concentration', value: holderConcentration, tone: /unknown/i.test(holderConcentration) ? 'text-amber-300' : 'text-white' },
+    { label: 'Honeypot Status', value: typeof anyAirdrop.honeypot_status === 'string' ? anyAirdrop.honeypot_status : 'Not verified' },
+    { label: 'Ownership Renounced', value: typeof anyAirdrop.ownership_renounced === 'boolean' ? (anyAirdrop.ownership_renounced ? 'Yes' : 'No') : 'Unknown' },
+    { label: 'Trading Status', value: airdrop.status === 'Active' ? 'Active' : airdrop.status },
+  ];
+
+  return (
+    <div className="space-y-6 animate-slide-up">
+      <section className="glass-card border-rose-500/20 bg-rose-500/5 p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">AI Security Score</h2>
+            <p className="mt-1 text-sm text-gray-400">Real-time token intelligence snapshot for speculative risk assessment.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={safeDexScreenerUrl}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-flex w-full items-center justify-center rounded-xl border border-neon-purple/40 bg-neon-purple/15 px-3 py-2 text-xs font-semibold text-neon-purple hover:border-neon-purple/60 sm:w-auto"
+            >
+              Analyze Token
+            </a>
+            <button
+              type="button"
+              onClick={onViewFullReport}
+              className="inline-flex w-full items-center justify-center rounded-xl border border-cyan-500/35 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-200 hover:border-cyan-400/60 sm:w-auto"
+            >
+              View Full Security Report
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-white/10 bg-dark-700/40 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-gray-600">Overall Score</div>
+            <div className="mt-1 text-3xl font-black text-white">{Math.max(0, Math.min(100, securityScore))}<span className="text-sm text-gray-500">/100</span></div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-dark-700/40 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-gray-600">Risk Level</div>
+            <div className={cn('mt-1 inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold', getRiskColor(airdrop.risk_level))}>{airdrop.risk_level}</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-dark-700/40 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-gray-600">Confidence</div>
+            <div className="mt-1 text-sm font-semibold text-cyan-200">{confidence}</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-dark-700/40 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-gray-600">Last Updated</div>
+            <div className="mt-1 text-sm font-semibold text-white">{lastUpdated ? formatDate(lastUpdated) : 'Unknown'}</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="glass-card p-6">
+        <h3 className="text-sm font-semibold text-white">Token Health</h3>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {healthItems.map((item) => (
+            <div key={item.label} className="rounded-xl border border-white/10 bg-dark-700/30 px-3 py-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">{item.label}</div>
+              <div className={cn('mt-1 text-xs font-semibold text-white', item.tone)}>{item.value}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div className="glass-card p-6">
+          <h3 className="text-sm font-semibold text-white">Contract Information</h3>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Contract Address</div>
+              <div className="mt-1 break-all font-mono text-xs text-gray-200">{contractAddress || 'Unavailable'}</div>
+              <button
+                type="button"
+                onClick={handleCopyContract}
+                disabled={!contractAddress}
+                className="mt-2 rounded-lg border border-white/15 bg-white/[0.04] px-2.5 py-1 text-[11px] font-semibold text-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Blockchain</div>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {airdrop.blockchain.length > 0 ? airdrop.blockchain.map((b) => (
+                  <span key={b} className="rounded-full border border-white/10 bg-dark-600/60 px-2 py-0.5 text-[10px] text-gray-400">{b}</span>
+                )) : <span className="text-xs text-gray-500">Unknown</span>}
+              </div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Explorer</div>
+              {explorerUrl ? (
+                <a href={explorerUrl} target="_blank" rel="noopener noreferrer nofollow" className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-cyan-200 hover:text-cyan-100">
+                  Open contract explorer
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : (
+                <div className="mt-1 text-xs text-gray-500">Unavailable for current chain data</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-card p-6">
+          <h3 className="text-sm font-semibold text-white">Market Overview</h3>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Trading Since</div>
+              <div className="mt-1 text-xs font-semibold text-white">{getTradingSinceLabel(airdrop)}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Market Cap</div>
+              <div className="mt-1 text-xs font-semibold text-white">{marketData?.marketCap != null ? fmt(marketData.marketCap) : (loadingMarket ? 'Loading...' : 'Unavailable')}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Liquidity</div>
+              <div className="mt-1 text-xs font-semibold text-white">{liquidityValue}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">24h Volume</div>
+              <div className="mt-1 text-xs font-semibold text-white">{marketData?.volume24h != null ? fmt(marketData.volume24h) : (loadingMarket ? 'Loading...' : 'Unavailable')}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Holders</div>
+              <div className="mt-1 text-xs font-semibold text-white">{holders != null ? holders.toLocaleString('en-US') : 'Unknown'}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">DEX Listed</div>
+              <div className="mt-1 text-xs font-semibold text-white">{contractAddress ? 'Yes' : 'Unknown'}</div>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a href={safeDexScreenerUrl} target="_blank" rel="noopener noreferrer nofollow" className="rounded-lg border border-neon-purple/35 bg-neon-purple/10 px-2.5 py-1 text-[11px] font-semibold text-neon-purple">DexScreener</a>
+            <a href={safeRugCheckUrl} target="_blank" rel="noopener noreferrer nofollow" className="rounded-lg border border-rose-500/35 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-200">RugCheck</a>
+            <a href={safeSolscanUrl} target="_blank" rel="noopener noreferrer nofollow" className="rounded-lg border border-cyan-500/35 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-200">Solscan</a>
+          </div>
+        </div>
+      </section>
+
+      <section className="glass-card p-6">
+        <h3 className="text-sm font-semibold text-white">Security Summary</h3>
+        <p className="mt-3 text-sm leading-relaxed text-gray-300">
+          {airdrop.ai_risk_analysis || airdrop.ai_summary || 'AI security narrative is not available yet. Treat this token as high-risk until independent verification is complete.'}
+        </p>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4">
+            <div className="text-xs font-semibold text-rose-200">Key Risks</div>
+            <ul className="mt-2 space-y-1.5">
+              {(riskCandidates.length > 0 ? riskCandidates : ['No structured risk reasons provided by AI yet.']).map((risk) => (
+                <li key={risk} className="text-xs leading-relaxed text-rose-100">{risk}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+            <div className="text-xs font-semibold text-emerald-200">Positive Signals</div>
+            <ul className="mt-2 space-y-1.5">
+              {(positiveCandidates.length > 0 ? positiveCandidates : ['Positive confirmation signals are limited right now.']).map((signal) => (
+                <li key={signal} className="text-xs leading-relaxed text-emerald-100">{signal}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-4">
+            <div className="text-xs font-semibold text-amber-100">Recommended Precautions</div>
+            <ul className="mt-2 space-y-1.5">
+              {precautions.map((item) => (
+                <li key={item} className="text-xs leading-relaxed text-amber-100">{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -1626,9 +1993,13 @@ export default function AirdropDetailPage() {
   useEffect(() => {
     if (!airdrop) return;
 
+    const isSpeculative = isSpeculativeTokenProject(airdrop);
+
     window.dispatchEvent(new CustomEvent('ag:copilot-context', {
       detail: {
-        context: `Airdrop detail page for ${airdrop.name}. Use its trust score, risk level, reward estimate and checklist tasks when answering.`,
+        context: isSpeculative
+          ? `Speculative token detail page for ${airdrop.name}. Use risk signals, team transparency, and external due-diligence context when answering.`
+          : `Airdrop detail page for ${airdrop.name}. Use its trust score, risk level, reward estimate and checklist tasks when answering.`,
       },
     }));
   }, [airdrop]);
@@ -1675,17 +2046,29 @@ export default function AirdropDetailPage() {
   const shouldSummary = getShouldIBotherSummary(airdrop, rec);
   const pros      = getWhyWeLikeIt(airdrop);
   const cons      = getThingsToConsider(airdrop);
+  const opportunityType = getOpportunityType(airdrop);
+  const isSpeculativeToken = isSpeculativeTokenProject(airdrop);
+  const isScamAlert = opportunityType === 'Scam Alert';
+  const isRiskOnlyOpportunity = isSpeculativeToken || isScamAlert;
+  const dexScreenerUrl = getDexScreenerUrl(airdrop);
+  const rugCheckUrl = getRugCheckUrl(airdrop);
+  const solscanUrl = getSolscanUrl(airdrop);
+  const safeDexScreenerUrl = safeExternalUrl(dexScreenerUrl, 'https://dexscreener.com');
+  const safeRugCheckUrl = safeExternalUrl(rugCheckUrl, 'https://rugcheck.xyz');
+  const safeSolscanUrl = safeExternalUrl(solscanUrl, 'https://solscan.io');
 
   const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'overview', label: 'Overview', icon: <FileText className="w-3.5 h-3.5" /> },
-    { key: 'tasks', label: `Tasks (${airdrop.tasks.length})`, icon: <ListChecks className="w-3.5 h-3.5" /> },
+    ...(!isRiskOnlyOpportunity ? [{ key: 'tasks' as const, label: `Tasks (${airdrop.tasks.length})`, icon: <ListChecks className="w-3.5 h-3.5" /> }] : []),
     { key: 'analysis', label: 'AI Analysis', icon: <BarChart3 className="w-3.5 h-3.5" /> },
   ];
   const pageUrl = `https://airdropguard.com/airdrop/${airdrop.slug}`;
 
   const pageDescription =
     airdrop.ai_summary ||
-    `Research the ${airdrop.name} airdrop with AirdropGuard intelligence, trust signals, risk level, reward potential and task guidance.`;
+    (isSpeculativeToken
+      ? `Research the ${airdrop.name} speculative token risk profile with AirdropGuard intelligence and external due-diligence links.`
+      : `Research the ${airdrop.name} airdrop with AirdropGuard intelligence, trust signals, risk level, reward potential and task guidance.`);
 
   const airdropSchema = {
     '@context': 'https://schema.org',
@@ -1693,7 +2076,7 @@ export default function AirdropDetailPage() {
       {
         '@type': 'Article',
         '@id': `${pageUrl}#article`,
-        headline: `${airdrop.name} Airdrop Guide`,
+        headline: isSpeculativeToken ? `${airdrop.name} Token Risk Guide` : `${airdrop.name} Airdrop Guide`,
         description: pageDescription,
         url: pageUrl,
         image: airdrop.logo_url || 'https://airdropguard.com/airdrop_guards.png',
@@ -1711,7 +2094,7 @@ export default function AirdropDetailPage() {
           },
         },
         mainEntityOfPage: pageUrl,
-        articleSection: 'Crypto Airdrops',
+        articleSection: isSpeculativeToken ? 'Speculative Tokens' : 'Crypto Airdrops',
         keywords: [
           airdrop.name,
           airdrop.ticker,
@@ -1750,7 +2133,7 @@ export default function AirdropDetailPage() {
   return (
   <>
     <SEO
-      title={`${airdrop.name} Airdrop Guide | AirdropGuard`}
+      title={`${airdrop.name} ${isSpeculativeToken ? 'Token Risk Guide' : 'Airdrop Guide'} | AirdropGuard`}
       description={pageDescription}
       canonical={pageUrl}
       image={airdrop.logo_url || "https://airdropguard.com/airdrop_guards.png"}
@@ -1785,6 +2168,9 @@ export default function AirdropDetailPage() {
               <div>
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <h1 className="text-2xl font-black leading-tight text-white sm:text-4xl">{airdrop.name}</h1>
+                  <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]', getOpportunityTypeTone(opportunityType))}>
+                    {opportunityType}
+                  </span>
                   {airdrop.ticker && (
                     <span className="text-sm font-bold font-mono text-neon-purple bg-neon-purple/10 border border-neon-purple/25 rounded-lg px-2 py-0.5 tracking-wider">
                       ${airdrop.ticker}
@@ -1825,17 +2211,45 @@ export default function AirdropDetailPage() {
               </button>
             </div>
 
-            <p className="mb-5 text-sm leading-relaxed text-gray-400 sm:text-base">{airdrop.ai_summary || `Research ${airdrop.name} with AirdropGuard intelligence, trust signals, task guidance and wallet safety reminders.`}</p>
+            <p className="mb-5 text-sm leading-relaxed text-gray-400 sm:text-base">{airdrop.ai_summary || (isRiskOnlyOpportunity
+              ? `Research ${airdrop.name} with AirdropGuard risk intelligence, contract checks and external due-diligence links.`
+              : `Research ${airdrop.name} with AirdropGuard intelligence, trust signals, task guidance and wallet safety reminders.`)}</p>
+
+            {isScamAlert && (
+              <div className="mb-5 rounded-2xl border border-rose-500/35 bg-rose-600/15 p-4">
+                <div className="flex items-center gap-2 text-rose-200">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm font-bold">Scam Alert</span>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-rose-100">
+                  This listing is flagged as dangerous. Avoid wallet connection and verify only through trusted official channels.
+                </p>
+              </div>
+            )}
+
+            {isSpeculativeToken && (
+              <div className="mb-5 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4">
+                <div className="flex items-center gap-2 text-rose-200">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm font-bold">Permanent Risk Warning</span>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-rose-100">
+                  This is a high-risk speculative token and not a verified airdrop. Do not expect guaranteed rewards, qualification progress, or campaign task coverage.
+                </p>
+              </div>
+            )}
 
             {/* Metric pills */}
             <div className="flex flex-wrap gap-3 mb-5">
-              <div className="flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-gray-500" />
-                <span className="text-xs text-gray-500">Reward</span>
-                <span className={cn('badge border text-xs', getRewardColor(airdrop.reward_potential))}>
-                  {airdrop.reward_potential}
-                </span>
-              </div>
+              {!isRiskOnlyOpportunity && (
+                <div className="flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-gray-500" />
+                  <span className="text-xs text-gray-500">Reward</span>
+                  <span className={cn('badge border text-xs', getRewardColor(airdrop.reward_potential))}>
+                    {airdrop.reward_potential}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center gap-1.5">
                 <ShieldAlert className="w-3.5 h-3.5 text-gray-500" />
                 <span className="text-xs text-gray-500">Risk</span>
@@ -1843,13 +2257,31 @@ export default function AirdropDetailPage() {
                   {airdrop.risk_level}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-500">Difficulty</span>
-                <span className={cn('badge border text-xs', getDifficultyColor(airdrop.difficulty))}>
-                  {airdrop.difficulty}
-                </span>
-              </div>
-              {airdrop.estimated_reward && (
+              {!isRiskOnlyOpportunity && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-500">Difficulty</span>
+                  <span className={cn('badge border text-xs', getDifficultyColor(airdrop.difficulty))}>
+                    {airdrop.difficulty}
+                  </span>
+                </div>
+              )}
+              {isSpeculativeToken && (
+                <>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <span className="text-gray-500">Team</span>
+                    <span className="font-semibold text-amber-200">{getTeamProfileLabel(airdrop)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <span className="text-gray-500">DEX Listed</span>
+                    <span className="font-semibold text-white">{airdrop.contract_address ? 'Yes' : 'Unknown'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <span className="text-gray-500">Trading Since</span>
+                    <span className="font-semibold text-white">{getTradingSinceLabel(airdrop)}</span>
+                  </div>
+                </>
+              )}
+              {!isRiskOnlyOpportunity && airdrop.estimated_reward && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-gray-500">Est. Reward</span>
                   <span className="text-xs font-semibold text-neon-green">{airdrop.estimated_reward}</span>
@@ -1865,6 +2297,22 @@ export default function AirdropDetailPage() {
 
             {/* Social links */}
             <div className="flex items-center gap-2 flex-wrap">
+              {isSpeculativeToken && (
+                <>
+                  <a href={safeDexScreenerUrl} target="_blank" rel="noopener noreferrer nofollow"
+                    className="flex items-center gap-1.5 text-xs text-white hover:text-white glass border border-neon-purple/35 rounded-lg px-3 py-1.5 bg-neon-purple/10 hover:border-neon-purple/50 transition-colors">
+                    <ExternalLink className="w-3.5 h-3.5" /> DexScreener
+                  </a>
+                  <a href={safeRugCheckUrl} target="_blank" rel="noopener noreferrer nofollow"
+                    className="flex items-center gap-1.5 text-xs text-rose-200 hover:text-rose-100 glass border border-rose-500/30 rounded-lg px-3 py-1.5 bg-rose-500/10 hover:border-rose-400/50 transition-colors">
+                    <ShieldAlert className="w-3.5 h-3.5" /> RugCheck
+                  </a>
+                  <a href={safeSolscanUrl} target="_blank" rel="noopener noreferrer nofollow"
+                    className="flex items-center gap-1.5 text-xs text-cyan-200 hover:text-cyan-100 glass border border-cyan-500/30 rounded-lg px-3 py-1.5 bg-cyan-500/10 hover:border-cyan-400/50 transition-colors">
+                    <ExternalLink className="w-3.5 h-3.5" /> Solscan
+                  </a>
+                </>
+              )}
               {airdrop.website_url && (
                 <a href={airdrop.website_url} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white glass border border-white/10 rounded-lg px-3 py-1.5 hover:border-white/20 transition-colors">
@@ -1911,7 +2359,7 @@ export default function AirdropDetailPage() {
         )}
       </div>
 
-      <KeyFactsBar airdrop={airdrop} days={days} oppScore={oppScore} completionPct={completionPct} />
+      <KeyFactsBar airdrop={airdrop} days={days} oppScore={oppScore} completionPct={completionPct} isSpeculativeToken={isSpeculativeToken} />
 
       <AgieCommandCenter airdrop={airdrop} opportunityScore={oppScore} recommendationLabel={recMeta.label} />
 
@@ -1921,38 +2369,67 @@ export default function AirdropDetailPage() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         completionPct={completionPct}
+        showProgress={!isRiskOnlyOpportunity}
       />
 
       {/* Tab content */}
       {activeTab === 'overview' && (
+        isSpeculativeToken ? (
+          <SpeculativeTokenIntelligenceDashboard
+            airdrop={airdrop}
+            securityScore={scoreFrom(airdrop, 'security') ?? airdrop.trust_score ?? oppScore}
+            dexScreenerUrl={dexScreenerUrl}
+            rugCheckUrl={rugCheckUrl}
+            solscanUrl={solscanUrl}
+            onViewFullReport={() => setActiveTab('analysis')}
+          />
+        ) : (
         <div className="space-y-6 animate-slide-up">
 
-          {/* ── Should I Bother? ───────────────────────────────────────────── */}
-          <div className="glass-card p-6 border-neon-purple/15">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5 text-neon-purple" />
-              <h2 className="text-base font-semibold text-white">Should I Bother?</h2>
-            </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              {/* Score */}
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="text-center">
-                  <div className={cn('text-4xl font-bold tabular-nums leading-none',
-                    oppScore >= 68 ? 'text-emerald-400' : oppScore >= 45 ? 'text-amber-400' : 'text-rose-400'
-                  )}>
-                    {oppScore}
-                  </div>
-                  <div className="text-[10px] text-gray-600 mt-0.5 uppercase tracking-wider">Opportunity</div>
-                </div>
-                <div className="w-px h-10 bg-white/10" />
-                <span className={cn('text-sm font-bold border rounded-xl px-3 py-1.5 flex items-center gap-1.5', recMeta.cls)}>
-                  <span className={cn('w-2 h-2 rounded-full inline-block', recMeta.dot)} />
-                  {recMeta.label}
-                </span>
+          {!isRiskOnlyOpportunity && (
+            <div className="glass-card p-6 border-neon-purple/15">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-neon-purple" />
+                <h2 className="text-base font-semibold text-white">Should I Bother?</h2>
               </div>
-              <p className="text-sm text-gray-400 leading-relaxed capitalize-first">{shouldSummary}</p>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-center">
+                    <div className={cn('text-4xl font-bold tabular-nums leading-none',
+                      oppScore >= 68 ? 'text-emerald-400' : oppScore >= 45 ? 'text-amber-400' : 'text-rose-400'
+                    )}>
+                      {oppScore}
+                    </div>
+                    <div className="text-[10px] text-gray-600 mt-0.5 uppercase tracking-wider">Opportunity</div>
+                  </div>
+                  <div className="w-px h-10 bg-white/10" />
+                  <span className={cn('text-sm font-bold border rounded-xl px-3 py-1.5 flex items-center gap-1.5', recMeta.cls)}>
+                    <span className={cn('w-2 h-2 rounded-full inline-block', recMeta.dot)} />
+                    {recMeta.label}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-400 leading-relaxed capitalize-first">{shouldSummary}</p>
+              </div>
             </div>
-          </div>
+          )}
+
+          {isSpeculativeToken && (
+            <div className="glass-card border-rose-500/20 bg-rose-500/5 p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-rose-300" />
+                <h2 className="text-base font-semibold text-white">High-Risk Speculative Token</h2>
+              </div>
+              <p className="text-sm leading-relaxed text-rose-100">
+                Treat this page as risk intelligence only. AirdropGuard does not present qualification checklists, expected rewards, or completion progress for speculative-token listings.
+              </p>
+              <div className="mt-4 grid gap-2 text-xs text-gray-300 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-dark-700/40 px-3 py-2">Speculative Risk: <span className="font-semibold text-rose-200">{airdrop.risk_level}</span></div>
+                <div className="rounded-xl border border-white/10 bg-dark-700/40 px-3 py-2">Team Profile: <span className="font-semibold text-amber-200">{getTeamProfileLabel(airdrop)}</span></div>
+                <div className="rounded-xl border border-white/10 bg-dark-700/40 px-3 py-2">DEX Listed: <span className="font-semibold text-white">{airdrop.contract_address ? 'Yes' : 'Unknown'}</span></div>
+                <div className="rounded-xl border border-white/10 bg-dark-700/40 px-3 py-2">Trading Since: <span className="font-semibold text-white">{getTradingSinceLabel(airdrop)}</span></div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
             <div className="xl:col-span-2 space-y-5">
@@ -1971,7 +2448,7 @@ export default function AirdropDetailPage() {
           </div>
 
           {/* ── Why We Like It + Things To Consider ───────────────────────── */}
-          {(pros.length > 0 || cons.length > 0) && (
+          {!isRiskOnlyOpportunity && (pros.length > 0 || cons.length > 0) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {pros.length > 0 && (
                 <div className="glass-card p-5">
@@ -2025,7 +2502,13 @@ export default function AirdropDetailPage() {
               {[
                 { label: 'Time Required', value: airdrop.time_required || 'N/A' },
                 { label: 'Expiry', value: formatDate(airdrop.expiry_date) },
-                { label: 'Est. Reward', value: airdrop.estimated_reward || 'TBA' },
+                ...(isSpeculativeToken
+                  ? [
+                    { label: 'Contract Address', value: airdrop.contract_address || 'Unavailable' },
+                  ]
+                  : [
+                    { label: 'Est. Reward', value: airdrop.estimated_reward || 'TBA' },
+                  ]),
               ].map(item => (
                 <div key={item.label} className="bg-dark-700/40 rounded-xl p-3">
                   <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">{item.label}</div>
@@ -2048,9 +2531,10 @@ export default function AirdropDetailPage() {
 
           <TrustProofPanel airdrop={airdrop} />
         </div>
+        )
       )}
 
-      {activeTab === 'tasks' && (
+      {activeTab === 'tasks' && !isRiskOnlyOpportunity && (
         <div className="space-y-4 animate-slide-up">
           {/* Progress bar */}
           {airdrop.tasks.length > 0 && (
@@ -2115,7 +2599,29 @@ export default function AirdropDetailPage() {
       )}
 
       {activeTab === 'analysis' && (
-        <AnalysisTab airdrop={airdrop} pros={pros} cons={cons} />
+        isSpeculativeToken ? (
+          <div className="space-y-5 animate-slide-up">
+            <div className="glass-card border-rose-500/20 bg-rose-500/5 p-6">
+              <h2 className="text-base font-semibold text-white">Full Security Report</h2>
+              <p className="mt-3 text-sm leading-relaxed text-gray-300">
+                {airdrop.ai_risk_analysis || 'Risk analysis is not available yet. Review external tools before interacting with this token.'}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <a href={safeDexScreenerUrl} target="_blank" rel="noopener noreferrer nofollow" className="glass-card p-4 text-sm font-semibold text-white hover:border-neon-purple/40">
+                Open on DexScreener
+              </a>
+              <a href={safeRugCheckUrl} target="_blank" rel="noopener noreferrer nofollow" className="glass-card p-4 text-sm font-semibold text-rose-200 hover:border-rose-500/40">
+                Run RugCheck
+              </a>
+              <a href={safeSolscanUrl} target="_blank" rel="noopener noreferrer nofollow" className="glass-card p-4 text-sm font-semibold text-cyan-200 hover:border-cyan-500/40">
+                Inspect on Solscan
+              </a>
+            </div>
+          </div>
+        ) : (
+          <AnalysisTab airdrop={airdrop} pros={pros} cons={cons} />
+        )
       )}
     </div>
 
@@ -2126,6 +2632,8 @@ export default function AirdropDetailPage() {
       bookmarked={bookmarked}
       onBookmark={handleBookmark}
       onTasksClick={() => setActiveTab('tasks')}
+      isSpeculativeToken={isSpeculativeToken}
+      externalPrimaryUrl={dexScreenerUrl}
     />
     </>
   );

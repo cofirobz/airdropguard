@@ -15,6 +15,8 @@ import {
   getOpportunityScore,
   getRecommendation,
   getRecommendationMeta,
+  getOpportunityType,
+  getOpportunityTypeTone,
 } from '../lib/utils';
 
 interface Props {
@@ -43,6 +45,16 @@ function LightweightTrustScoreBadge({ score }: { score: number | null }) {
 export default function AirdropCard({ airdrop, priority = false }: Props) {
   const [imgError, setImgError] = useState(false);
   const [bookmarked, setBookmarked] = useState(() => isBookmarked(airdrop.id));
+  const opportunityType = getOpportunityType(airdrop);
+  const isSpeculativeToken = opportunityType === 'Speculative Token';
+  const isScamAlert = opportunityType === 'Scam Alert';
+  const isRiskOnlyOpportunity = isSpeculativeToken || isScamAlert;
+  const communityProfile = !airdrop.team_info || /anon/i.test(airdrop.team_info)
+    ? 'Community Funded / Anonymous'
+    : 'Known Team / Public';
+  const tradingSince = airdrop.created_at
+    ? new Date(airdrop.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    : 'Unverified';
 
   const days = daysUntil(airdrop.expiry_date);
   const oppScore = getOpportunityScore(airdrop);
@@ -60,7 +72,7 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
     <Link
       to={`/airdrop/${airdrop.slug}`}
       className="glass-card group flex h-full min-w-0 flex-col rounded-[26px] p-3.5 transition-colors duration-200 hover:border-white/10 sm:rounded-2xl sm:p-5"
-      aria-label={`Open ${airdrop.name} airdrop report`}
+      aria-label={`Open ${airdrop.name} project intelligence report`}
     >
       <div className="mb-3 flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-neon-purple/20 to-neon-blue/20 sm:h-12 sm:w-12">
@@ -93,6 +105,12 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
                 ${airdrop.ticker}
               </span>
             )}
+          </div>
+
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold', getOpportunityTypeTone(opportunityType))}>
+              {opportunityType}
+            </span>
           </div>
 
           <div className="hidden flex-wrap items-center gap-1.5 sm:flex">
@@ -131,7 +149,16 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
         </button>
       </div>
 
-      {airdrop.listing_state === 'under_review' && (
+      {isScamAlert && (
+        <div className="mb-3 flex items-start gap-2 rounded-xl border border-rose-500/35 bg-rose-600/15 px-3 py-2">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-200" />
+          <span className="text-[11px] font-semibold leading-relaxed text-rose-100">
+            Scam Alert - dangerous project. Do not connect wallet.
+          </span>
+        </div>
+      )}
+
+      {airdrop.listing_state === 'under_review' && !isScamAlert && (
         <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
           <span className="text-[11px] font-medium leading-relaxed text-amber-300">
@@ -140,46 +167,101 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
         </div>
       )}
 
+      {isSpeculativeToken && (
+        <div className="mb-3 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-300" />
+          <span className="text-[11px] font-medium leading-relaxed text-rose-100">
+            High-Risk Speculative Token - not a verified airdrop.
+          </span>
+        </div>
+      )}
+
       <div className="mb-3 grid grid-cols-2 gap-2">
-        <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
-          <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
-            <Zap className="h-3 w-3" />
-            Reward estimate
-          </div>
-          <span className="inline-flex text-[11px] font-semibold text-neon-green">
-            {airdrop.estimated_reward || airdrop.reward_potential}
-          </span>
-        </div>
+        {isRiskOnlyOpportunity ? (
+          <>
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
+                <ShieldAlert className="h-3 w-3" />
+                {isScamAlert ? 'Threat level' : 'Speculative risk'}
+              </div>
+              <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium', getRiskColor(airdrop.risk_level))}>
+                {airdrop.risk_level}
+              </span>
+            </div>
 
-        <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
-          <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
-            <ShieldAlert className="h-3 w-3" />
-            Risk
-          </div>
-          <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium', getRiskColor(airdrop.risk_level))}>
-            {airdrop.risk_level}
-          </span>
-        </div>
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
+                <ShieldAlert className="h-3 w-3" />
+                Team profile
+              </div>
+              <span className="inline-flex text-[11px] font-semibold text-amber-200">
+                {communityProfile}
+              </span>
+            </div>
 
-        <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
-          <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
-            <Clock className="h-3 w-3" />
-            Time required
-          </div>
-          <span className="inline-flex text-[11px] font-semibold text-white">
-            {airdrop.time_required || 'TBA'}
-          </span>
-        </div>
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
+                <Zap className="h-3 w-3" />
+                DEX listed
+              </div>
+              <span className="inline-flex text-[11px] font-semibold text-white">
+                {airdrop.contract_address ? 'Yes' : 'Unknown'}
+              </span>
+            </div>
 
-        <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
-          <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
-            <ShieldCheck className="h-3 w-3" />
-            Trust score
-          </div>
-          <div>
-            <LightweightTrustScoreBadge score={airdrop.trust_score ?? null} />
-          </div>
-        </div>
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
+                <Clock className="h-3 w-3" />
+                Trading since
+              </div>
+              <span className="inline-flex text-[11px] font-semibold text-white">
+                {tradingSince}
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
+                <Zap className="h-3 w-3" />
+                Reward estimate
+              </div>
+              <span className="inline-flex text-[11px] font-semibold text-neon-green">
+                {airdrop.estimated_reward || airdrop.reward_potential}
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
+                <ShieldAlert className="h-3 w-3" />
+                Risk
+              </div>
+              <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium', getRiskColor(airdrop.risk_level))}>
+                {airdrop.risk_level}
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
+                <Clock className="h-3 w-3" />
+                Time required
+              </div>
+              <span className="inline-flex text-[11px] font-semibold text-white">
+                {airdrop.time_required || 'TBA'}
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
+                <ShieldCheck className="h-3 w-3" />
+                Trust score
+              </div>
+              <div>
+                <LightweightTrustScoreBadge score={airdrop.trust_score ?? null} />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="mb-4 hidden flex-wrap items-center gap-2 sm:flex">
@@ -263,7 +345,7 @@ export default function AirdropCard({ airdrop, priority = false }: Props) {
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-white/5 pt-3">
         <div className="min-w-0">
           <span className="inline-flex min-h-[36px] items-center rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-semibold text-cyan-200">
-            View airdrop
+            {isScamAlert ? 'View scam alert' : isSpeculativeToken ? 'Analyze token' : 'View airdrop'}
           </span>
         </div>
 

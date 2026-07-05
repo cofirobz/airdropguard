@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { Airdrop, Blockchain, Category } from '../lib/types';
 import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
+import { getOpportunityType, getOpportunityTypeTone } from '../lib/utils';
 import {
   DEFAULT_ARTICLE_CHECKLIST,
   DEFAULT_ARTICLE_TRUST_PROFILES,
@@ -239,6 +240,23 @@ const BLANK_FORM: AirdropFormData = {
   tasks_text: '',
 };
 
+const SPECULATIVE_TOKEN_CATEGORY: Category = 'Speculative Token';
+
+function isSpeculativeForm(form: Pick<AirdropFormData, 'category'>): boolean {
+  return form.category.includes(SPECULATIVE_TOKEN_CATEGORY);
+}
+
+function normalizeSpeculativeForm(form: AirdropFormData): AirdropFormData {
+  if (!isSpeculativeForm(form)) return form;
+  return {
+    ...form,
+    category: [SPECULATIVE_TOKEN_CATEGORY],
+    reward_potential: 'Low',
+    estimated_reward: '',
+    tasks_text: '',
+  };
+}
+
 const SCAM_REPORT_REP = 50;
 
 type BannerPlacement = 'Homepage Hero Banner' | 'Homepage Mid-Page Banner' | 'Airdrop Detail Banner' | 'Dashboard Banner';
@@ -246,14 +264,38 @@ type BannerStatus = 'Enquiry' | 'Awaiting Artwork' | 'Ready to Publish' | 'Live'
 type BannerDisplayStatus = 'Active' | 'Scheduled' | 'Expired';
 type BannerPaymentState = 'Unpaid' | 'Pending' | 'Paid';
 
-type SocialDraftChannel = 'x' | 'discord' | 'telegram' | 'seo';
+type DiscordUpdateStatus = 'draft' | 'approved' | 'scheduled' | 'sent' | 'failed' | 'rejected';
 
-interface SocialDraftItem {
+interface DiscordSocialUpdate {
   id: string;
-  channel: SocialDraftChannel;
+  message_key: string;
   title: string;
-  copy: string;
-  status: 'ready' | 'used' | 'rejected';
+  body: string;
+  embed_payload: Record<string, unknown>;
+  source_summary: Record<string, unknown>;
+  status: DiscordUpdateStatus;
+  scheduled_for: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  sent_at: string | null;
+  failed_at: string | null;
+  reject_reason: string | null;
+  last_error: string | null;
+  attempt_count: number;
+  dedupe_hash: string;
+  discord_message_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DiscordSocialSettings {
+  id: string;
+  auto_send_approved: boolean;
+  schedule_days: string[];
+  schedule_time_utc: string;
+  timezone: string;
+  announcements_channel_id: string | null;
 }
 
 interface BannerAd {
@@ -279,7 +321,7 @@ interface BannerAd {
 type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt'>;
 
 type ContentView = 'airdrops' | 'articles' | 'hero' | 'featured' | 'trending' | 'learn' | 'sections';
-type AdminView = 'overview' | 'airdrops' | 'submissions' | 'competitor-watch' | 'articles' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
+type AdminView = 'overview' | 'airdrops' | 'submissions' | 'competitor-watch' | 'articles' | 'social-admin' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
 
 interface ControlArticle {
   id: string;
@@ -310,6 +352,8 @@ const ARTICLE_CATEGORY_OPTIONS = [
   'Developer Guides',
   'Announcements',
 ] as const;
+
+const DISCORD_DAY_OPTIONS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 
 type ArticleWorkflowStatus = 'Draft' | 'AI Generated' | 'Human Review Required' | 'Approved' | 'Published' | 'Archived';
 
@@ -1648,6 +1692,7 @@ function AirdropFormModal({
 }) {
   const inp = 'w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40';
   const lbl = 'block text-[10px] text-gray-500 uppercase tracking-wider mb-1';
+  const speculativeSelected = isSpeculativeForm(form);
 
   function toggleChain(chain: Blockchain) {
     setForm(f => ({
@@ -1659,12 +1704,25 @@ function AirdropFormModal({
   }
 
   function toggleCat(cat: Category) {
-    setForm(f => ({
-      ...f,
-      category: f.category.includes(cat)
-        ? f.category.filter(c => c !== cat)
-        : [...f.category, cat],
-    }));
+    setForm(f => {
+      if (cat === SPECULATIVE_TOKEN_CATEGORY) {
+        const nextCategory = f.category.includes(cat) ? [] : [SPECULATIVE_TOKEN_CATEGORY];
+        return normalizeSpeculativeForm({
+          ...f,
+          category: nextCategory,
+        });
+      }
+
+      const withoutSpeculative = f.category.filter(c => c !== SPECULATIVE_TOKEN_CATEGORY);
+      const nextCategory = withoutSpeculative.includes(cat)
+        ? withoutSpeculative.filter(c => c !== cat)
+        : [...withoutSpeculative, cat];
+
+      return {
+        ...f,
+        category: nextCategory,
+      };
+    });
   }
 
   return (
@@ -1790,12 +1848,23 @@ function AirdropFormModal({
                 }`}>{cat}</button>
             ))}
           </div>
+          {speculativeSelected && (
+            <p className="mt-2 text-[11px] leading-relaxed text-rose-300">
+              Speculative guard active: this entry is isolated as High-Risk Speculative Token. Reward estimates and task checklists are disabled.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className={lbl}>Est. Reward</label>
-            <input value={form.estimated_reward} onChange={e => setForm(f => ({ ...f, estimated_reward: e.target.value }))} placeholder="e.g. $200–$2,000" className={inp} />
+            <input
+              value={form.estimated_reward}
+              disabled={speculativeSelected}
+              onChange={e => setForm(f => ({ ...f, estimated_reward: e.target.value }))}
+              placeholder={speculativeSelected ? 'Disabled for speculative tokens' : 'e.g. $200–$2,000'}
+              className={`${inp} ${speculativeSelected ? 'cursor-not-allowed opacity-60' : ''}`}
+            />
           </div>
           <div>
             <label className={lbl}>Expiry Date</label>
@@ -1821,6 +1890,7 @@ function AirdropFormModal({
           </div>
           <textarea
             value={form.tasks_text}
+            disabled={speculativeSelected}
             onChange={e => setForm(f => ({ ...f, tasks_text: e.target.value }))}
             placeholder={`Follow official X account
 Join Discord
@@ -1828,10 +1898,12 @@ Complete onboarding
 Use testnet / bridge / swap
 Check eligibility updates`}
             rows={5}
-            className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40 resize-none"
+            className={`w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40 resize-none ${speculativeSelected ? 'cursor-not-allowed opacity-60' : ''}`}
           />
           <p className="text-[10px] text-gray-600 mt-1">
-            These tasks are saved into the airdrop_tasks table so the customer dashboard can show real tasks and progress.
+            {speculativeSelected
+              ? 'Task checklists are disabled for speculative tokens to prevent qualification-style UX.'
+              : 'These tasks are saved into the airdrop_tasks table so the customer dashboard can show real tasks and progress.'}
           </p>
         </div>
 
@@ -2384,81 +2456,11 @@ export default function AdminPage() {
   const [expandedAirdropIds, setExpandedAirdropIds] = useState<string[]>([]);
   const [subNotes, setSubNotes] = useState<Record<string, string>>({});
   const [analyzingSub, setAnalyzingSub] = useState<string | null>(null);
-  const [socialDrafts, setSocialDrafts] = useState<SocialDraftItem[]>([
-    {
-      id: 'social-x-1',
-      channel: 'x',
-      title: 'Weekly trust-first thread',
-      copy: 'New this week on AirdropGuard: top safe opportunities and scam red flags. Verify links, protect wallet approvals, and never share seed phrases. Full breakdown on site.',
-      status: 'ready',
-    },
-    {
-      id: 'social-discord-1',
-      channel: 'discord',
-      title: 'Discord community update',
-      copy: 'Ops update: reviewed listings are now live in the dashboard. Use the safety checklist before claiming any drop and report suspicious links to moderators.',
-      status: 'ready',
-    },
-    {
-      id: 'social-telegram-1',
-      channel: 'telegram',
-      title: 'Telegram alert post',
-      copy: 'Safety alert: we flagged new impersonation patterns this week. Confirm official docs and contract addresses from trusted sources only.',
-      status: 'ready',
-    },
-    {
-      id: 'social-seo-1',
-      channel: 'seo',
-      title: 'SEO article idea: airdrop wallet security checklist',
-      copy: 'Draft idea: "Airdrop wallet security checklist for 2026" with practical steps, warning signs and trusted verification workflow.',
-      status: 'ready',
-    },
-  ]);
-
-  const socialChannelLabel: Record<SocialDraftChannel, string> = {
-    x: 'X / Twitter',
-    discord: 'Discord',
-    telegram: 'Telegram',
-    seo: 'SEO idea',
-  };
-
-  const socialChannelTone: Record<SocialDraftChannel, string> = {
-    x: 'text-cyan-200 border-cyan-500/25 bg-cyan-500/10',
-    discord: 'text-indigo-200 border-indigo-500/25 bg-indigo-500/10',
-    telegram: 'text-sky-200 border-sky-500/25 bg-sky-500/10',
-    seo: 'text-emerald-200 border-emerald-500/25 bg-emerald-500/10',
-  };
-
-  const copySocialDraft = useCallback(async (draft: SocialDraftItem) => {
-    try {
-      await navigator.clipboard.writeText(draft.copy);
-      showToast(`Copied ${socialChannelLabel[draft.channel]} draft`);
-    } catch {
-      showToast('Clipboard copy failed in this browser session.', 'error');
-    }
-  }, [showToast]);
-
-  const markSocialDraftUsed = useCallback((id: string) => {
-    setSocialDrafts((prev) => prev.map((item) => item.id === id ? { ...item, status: 'used' } : item));
-    showToast('Marked as used');
-  }, [showToast]);
-
-  const rejectSocialDraft = useCallback((id: string) => {
-    setSocialDrafts((prev) => prev.map((item) => item.id === id ? { ...item, status: 'rejected' } : item));
-    showToast('Draft rejected');
-  }, [showToast]);
-
-  const regenerateSocialDraft = useCallback((id: string) => {
-    setSocialDrafts((prev) => prev.map((item) => {
-      if (item.id !== id) return item;
-      return {
-        ...item,
-        status: 'ready',
-        copy: `${item.copy}\n\nRegenerated for ${new Date().toLocaleDateString()}.`,
-      };
-    }));
-    showToast('Draft regenerated');
-  }, [showToast]);
+  const [discordOpsLoading, setDiscordOpsLoading] = useState(false);
+  const [discordOpsBusy, setDiscordOpsBusy] = useState(false);
+  const [discordSocialUpdates, setDiscordSocialUpdates] = useState<DiscordSocialUpdate[]>([]);
+  const [discordSettings, setDiscordSettings] = useState<DiscordSocialSettings | null>(null);
+  const [discordEditBody, setDiscordEditBody] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setExpandedAirdropIds((prev) => {
@@ -2894,12 +2896,27 @@ export default function AdminPage() {
     [adminNotifications]
   );
 
+  const discordQueueCount = useMemo(
+    () => discordSocialUpdates.filter((item) => item.status === 'draft' || item.status === 'failed').length,
+    [discordSocialUpdates]
+  );
+
+  const discordStatusMeta: Record<DiscordUpdateStatus, { label: string; tone: string }> = {
+    draft: { label: 'Draft', tone: 'text-gray-200 border-white/15 bg-white/[0.04]' },
+    approved: { label: 'Approved', tone: 'text-emerald-200 border-emerald-500/25 bg-emerald-500/10' },
+    scheduled: { label: 'Scheduled', tone: 'text-sky-200 border-sky-500/25 bg-sky-500/10' },
+    sent: { label: 'Sent', tone: 'text-indigo-200 border-indigo-500/25 bg-indigo-500/10' },
+    failed: { label: 'Failed', tone: 'text-rose-200 border-rose-500/25 bg-rose-500/10' },
+    rejected: { label: 'Rejected', tone: 'text-amber-200 border-amber-500/25 bg-amber-500/10' },
+  };
+
   const adminNavItems: Array<{ id: AdminView; label: string; blurb: string }> = useMemo(() => [
     { id: 'overview', label: 'Overview', blurb: 'Command centre summary and alerts' },
     { id: 'airdrops', label: 'Airdrops', blurb: 'Listings, publish, health, queue' },
     { id: 'submissions', label: 'Submissions', blurb: 'Project and scam report triage' },
     { id: 'competitor-watch', label: 'Competitor Watch', blurb: 'Missing-opportunity monitoring' },
     { id: 'articles', label: 'Articles', blurb: 'Unified content editor, SEO and publishing workflow' },
+    { id: 'social-admin', label: 'Social Admin', blurb: 'Discord update queue, approvals and scheduling' },
     { id: 'advertise-admin', label: 'Advertise Admin', blurb: 'Paid visibility, API and campaign operations' },
     { id: 'users', label: 'Users', blurb: 'Users and adoption overview' },
     { id: 'audit-logs', label: 'Audit Logs', blurb: 'Human decision trail' },
@@ -2948,6 +2965,16 @@ export default function AdminPage() {
         onClick: () => {
           setAdminView('system-tools');
           jumpToSection('admin-ai-control');
+        },
+      };
+    }
+
+    if (type.startsWith('discord_')) {
+      return {
+        label: 'Open Social Admin',
+        onClick: () => {
+          setAdminView('social-admin');
+          jumpToSection('admin-social-admin');
         },
       };
     }
@@ -4832,7 +4859,7 @@ export default function AdminPage() {
       tasksText = '';
     }
 
-    setForm({
+    setForm(normalizeSpeculativeForm({
       name: a.name ?? '',
       ticker: a.ticker ?? '',
       logo_url: a.logo_url ?? '',
@@ -4861,7 +4888,7 @@ export default function AdminPage() {
       is_trending: a.is_trending,
       is_sponsored: a.is_sponsored,
       tasks_text: tasksText,
-    });
+    }));
     setEditingId(a.id);
     setModalMode('edit');
   };
@@ -5013,41 +5040,48 @@ export default function AdminPage() {
         throw new Error('Missing airdrop ID for edit save.');
       }
 
+      const normalizedForm = normalizeSpeculativeForm(form);
+      const speculativeGuardApplied = normalizedForm !== form;
+      if (speculativeGuardApplied) {
+        setForm(normalizedForm);
+      }
+
       currentStep = 'prepare_payload';
       const payload = {
-        name: form.name.trim(),
-        ticker: form.ticker.trim(),
-        logo_url: form.logo_url.trim(),
-        ai_summary: form.ai_summary.trim(),
-        website_url: form.website_url.trim(),
-        twitter_url: form.twitter_url.trim(),
-        discord_url: form.discord_url.trim(),
-        telegram_url: form.telegram_url.trim(),
-        github_url: form.github_url.trim(),
-        contract_address: form.contract_address.trim(),
-        docs_url: form.docs_url.trim() || null,
-        funding_info: form.funding_info.trim() || null,
-        investors: form.investors.trim() || null,
-        team_info: form.team_info.trim() || null,
-        estimated_reward: form.estimated_reward.trim(),
-        expiry_date: form.expiry_date || null,
-        time_required: form.time_required.trim(),
-        blockchain: form.blockchain,
-        category: form.category,
-        status: form.status,
-        risk_level: form.risk_level,
-        reward_potential: form.reward_potential,
-        difficulty: form.difficulty,
-        published: form.published,
-        human_verified: form.published,
-        is_featured: form.is_featured,
-        is_trending: form.is_trending,
-        is_sponsored: form.is_sponsored,
+        name: normalizedForm.name.trim(),
+        ticker: normalizedForm.ticker.trim(),
+        logo_url: normalizedForm.logo_url.trim(),
+        ai_summary: normalizedForm.ai_summary.trim(),
+        website_url: normalizedForm.website_url.trim(),
+        twitter_url: normalizedForm.twitter_url.trim(),
+        discord_url: normalizedForm.discord_url.trim(),
+        telegram_url: normalizedForm.telegram_url.trim(),
+        github_url: normalizedForm.github_url.trim(),
+        contract_address: normalizedForm.contract_address.trim(),
+        docs_url: normalizedForm.docs_url.trim() || null,
+        funding_info: normalizedForm.funding_info.trim() || null,
+        investors: normalizedForm.investors.trim() || null,
+        team_info: normalizedForm.team_info.trim() || null,
+        estimated_reward: normalizedForm.estimated_reward.trim(),
+        expiry_date: normalizedForm.expiry_date || null,
+        time_required: normalizedForm.time_required.trim(),
+        blockchain: normalizedForm.blockchain,
+        category: normalizedForm.category,
+        status: normalizedForm.status,
+        risk_level: normalizedForm.risk_level,
+        reward_potential: normalizedForm.reward_potential,
+        difficulty: normalizedForm.difficulty,
+        published: normalizedForm.published,
+        human_verified: normalizedForm.published,
+        is_featured: normalizedForm.is_featured,
+        is_trending: normalizedForm.is_trending,
+        is_sponsored: normalizedForm.is_sponsored,
       };
 
       console.info('[Admin][AirdropSave] Payload prepared', {
         mode: modalMode,
         editingId,
+          speculativeGuardApplied,
         published: payload.published,
         isFeatured: payload.is_featured,
         isTrending: payload.is_trending,
@@ -5056,7 +5090,7 @@ export default function AdminPage() {
 
       if (modalMode === 'add') {
         currentStep = 'insert_airdrop';
-        const base = form.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const base = normalizedForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const slug = `${base}-${Date.now().toString(36)}`;
 
         console.info('[Admin][AirdropSave] Inserting new airdrop', { slug });
@@ -5075,7 +5109,7 @@ export default function AdminPage() {
         if (error) throw error;
 
         currentStep = 'update_airdrop_tasks';
-        const taskCount = newAirdrop ? await saveTasksForAirdrop(newAirdrop.id, form.tasks_text) : 0;
+        const taskCount = newAirdrop ? await saveTasksForAirdrop(newAirdrop.id, normalizedForm.tasks_text) : 0;
 
         if (newAirdrop) {
           try {
@@ -5086,20 +5120,20 @@ export default function AdminPage() {
             });
             if (analyzeRes.error) throw analyzeRes.error;
           } catch (analysisErr) {
-            showToast(`${form.name} added, but automatic AI enrichment failed: ${analysisErr instanceof Error ? analysisErr.message : 'Unknown error'}`, 'error');
+            showToast(`${normalizedForm.name} added, but automatic AI enrichment failed: ${analysisErr instanceof Error ? analysisErr.message : 'Unknown error'}`, 'error');
           }
 
-          if (form.published) {
+          if (normalizedForm.published) {
             currentStep = 'write_publish_audit_log';
             try {
               await logAdminAudit({
                 actionTaken: 'Publish airdrop',
-                aiRecommendation: `Trust ${form.risk_level} risk | Reward ${form.reward_potential}`,
+                aiRecommendation: `Trust ${normalizedForm.risk_level} risk | Reward ${normalizedForm.reward_potential}`,
                 finalDecision: 'Approved and published',
                 notes: reviewNotes ?? undefined,
                 context: {
                   airdropId: newAirdrop.id,
-                  airdropName: form.name.trim(),
+                  airdropName: normalizedForm.name.trim(),
                   source: 'airdrop_form_add',
                 },
               }, { throwOnError: true, source: 'airdrop_form_add_publish' });
@@ -5110,7 +5144,7 @@ export default function AdminPage() {
           }
         }
 
-        showToast(`${form.name} added successfully${taskCount ? ` with ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''} and AI enrichment started`);
+        showToast(`${normalizedForm.name} added successfully${taskCount ? ` with ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''} and AI enrichment started`);
         fetchStats();
       } else {
         currentStep = 'update_airdrop';
@@ -5172,15 +5206,15 @@ export default function AdminPage() {
         }
 
         currentStep = 'update_airdrop_tasks';
-        const taskCount = await saveTasksForAirdrop(editingId!, form.tasks_text);
-        showToast(`${form.name} updated${taskCount ? ` with ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''}`);
+        const taskCount = await saveTasksForAirdrop(editingId!, normalizedForm.tasks_text);
+        showToast(`${normalizedForm.name} updated${taskCount ? ` with ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''}`);
       }
 
       currentStep = 'finalize_success';
       console.info('[Admin][AirdropSave] Final success', {
         modalMode,
         editingId,
-        name: form.name.trim(),
+        name: normalizedForm.name.trim(),
       });
 
       setModalMode(null);
@@ -5346,6 +5380,304 @@ export default function AdminPage() {
     }
   }, []);
 
+  const fetchDiscordSocialOps = useCallback(async () => {
+    setDiscordOpsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('discord-social-ops', {
+        body: { action: 'get_state' },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Discord Social Ops request failed');
+      }
+
+      const payload = (data ?? {}) as {
+        settings?: DiscordSocialSettings;
+        updates?: DiscordSocialUpdate[];
+      };
+
+      setDiscordSettings(payload.settings ?? null);
+      const updates = payload.updates ?? [];
+      setDiscordSocialUpdates(updates);
+      setDiscordEditBody((prev) => {
+        const next = { ...prev };
+        updates.forEach((item) => {
+          if (!(item.id in next)) next[item.id] = item.body;
+        });
+        return next;
+      });
+    } catch (error) {
+      showToast(`Unable to load Discord Social Ops: ${describeError(error)}`, 'error');
+      setDiscordSocialUpdates([]);
+      setDiscordSettings(null);
+    } finally {
+      setDiscordOpsLoading(false);
+    }
+  }, [describeError, showToast]);
+
+  const generateDiscordUpdates = useCallback(async () => {
+    setDiscordOpsBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('discord-social-ops', {
+        body: { action: 'generate' },
+      });
+      if (error) throw error;
+
+      const payload = (data ?? {}) as { generatedCount?: number };
+      await fetchDiscordSocialOps();
+      showToast(`Discord updates generated (${payload.generatedCount ?? 2})`);
+      await createAdminNotification({
+        notification_type: 'discord_updates_generated',
+        title: 'Discord updates generated',
+        message: 'Two weekly Discord update drafts were prepared for review.',
+        severity: 'success',
+        context: { sectionId: 'admin-social-admin' },
+      });
+    } catch (error) {
+      const exact = describeError(error);
+      showToast(`Generate failed: ${exact}`, 'error');
+      await createAdminNotification({
+        notification_type: 'discord_update_failed',
+        title: 'Discord update generation failed',
+        message: exact,
+        severity: 'error',
+        context: { sectionId: 'admin-social-admin' },
+      });
+    } finally {
+      setDiscordOpsBusy(false);
+    }
+  }, [createAdminNotification, describeError, fetchDiscordSocialOps, showToast]);
+
+  const saveDiscordSettings = useCallback(async (next: DiscordSocialSettings) => {
+    setDiscordOpsBusy(true);
+    try {
+      const { data, error } = await supabase
+        .from('discord_social_settings')
+        .update({
+          auto_send_approved: next.auto_send_approved,
+          schedule_days: next.schedule_days,
+          schedule_time_utc: next.schedule_time_utc,
+          timezone: next.timezone,
+          announcements_channel_id: next.announcements_channel_id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', next.id)
+        .select('id, auto_send_approved, schedule_days, schedule_time_utc, timezone, announcements_channel_id')
+        .single();
+
+      if (error) throw error;
+      setDiscordSettings((data ?? next) as DiscordSocialSettings);
+      showToast('Discord Social settings saved');
+    } catch (error) {
+      showToast(`Unable to save settings: ${describeError(error)}`, 'error');
+    } finally {
+      setDiscordOpsBusy(false);
+    }
+  }, [describeError, showToast]);
+
+  const updateDiscordStatus = useCallback(async (
+    item: DiscordSocialUpdate,
+    status: DiscordUpdateStatus,
+    options?: { rejectReason?: string }
+  ) => {
+    const patch: Record<string, unknown> = {
+      status,
+      updated_at: new Date().toISOString(),
+      reject_reason: options?.rejectReason ?? null,
+      last_error: status === 'failed' ? item.last_error : null,
+      failed_at: status === 'failed' ? new Date().toISOString() : null,
+    };
+
+    if (status === 'approved') {
+      patch.approved_at = new Date().toISOString();
+      patch.approved_by = user?.id ?? null;
+      patch.reject_reason = null;
+      if (discordSettings?.auto_send_approved) {
+        patch.status = 'scheduled';
+      }
+    }
+
+    if (status === 'rejected') {
+      patch.approved_by = null;
+      patch.approved_at = null;
+    }
+
+    if (status === 'draft') {
+      patch.approved_by = null;
+      patch.approved_at = null;
+      patch.reject_reason = null;
+    }
+
+    const { data, error } = await supabase
+      .from('discord_social_updates')
+      .update(patch)
+      .eq('id', item.id)
+      .select('id, message_key, title, body, embed_payload, source_summary, status, scheduled_for, approved_by, approved_at, sent_at, failed_at, reject_reason, last_error, attempt_count, dedupe_hash, discord_message_id, created_by, created_at, updated_at')
+      .single();
+
+    if (error) {
+      showToast(`Status update failed: ${describeError(error)}`, 'error');
+      return;
+    }
+
+    if (data) {
+      setDiscordSocialUpdates((prev) => prev.map((row) => row.id === item.id ? (data as DiscordSocialUpdate) : row));
+    }
+
+    showToast(`Discord update set to ${status}`);
+  }, [describeError, discordSettings?.auto_send_approved, showToast, user?.id]);
+
+  const saveDiscordBody = useCallback(async (item: DiscordSocialUpdate) => {
+    const nextBody = (discordEditBody[item.id] ?? '').trim();
+    if (!nextBody) {
+      showToast('Message body cannot be empty', 'error');
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('discord_social_updates')
+      .update({
+        body: nextBody,
+        status: 'draft',
+        approved_by: null,
+        approved_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', item.id)
+      .select('id, message_key, title, body, embed_payload, source_summary, status, scheduled_for, approved_by, approved_at, sent_at, failed_at, reject_reason, last_error, attempt_count, dedupe_hash, discord_message_id, created_by, created_at, updated_at')
+      .single();
+
+    if (error) {
+      showToast(`Unable to save edit: ${describeError(error)}`, 'error');
+      return;
+    }
+
+    if (data) {
+      setDiscordSocialUpdates((prev) => prev.map((row) => row.id === item.id ? (data as DiscordSocialUpdate) : row));
+      setDiscordEditBody((prev) => ({ ...prev, [item.id]: (data as DiscordSocialUpdate).body }));
+    }
+
+    showToast('Draft saved');
+  }, [describeError, discordEditBody, showToast]);
+
+  const regenerateDiscordUpdate = useCallback(async (item: DiscordSocialUpdate) => {
+    setDiscordOpsBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('discord-social-ops', {
+        body: { action: 'regenerate', updateId: item.id },
+      });
+      if (error) throw error;
+
+      const update = (data as { update?: DiscordSocialUpdate })?.update;
+      if (update) {
+        setDiscordSocialUpdates((prev) => prev.map((row) => row.id === item.id ? update : row));
+        setDiscordEditBody((prev) => ({ ...prev, [item.id]: update.body }));
+      }
+      showToast('Discord update regenerated');
+    } catch (error) {
+      showToast(`Regenerate failed: ${describeError(error)}`, 'error');
+    } finally {
+      setDiscordOpsBusy(false);
+    }
+  }, [describeError, showToast]);
+
+  const sendDiscordUpdateNow = useCallback(async (item: DiscordSocialUpdate) => {
+    setDiscordOpsBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('discord-social-ops', {
+        body: { action: 'send_now', updateId: item.id },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Discord send failed');
+      }
+
+      const payload = (data ?? {}) as { update?: DiscordSocialUpdate; skipped?: boolean; reason?: string | null };
+      if (payload.update) {
+        setDiscordSocialUpdates((prev) => prev.map((row) => row.id === item.id ? payload.update! : row));
+      }
+
+      if (payload.skipped) {
+        showToast(`Send skipped: ${payload.reason || 'already sent'}`);
+      } else {
+        showToast('Discord update sent to #announcements');
+      }
+    } catch (error) {
+      const exact = describeError(error);
+      showToast(`Send failed: ${exact}`, 'error');
+      await createAdminNotification({
+        notification_type: 'discord_send_failed',
+        title: 'Discord send failed',
+        message: exact,
+        severity: 'error',
+        context: { sectionId: 'admin-social-admin' },
+      });
+      await fetchDiscordSocialOps();
+    } finally {
+      setDiscordOpsBusy(false);
+    }
+  }, [createAdminNotification, describeError, fetchDiscordSocialOps, showToast]);
+
+  const processDueDiscordUpdates = useCallback(async () => {
+    setDiscordOpsBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('discord-social-ops', {
+        body: { action: 'process_due' },
+      });
+      if (error) throw error;
+
+      const payload = (data ?? {}) as { sentCount?: number; skipped?: number; message?: string; errors?: string[] };
+      await fetchDiscordSocialOps();
+
+      if (payload.message) {
+        showToast(payload.message);
+      } else {
+        showToast(`Scheduler run complete: sent ${payload.sentCount ?? 0}, skipped ${payload.skipped ?? 0}`);
+      }
+
+      if ((payload.errors?.length ?? 0) > 0) {
+        await createAdminNotification({
+          notification_type: 'discord_scheduler_partial_failure',
+          title: 'Discord scheduler reported failures',
+          message: payload.errors?.slice(0, 2).join(' | ') ?? 'Unknown scheduler error',
+          severity: 'warning',
+          context: { sectionId: 'admin-social-admin' },
+        });
+      }
+    } catch (error) {
+      showToast(`Scheduler failed: ${describeError(error)}`, 'error');
+    } finally {
+      setDiscordOpsBusy(false);
+    }
+  }, [createAdminNotification, describeError, fetchDiscordSocialOps, showToast]);
+
+  const testDiscordConnection = useCallback(async () => {
+    setDiscordOpsBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('discord-social-ops', {
+        body: { action: 'test_connection' },
+      });
+
+      if (error) throw error;
+
+      const payload = (data ?? {}) as {
+        ok?: boolean;
+        destination?: { mode?: string; channelName?: string; channelId?: string };
+      };
+
+      if (!payload.ok) {
+        showToast('Discord test connection failed', 'error');
+        return;
+      }
+
+      showToast(`Discord connection OK (${payload.destination?.mode || 'unknown'} -> ${payload.destination?.channelName || payload.destination?.channelId || 'configured destination'})`);
+    } catch (error) {
+      showToast(`Discord test failed: ${describeError(error)}`, 'error');
+    } finally {
+      setDiscordOpsBusy(false);
+    }
+  }, [describeError, showToast]);
+
   useEffect(() => {
     if (!authLoading && isAdmin) {
       fetchAirdrops();
@@ -5357,8 +5689,9 @@ export default function AdminPage() {
       fetchAIDrafts();
       fetchCompetitorWatchData();
       fetchAdminNotifications();
+      fetchDiscordSocialOps();
     }
-  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications]);
+  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications, fetchDiscordSocialOps]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -5938,7 +6271,7 @@ export default function AdminPage() {
               : <Brain className="w-4 h-4" />}
             {refreshingAll ? 'Analyzing…' : 'Refresh All AI'}
           </button>
-          <button onClick={() => { fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); }}
+          <button onClick={() => { fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); fetchDiscordSocialOps(); }}
             aria-label="Refresh admin data"
             className="min-h-[44px] px-3 py-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
@@ -6156,6 +6489,14 @@ export default function AdminPage() {
             onAction={() => { setAdminView('articles'); jumpToSection('admin-content'); }}
           />
           <ActionCard
+            title="Discord Updates Awaiting Review"
+            count={discordQueueCount}
+            status="Social admin"
+            blurb="Draft or failed Discord updates that need action before sending."
+            actionLabel="Open Social Admin"
+            onAction={() => { setAdminView('social-admin'); jumpToSection('admin-social-admin'); }}
+          />
+          <ActionCard
             title="Competitor Queue"
             count={competitorOpportunities.filter((o) => o.status === 'new').length}
             status="New projects found"
@@ -6182,36 +6523,181 @@ export default function AdminPage() {
         <div className="grid gap-2 md:grid-cols-3">
           <button onClick={() => jumpToSection('admin-content')} className="rounded-xl border border-indigo-400/25 bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-100">Published articles and content tools</button>
           <button onClick={() => jumpToSection('admin-content')} className="rounded-xl border border-indigo-400/25 bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-100">AI article drafts and review queue</button>
-          <button onClick={() => jumpToSection('admin-social-growth-queue')} className="rounded-xl border border-indigo-400/25 bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-100">Growth queue and social post drafts</button>
+          <button onClick={() => setAdminView('social-admin')} className="rounded-xl border border-indigo-400/25 bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-100">Open Social Admin for Discord operations</button>
         </div>
       </section>
 
-      <section id="admin-social-growth-queue" className={`glass-card p-4 space-y-3 ${canShowSection('articles') ? '' : 'hidden'}`}>
+      <section id="admin-social-admin" className={`glass-card p-4 space-y-4 ${canShowSection('social-admin') ? '' : 'hidden'}`}>
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-200">Growth Queue</h3>
-          <p className="text-[11px] text-gray-400 mt-1">X/Twitter, Discord, Telegram and SEO draft copy with one-click actions.</p>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-200">Social Admin · Discord Ops</h3>
+          <p className="text-[11px] text-gray-400 mt-1">Generate two weekly Discord updates, review, approve, schedule, and send to announcements safely.</p>
         </div>
+
+        {discordSettings ? (
+          <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] p-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-indigo-100">Automation Settings</p>
+              <span className="text-[11px] text-gray-400">Timezone: {discordSettings.timezone}</span>
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-3">
+              <label className="space-y-1">
+                <span className="text-[11px] text-gray-300">Schedule Day 1</span>
+                <select
+                  value={discordSettings.schedule_days[0] ?? 'tuesday'}
+                  onChange={(event) => {
+                    const nextDays = [...discordSettings.schedule_days];
+                    nextDays[0] = event.target.value;
+                    setDiscordSettings({ ...discordSettings, schedule_days: nextDays });
+                  }}
+                  className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-2.5 py-2 text-xs text-white"
+                >
+                  {DISCORD_DAY_OPTIONS.map((day) => (
+                    <option key={`discord-day-1-${day}`} value={day}>{day}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-[11px] text-gray-300">Schedule Day 2</span>
+                <select
+                  value={discordSettings.schedule_days[1] ?? 'friday'}
+                  onChange={(event) => {
+                    const nextDays = [...discordSettings.schedule_days];
+                    nextDays[1] = event.target.value;
+                    setDiscordSettings({ ...discordSettings, schedule_days: nextDays });
+                  }}
+                  className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-2.5 py-2 text-xs text-white"
+                >
+                  {DISCORD_DAY_OPTIONS.map((day) => (
+                    <option key={`discord-day-2-${day}`} value={day}>{day}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="text-[11px] text-gray-300">Time (UTC)</span>
+                <input
+                  type="time"
+                  value={discordSettings.schedule_time_utc.slice(0, 5)}
+                  onChange={(event) => setDiscordSettings({ ...discordSettings, schedule_time_utc: `${event.target.value}:00` })}
+                  className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-2.5 py-2 text-xs text-white"
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="inline-flex items-center gap-2 text-xs text-gray-200">
+                <input
+                  type="checkbox"
+                  checked={discordSettings.auto_send_approved}
+                  onChange={(event) => setDiscordSettings({ ...discordSettings, auto_send_approved: event.target.checked })}
+                  className="h-3.5 w-3.5 rounded border-white/20 bg-dark-900/70"
+                />
+                Auto-send approved Discord updates
+              </label>
+              <button
+                onClick={() => void saveDiscordSettings(discordSettings)}
+                disabled={discordOpsBusy}
+                className="rounded-lg border border-indigo-500/25 bg-indigo-500/10 px-3 py-1.5 text-[11px] text-indigo-100 hover:bg-indigo-500/20 disabled:opacity-60"
+              >
+                Save settings
+              </button>
+            </div>
+
+            <div className="text-[11px] text-gray-400">
+              Destination: #announcements
+              {discordSettings.announcements_channel_id ? ` (channel: ${discordSettings.announcements_channel_id})` : ' (using existing bot config if set)'}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-white/10 bg-dark-900/35 p-3 text-xs text-gray-400">
+            Discord settings unavailable. Apply migration and refresh.
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => void generateDiscordUpdates()}
+            disabled={discordOpsBusy}
+            className="rounded-lg border border-indigo-500/25 bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-100 hover:bg-indigo-500/20 disabled:opacity-60"
+          >
+            Generate 2 Weekly Updates
+          </button>
+          <button
+            onClick={() => void testDiscordConnection()}
+            disabled={discordOpsBusy}
+            className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-100 hover:bg-emerald-500/20 disabled:opacity-60"
+          >
+            Test Discord Connection
+          </button>
+          <button
+            onClick={() => void processDueDiscordUpdates()}
+            disabled={discordOpsBusy}
+            className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-1.5 text-xs text-sky-100 hover:bg-sky-500/20 disabled:opacity-60"
+          >
+            Run Scheduled Send
+          </button>
+          <button
+            onClick={() => void fetchDiscordSocialOps()}
+            disabled={discordOpsLoading}
+            className="rounded-lg border border-white/15 bg-white/[0.04] px-3 py-1.5 text-xs text-gray-200 hover:bg-white/[0.08] disabled:opacity-60"
+          >
+            Refresh Queue
+          </button>
+        </div>
+
         <div className="space-y-2">
-          {socialDrafts.map((draft) => (
-            <div key={draft.id} className="rounded-xl border border-white/10 bg-dark-900/35 p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] ${socialChannelTone[draft.channel]}`}>{socialChannelLabel[draft.channel]}</span>
-                  <span className="text-xs font-medium text-white">{draft.title}</span>
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] ${draft.status === 'used' ? 'text-emerald-200 border-emerald-500/25 bg-emerald-500/10' : draft.status === 'rejected' ? 'text-rose-200 border-rose-500/25 bg-rose-500/10' : 'text-gray-300 border-white/15 bg-white/[0.04]'}`}>
-                    {draft.status}
-                  </span>
+          {discordSocialUpdates.length === 0 ? (
+            <div className="rounded-xl border border-white/10 bg-dark-900/35 p-3 text-xs text-gray-400">
+              No Discord updates queued yet. Generate weekly drafts to start review.
+            </div>
+          ) : discordSocialUpdates.map((item) => {
+            const meta = discordStatusMeta[item.status] ?? discordStatusMeta.draft;
+            const canSendNow = item.status === 'approved' || item.status === 'scheduled' || item.status === 'failed';
+            const canApprove = item.status === 'draft' || item.status === 'failed';
+
+            return (
+              <div key={item.id} className="rounded-xl border border-white/10 bg-dark-900/35 p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[10px] text-indigo-100">Discord</span>
+                    <span className="text-xs font-medium text-white">{item.title}</span>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] ${meta.tone}`}>
+                      {meta.label}
+                    </span>
+                    {item.scheduled_for && (
+                      <span className="text-[10px] text-gray-500">Scheduled: {new Date(item.scheduled_for).toLocaleString()}</span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-gray-500">Attempts: {item.attempt_count}</span>
                 </div>
+
+                <textarea
+                  value={discordEditBody[item.id] ?? item.body}
+                  onChange={(event) => setDiscordEditBody((prev) => ({ ...prev, [item.id]: event.target.value }))}
+                  rows={6}
+                  className="w-full rounded-xl border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-gray-200"
+                />
+
+                {item.last_error && (
+                  <p className="rounded-lg border border-rose-500/25 bg-rose-500/10 px-2.5 py-1.5 text-[11px] text-rose-100">
+                    Failed send: {item.last_error}
+                  </p>
+                )}
+
                 <div className="flex flex-wrap gap-1.5">
-                  <button onClick={() => void copySocialDraft(draft)} className="px-2.5 py-1 rounded-lg border border-white/15 bg-white/[0.04] text-[11px] text-gray-200">Copy</button>
-                  <button onClick={() => markSocialDraftUsed(draft.id)} className="px-2.5 py-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-[11px] text-emerald-200">Mark as used</button>
-                  <button onClick={() => rejectSocialDraft(draft.id)} className="px-2.5 py-1 rounded-lg border border-rose-500/25 bg-rose-500/10 text-[11px] text-rose-200">Reject</button>
-                  <button onClick={() => regenerateSocialDraft(draft.id)} className="px-2.5 py-1 rounded-lg border border-indigo-500/25 bg-indigo-500/10 text-[11px] text-indigo-200">Regenerate</button>
+                  <button onClick={() => void saveDiscordBody(item)} className="px-2.5 py-1 rounded-lg border border-white/15 bg-white/[0.04] text-[11px] text-gray-200">Edit</button>
+                  <button onClick={() => void updateDiscordStatus(item, 'approved')} disabled={!canApprove} className="px-2.5 py-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-[11px] text-emerald-200 disabled:opacity-50">Approve</button>
+                  <button onClick={() => void sendDiscordUpdateNow(item)} disabled={!canSendNow || discordOpsBusy} className="px-2.5 py-1 rounded-lg border border-sky-500/25 bg-sky-500/10 text-[11px] text-sky-200 disabled:opacity-50">Send now</button>
+                  <button onClick={() => void updateDiscordStatus(item, 'rejected', { rejectReason: 'Rejected by admin review.' })} className="px-2.5 py-1 rounded-lg border border-amber-500/25 bg-amber-500/10 text-[11px] text-amber-200">Reject</button>
+                  <button onClick={() => void regenerateDiscordUpdate(item)} className="px-2.5 py-1 rounded-lg border border-indigo-500/25 bg-indigo-500/10 text-[11px] text-indigo-200">Regenerate</button>
+                </div>
+
+                <div className="text-[10px] text-gray-500">
+                  Safety: messaging is filtered to avoid risky wording and keeps "Check Before You Connect" CTA.
                 </div>
               </div>
-              <p className="mt-2 text-xs text-gray-300 whitespace-pre-wrap">{draft.copy}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -7781,6 +8267,7 @@ export default function AdminPage() {
         <div className="space-y-3 md:hidden mb-3">
           {airdrops.map((a) => {
             const isOpen = expandedAirdropIds.includes(a.id);
+            const opportunityType = getOpportunityType(a);
             const riskCls = a.risk_level === 'Low' ? 'text-emerald-400' : a.risk_level === 'High' ? 'text-rose-400' : 'text-amber-400';
             const scoreCls = a.trust_score == null ? 'text-gray-500' : a.trust_score >= 75 ? 'text-emerald-400' : a.trust_score >= 50 ? 'text-amber-400' : 'text-rose-400';
             return (
@@ -7788,6 +8275,9 @@ export default function AdminPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white truncate">{a.name}</p>
+                    <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getOpportunityTypeTone(opportunityType)}`}>
+                      {opportunityType}
+                    </span>
                     <p className="text-[11px] text-gray-500 mt-1">State: {a.listing_state} · {a.published ? 'Published' : 'Draft'}</p>
                     <div className="mt-1 flex items-center gap-2 text-[11px]">
                       <span className={scoreCls}>Trust {a.trust_score ?? '—'}</span>
@@ -7860,6 +8350,7 @@ export default function AdminPage() {
                 const expiry = a.expiry_date
                   ? new Date(a.expiry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
                   : null;
+                const opportunityType = getOpportunityType(a);
                 const riskCls = a.risk_level === 'Low' ? 'text-emerald-400' : a.risk_level === 'High' ? 'text-rose-400' : 'text-amber-400';
                 const scoreCls = a.trust_score == null ? 'text-gray-600' : a.trust_score >= 75 ? 'text-emerald-400' : a.trust_score >= 50 ? 'text-amber-400' : 'text-rose-400';
                 return (
@@ -7878,8 +8369,8 @@ export default function AdminPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
-                      <span className="text-xs text-gray-400">
-                        {(a.category ?? []).slice(0, 2).join(', ') || '—'}
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getOpportunityTypeTone(opportunityType)}`}>
+                        {opportunityType}
                       </span>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">

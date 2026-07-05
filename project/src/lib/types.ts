@@ -80,7 +80,11 @@ export const CATEGORY_OPTIONS = [
   'Quest Platform',
   'Consumer Crypto',
   'Bitcoin Ecosystem',
+  'Verified Airdrop',
   'Testnet',
+  'Points Program',
+  'Speculative Token',
+  'Scam Alert',
   'Mainnet',
   'Other',
 ] as const;

@@ -1,5 +1,12 @@
 import type { RiskLevel, RewardPotential, Difficulty, AirdropStatus, Airdrop } from './types';
 
+export type OpportunityType =
+  | 'Verified Airdrop'
+  | 'Testnet'
+  | 'Points Program'
+  | 'Speculative Token'
+  | 'Scam Alert';
+
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
@@ -47,6 +54,35 @@ export function getStatusColor(status: AirdropStatus): string {
     case 'Active': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25';
     case 'Ending Soon': return 'text-orange-400 bg-orange-500/10 border-orange-500/25';
     case 'Expired': return 'text-gray-500 bg-gray-500/10 border-gray-500/20';
+  }
+}
+
+export function getOpportunityType(
+  a: Pick<Airdrop, 'category' | 'listing_state' | 'human_verified'>,
+): OpportunityType {
+  const categories = Array.isArray(a.category) ? a.category : [];
+
+  if (a.listing_state === 'scam_alert' || categories.includes('Scam Alert')) return 'Scam Alert';
+  if (categories.includes('Speculative Token')) return 'Speculative Token';
+  if (categories.includes('Points Program')) return 'Points Program';
+  if (categories.includes('Testnet')) return 'Testnet';
+  if (categories.includes('Verified Airdrop')) return 'Verified Airdrop';
+  if (a.listing_state === 'verified' || a.human_verified) return 'Verified Airdrop';
+  return 'Verified Airdrop';
+}
+
+export function getOpportunityTypeTone(opportunityType: OpportunityType): string {
+  switch (opportunityType) {
+    case 'Verified Airdrop':
+      return 'text-emerald-200 bg-emerald-500/10 border-emerald-500/30';
+    case 'Testnet':
+      return 'text-sky-200 bg-sky-500/10 border-sky-500/30';
+    case 'Points Program':
+      return 'text-amber-200 bg-amber-500/10 border-amber-500/30';
+    case 'Speculative Token':
+      return 'text-rose-100 bg-rose-500/14 border-rose-500/35';
+    case 'Scam Alert':
+      return 'text-rose-100 bg-rose-600/18 border-rose-400/45';
   }
 }
 

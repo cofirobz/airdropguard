@@ -87,6 +87,10 @@ function parseRewardScore(value: string | null | undefined): number {
   return Math.max(...scores, 0);
 }
 
+function isSpeculativeToken(item: Airdrop): boolean {
+  return item.category.includes('Speculative Token');
+}
+
 function TrustRing({ score, label = 'confidence' }: { score: number | null; label?: string }) {
   const pct = Math.max(0, Math.min(100, score ?? 0));
   const size = 86;
@@ -1521,28 +1525,38 @@ export default function HomePage() {
     load();
   }, []);
 
+  const opportunityAirdrops = useMemo(
+    () => airdrops.filter(item => !isSpeculativeToken(item)),
+    [airdrops],
+  );
+
+  const speculativeTokens = useMemo(
+    () => airdrops.filter(item => isSpeculativeToken(item)),
+    [airdrops],
+  );
+
   const featured = useMemo(
     () =>
-      airdrops.find(
+      opportunityAirdrops.find(
         a =>
           isFeaturedPlacement(a) &&
           (a.listing_state === 'verified' || a.human_verified) &&
           (a.trust_score === null || a.trust_score >= 60) &&
           a.risk_level !== 'High'
       ) ??
-      airdrops.find(
+      opportunityAirdrops.find(
         a =>
           isFeaturedPlacement(a) &&
           a.risk_level !== 'High' &&
           (a.trust_score === null || a.trust_score >= 60)
       ) ??
       null,
-    [airdrops],
+    [opportunityAirdrops],
   );
 
   const verifiedProjects = useMemo(
-    () => airdrops.filter(item => item.listing_state === 'verified' || item.human_verified),
-    [airdrops],
+    () => opportunityAirdrops.filter(item => item.listing_state === 'verified' || item.human_verified),
+    [opportunityAirdrops],
   );
 
   const topVerified = useMemo(
@@ -1551,7 +1565,7 @@ export default function HomePage() {
   );
 
   const filtered = useMemo(() => {
-    let list = airdrops;
+    let list = opportunityAirdrops;
 
     if (tab === 'trending') list = list.filter(a => a.is_trending);
     else if (tab === 'ending') list = list.filter(a => a.status === 'Ending Soon');
@@ -1573,7 +1587,7 @@ export default function HomePage() {
     if (filters.difficulty) list = list.filter(a => a.difficulty === filters.difficulty);
 
     return list;
-  }, [airdrops, tab, filters]);
+  }, [opportunityAirdrops, tab, filters]);
 
   const visibleAirdrops = useMemo(
     () => filtered.slice(0, visibleCount),
@@ -1610,8 +1624,8 @@ export default function HomePage() {
   };
 
   const trustCounters: CounterItem[] = useMemo(() => {
-    const aiAnalyses = airdrops.filter(item => item.ai_summary || item.ai_risk_analysis || item.ai_reward_estimate).length;
-    const trustScores = airdrops
+    const aiAnalyses = opportunityAirdrops.filter(item => item.ai_summary || item.ai_risk_analysis || item.ai_reward_estimate).length;
+    const trustScores = opportunityAirdrops
       .map(item => item.trust_score)
       .filter((score): score is number => typeof score === 'number' && Number.isFinite(score));
     const averageTrust = trustScores.length ? Math.round(trustScores.reduce((sum, score) => sum + score, 0) / trustScores.length) : 0;
@@ -1644,7 +1658,7 @@ export default function HomePage() {
         sub: trustScores.length ? 'Across scored listings.' : 'Growing daily.',
       },
     ];
-  }, [airdrops, verifiedProjects.length, communityCount, walletCount]);
+  }, [opportunityAirdrops, verifiedProjects.length, communityCount, walletCount]);
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'all', label: 'All Airdrops', icon: <Grid3X3 className="w-3.5 h-3.5" /> },
@@ -1731,7 +1745,7 @@ export default function HomePage() {
       </section>
 
       <WhySection />
-      <LiveOpportunitiesSection airdrops={airdrops} />
+      <LiveOpportunitiesSection airdrops={opportunityAirdrops} />
       <HomepageHowItWorksSection />
       <CopilotPreviewSection />
       <HomepageTrustSection counters={trustCounters} />
@@ -1744,6 +1758,11 @@ export default function HomePage() {
             <h2 className="mt-3 text-2xl font-black text-white sm:text-4xl">
               Explore the projects users can actually act on
             </h2>
+            <div className="mt-3">
+              <span className="inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-200">
+                Opportunity Type: Verified Airdrop
+              </span>
+            </div>
             <p className="mt-3 max-w-2xl text-xs leading-relaxed text-gray-400 sm:text-base">
               Browse live opportunities, filter by chain and risk, and open the full research page for trust signals, rewards, tasks and supporting evidence.
             </p>
@@ -1845,6 +1864,36 @@ export default function HomePage() {
           </>
         )}
       </section>
+
+      {speculativeTokens.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 lg:px-8 lg:pb-8">
+          <div className="rounded-3xl border border-rose-500/20 bg-rose-500/5 p-5 sm:p-7">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-200">Separate category</div>
+                <h3 className="mt-2 text-xl font-black text-white sm:text-2xl">High-Risk Speculative Tokens</h3>
+                <div className="mt-2">
+                  <span className="inline-flex rounded-full border border-rose-500/35 bg-rose-500/14 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-rose-100">
+                    Opportunity Type: Speculative Token
+                  </span>
+                </div>
+                <p className="mt-2 max-w-3xl text-xs leading-relaxed text-rose-100/85 sm:text-sm">
+                  This category is intentionally isolated from verified airdrops. Use it for token-level due diligence only, not reward expectations or qualification progress.
+                </p>
+              </div>
+              <span className="inline-flex w-fit items-center rounded-full border border-rose-400/30 bg-rose-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-200">
+                Permanent risk warning
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+              {speculativeTokens.slice(0, 6).map((token) => (
+                <AirdropCard key={token.id} airdrop={token} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <HomepageFinalCtaSection />
       <div className="hidden md:block">
