@@ -3159,7 +3159,9 @@ export default function AdminPage() {
   }), [airdrops, getAdminOpportunityBucket]);
 
   const speculativeTokenListings = useMemo(
-    () => airdrops.filter((airdrop) => getAdminOpportunityBucket(airdrop) === 'Speculative Token'),
+    () => airdrops
+      .filter((airdrop) => getAdminOpportunityBucket(airdrop) === 'Speculative Token')
+      .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()),
     [airdrops, getAdminOpportunityBucket],
   );
 
@@ -5420,15 +5422,31 @@ export default function AdminPage() {
         risk_level: normalizedForm.risk_level,
         reward_potential: normalizedForm.reward_potential,
         difficulty: normalizedForm.difficulty,
-        ai_recommendation_override: normalizedForm.ai_recommendation_override || null,
-        human_override_score: Number.isFinite(parsedOverrideScore as number) ? parsedOverrideScore : null,
-        human_decision: normalizedForm.human_decision.trim() || null,
-        final_published_score: finalPublishedScore,
         published: normalizedForm.published,
         human_verified: normalizedForm.published,
         is_featured: normalizedForm.is_featured,
         is_trending: normalizedForm.is_trending,
         is_sponsored: normalizedForm.is_sponsored,
+      };
+
+      const removeUnsupportedAirdropColumns = (input: typeof payload, error: unknown) => {
+        const message = describeError(error);
+        if (!/PGRST204/i.test(message)) return input;
+
+        const unsupportedColumns = ['ai_recommendation_override', 'human_override_score', 'human_decision', 'final_published_score'];
+        const stripped = { ...input } as Record<string, unknown>;
+        let removed = 0;
+
+        for (const column of unsupportedColumns) {
+          const hasColumnHint = new RegExp(`'${column}'|\"${column}\"|\\b${column}\\b`, 'i').test(message);
+          if (!hasColumnHint) continue;
+          if (column in stripped) {
+            delete stripped[column];
+            removed += 1;
+          }
+        }
+
+        return removed > 0 ? (stripped as typeof payload) : input;
       };
 
       console.info('[Admin][AirdropSave] Payload prepared', {
@@ -5448,16 +5466,34 @@ export default function AdminPage() {
 
         console.info('[Admin][AirdropSave] Inserting new airdrop', { slug });
 
-        const { data: newAirdrop, error } = await supabase
+        const baseInsertPayload = {
+          ...payload,
+          slug,
+          sort_order: airdrops.length,
+          listing_state: 'verified',
+        };
+
+        let insertPayload = { ...baseInsertPayload };
+        let { data: newAirdrop, error } = await supabase
           .from('airdrops')
-          .insert({
-            ...payload,
-            slug,
-            sort_order: airdrops.length,
-            listing_state: 'verified',
-          })
+          .insert(insertPayload)
           .select('id, name')
           .single();
+
+        let insertFallbackAttempts = 0;
+        while (error && insertFallbackAttempts < 4) {
+          const fallbackPayload = removeUnsupportedAirdropColumns(insertPayload as typeof payload, error) as typeof baseInsertPayload;
+          if (fallbackPayload === insertPayload) break;
+          insertPayload = fallbackPayload;
+          const retry = await supabase
+            .from('airdrops')
+            .insert(insertPayload)
+            .select('id, name')
+            .single();
+          newAirdrop = retry.data;
+          error = retry.error;
+          insertFallbackAttempts += 1;
+        }
 
         if (error) throw error;
 
@@ -5502,10 +5538,24 @@ export default function AdminPage() {
       } else {
         currentStep = 'update_airdrop';
         console.info('[Admin][AirdropSave] Updating airdrop', { editingId });
-        const { error } = await supabase
+        let updatePayload = { ...payload };
+        let { error } = await supabase
           .from('airdrops')
-          .update(payload)
+          .update(updatePayload)
           .eq('id', editingId!);
+
+        let updateFallbackAttempts = 0;
+        while (error && updateFallbackAttempts < 4) {
+          const fallbackPayload = removeUnsupportedAirdropColumns(updatePayload, error);
+          if (fallbackPayload === updatePayload) break;
+          updatePayload = fallbackPayload;
+          const retry = await supabase
+            .from('airdrops')
+            .update(updatePayload)
+            .eq('id', editingId!);
+          error = retry.error;
+          updateFallbackAttempts += 1;
+        }
 
         if (error) throw error;
 

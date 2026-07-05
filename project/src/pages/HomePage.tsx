@@ -1531,7 +1531,7 @@ export default function HomePage() {
   );
 
   const speculativeTokens = useMemo(
-    () => airdrops.filter(item => isSpeculativeToken(item)),
+    () => [...airdrops.filter(item => isSpeculativeToken(item))].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()),
     [airdrops],
   );
 
