@@ -48,6 +48,164 @@ interface MarketData {
   volume24h: number;
 }
 
+interface SpeculativeMarketIntelligence {
+  priceUsd: number | null;
+  marketCap: number | null;
+  fdv: number | null;
+  liquidityUsd: number | null;
+  volume24h: number | null;
+  buys24h: number | null;
+  sells24h: number | null;
+  dex: string | null;
+  pairCreatedAt: number | null;
+  chainId: string | null;
+}
+
+interface SecurityScoreDetail {
+  score: number;
+  explanation: string;
+}
+
+interface TokenSecurityIntelligence {
+  overallSecurityScore: SecurityScoreDetail;
+  liquidityRisk: SecurityScoreDetail;
+  whaleRisk: SecurityScoreDetail;
+  contractRisk: SecurityScoreDetail;
+  tradingRisk: SecurityScoreDetail;
+  ownershipRisk: SecurityScoreDetail;
+  communityRisk: SecurityScoreDetail;
+  scamProbability: SecurityScoreDetail;
+  rugProbability: SecurityScoreDetail;
+  strengths: string[];
+  weaknesses: string[];
+  recommendations: string[];
+}
+
+const SPEC_MARKET_CACHE_TTL_MS = 5 * 60 * 1000;
+const specMarketMemoryCache = new Map<string, { fetchedAt: number; data: SpeculativeMarketIntelligence | null }>();
+const SPEC_SECURITY_CACHE_TTL_MS = 15 * 60 * 1000;
+
+function toFiniteNumber(value: unknown): number | null {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseTimestamp(value: unknown): number | null {
+  if (typeof value !== 'string' || !value) return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function formatSince(timestampMs: number | null): string {
+  if (timestampMs == null) return 'Currently unavailable.';
+  const diff = Date.now() - timestampMs;
+  if (!Number.isFinite(diff) || diff < 0) return 'Currently unavailable.';
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo`;
+  const years = Math.floor(months / 12);
+  return `${years}y`;
+}
+
+function formatCount(value: number | null): string {
+  return value == null ? 'Currently unavailable.' : Math.round(value).toLocaleString('en-US');
+}
+
+function formatMoney(value: number | null): string {
+  return value == null ? 'Currently unavailable.' : fmt(value);
+}
+
+function formatUsdPrice(value: number | null): string {
+  return value == null ? 'Currently unavailable.' : fmtPrice(value);
+}
+
+function pickBestDexPair(pairs: any[]): any | null {
+  if (!pairs.length) return null;
+  return [...pairs].sort((a, b) => {
+    const aLiquidity = toFiniteNumber(a?.liquidity?.usd) ?? -1;
+    const bLiquidity = toFiniteNumber(b?.liquidity?.usd) ?? -1;
+    if (aLiquidity !== bLiquidity) return bLiquidity - aLiquidity;
+    const aVolume = toFiniteNumber(a?.volume?.h24) ?? -1;
+    const bVolume = toFiniteNumber(b?.volume?.h24) ?? -1;
+    return bVolume - aVolume;
+  })[0] ?? null;
+}
+
+function readSpecMarketCache(contractAddress: string): SpeculativeMarketIntelligence | null | undefined {
+  const cacheKey = contractAddress.toLowerCase();
+  const memoryHit = specMarketMemoryCache.get(cacheKey);
+  if (memoryHit && Date.now() - memoryHit.fetchedAt < SPEC_MARKET_CACHE_TTL_MS) return memoryHit.data;
+
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const raw = window.localStorage.getItem(`ag:spec-market:${cacheKey}`);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as { fetchedAt?: number; data?: SpeculativeMarketIntelligence | null };
+    if (!parsed || typeof parsed.fetchedAt !== 'number') return undefined;
+    if (Date.now() - parsed.fetchedAt >= SPEC_MARKET_CACHE_TTL_MS) return undefined;
+    specMarketMemoryCache.set(cacheKey, { fetchedAt: parsed.fetchedAt, data: parsed.data ?? null });
+    return parsed.data ?? null;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeSpecMarketCache(contractAddress: string, data: SpeculativeMarketIntelligence | null): void {
+  const cacheKey = contractAddress.toLowerCase();
+  const payload = { fetchedAt: Date.now(), data };
+  specMarketMemoryCache.set(cacheKey, payload);
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(`ag:spec-market:${cacheKey}`, JSON.stringify(payload));
+  } catch {
+    // Ignore storage write failures.
+  }
+}
+
+async function fetchSpeculativeMarketIntelligence(contractAddress: string): Promise<SpeculativeMarketIntelligence | null> {
+  const cached = readSpecMarketCache(contractAddress);
+  if (cached !== undefined) return cached;
+
+  try {
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${encodeURIComponent(contractAddress)}`, {
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) {
+      writeSpecMarketCache(contractAddress, null);
+      return null;
+    }
+
+    const json = await res.json() as { pairs?: any[] };
+    const pair = pickBestDexPair(Array.isArray(json?.pairs) ? json.pairs : []);
+    if (!pair) {
+      writeSpecMarketCache(contractAddress, null);
+      return null;
+    }
+
+    const data: SpeculativeMarketIntelligence = {
+      priceUsd: toFiniteNumber(pair?.priceUsd),
+      marketCap: toFiniteNumber(pair?.marketCap),
+      fdv: toFiniteNumber(pair?.fdv),
+      liquidityUsd: toFiniteNumber(pair?.liquidity?.usd),
+      volume24h: toFiniteNumber(pair?.volume?.h24),
+      buys24h: toFiniteNumber(pair?.txns?.h24?.buys),
+      sells24h: toFiniteNumber(pair?.txns?.h24?.sells),
+      dex: typeof pair?.dexId === 'string' ? pair.dexId : null,
+      pairCreatedAt: toFiniteNumber(pair?.pairCreatedAt),
+      chainId: typeof pair?.chainId === 'string' ? pair.chainId : null,
+    };
+
+    writeSpecMarketCache(contractAddress, data);
+    return data;
+  } catch {
+    writeSpecMarketCache(contractAddress, null);
+    return null;
+  }
+}
+
 function fmt(n: number, decimals = 2): string {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
   if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
@@ -1682,26 +1840,112 @@ function SpeculativeTokenIntelligenceDashboard({
 }) {
   const anyAirdrop = airdrop as AnyAirdrop;
   const [copied, setCopied] = useState(false);
-  const [marketData, setMarketData] = useState<MarketData | null>(null);
+  const [liveMarket, setLiveMarket] = useState<SpeculativeMarketIntelligence | null>(null);
   const [loadingMarket, setLoadingMarket] = useState(Boolean(airdrop.contract_address));
+  const [securityIntel, setSecurityIntel] = useState<TokenSecurityIntelligence | null>(null);
+  const [loadingSecurityIntel, setLoadingSecurityIntel] = useState(false);
   const contractAddress = (airdrop.contract_address ?? '').trim();
 
   useEffect(() => {
     if (!airdrop.contract_address) {
-      setMarketData(null);
+      setLiveMarket(null);
       setLoadingMarket(false);
       return;
     }
 
     setLoadingMarket(true);
-    fetchMarketData(airdrop.contract_address, airdrop.blockchain as string[], airdrop.ticker ?? null, airdrop.name)
+    fetchSpeculativeMarketIntelligence(contractAddress)
       .then((data) => {
-        setMarketData(data);
+        setLiveMarket(data);
       })
       .finally(() => {
         setLoadingMarket(false);
       });
-  }, [airdrop.contract_address, (airdrop.blockchain as string[]).join(','), airdrop.ticker, airdrop.name]);
+  }, [contractAddress, airdrop.contract_address]);
+
+  useEffect(() => {
+    if (!contractAddress) {
+      setSecurityIntel(null);
+      return;
+    }
+
+    const cacheKey = `ag:spec-security-intel:${contractAddress.toLowerCase()}`;
+    try {
+      const raw = window.localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { fetchedAt?: number; data?: TokenSecurityIntelligence };
+        if (parsed?.fetchedAt && parsed?.data && Date.now() - parsed.fetchedAt < SPEC_SECURITY_CACHE_TTL_MS) {
+          setSecurityIntel(parsed.data);
+          return;
+        }
+      }
+    } catch {
+      // Ignore malformed cache and continue with fetch.
+    }
+
+    setLoadingSecurityIntel(true);
+    const payload = {
+      name: airdrop.name,
+      ticker: airdrop.ticker,
+      blockchain: airdrop.blockchain,
+      contractAddress,
+      riskLevel: airdrop.risk_level,
+      listingState: airdrop.listing_state,
+      trustScore: airdrop.trust_score,
+      market: {
+        priceUsd: liveMarket?.priceUsd ?? null,
+        marketCap: liveMarket?.marketCap ?? null,
+        fdv: liveMarket?.fdv ?? null,
+        liquidityUsd: liveMarket?.liquidityUsd ?? null,
+        volume24h: liveMarket?.volume24h ?? null,
+        buys24h: liveMarket?.buys24h ?? null,
+        sells24h: liveMarket?.sells24h ?? null,
+        holders: typeof anyAirdrop.holder_count === 'number' ? anyAirdrop.holder_count : null,
+      },
+      context: {
+        scoreReasons: airdrop.score_reasons ?? [],
+        aiRiskAnalysis: airdrop.ai_risk_analysis ?? '',
+        teamInfo: airdrop.team_info ?? '',
+        docsUrl: airdrop.docs_url ?? '',
+        websiteUrl: airdrop.website_url ?? '',
+      },
+    };
+
+    supabase.functions
+      .invoke('token-security-intelligence', { body: payload })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        const intelligence = data?.intelligence as TokenSecurityIntelligence | undefined;
+        if (!intelligence) return;
+        setSecurityIntel(intelligence);
+        try {
+          window.localStorage.setItem(cacheKey, JSON.stringify({ fetchedAt: Date.now(), data: intelligence }));
+        } catch {
+          // Ignore cache write failures.
+        }
+      })
+      .catch(() => {
+        setSecurityIntel(null);
+      })
+      .finally(() => {
+        setLoadingSecurityIntel(false);
+      });
+  }, [
+    airdrop.ai_risk_analysis,
+    airdrop.blockchain,
+    airdrop.docs_url,
+    airdrop.listing_state,
+    airdrop.name,
+    airdrop.risk_level,
+    airdrop.score_reasons,
+    airdrop.team_info,
+    airdrop.ticker,
+    airdrop.trust_score,
+    airdrop.website_url,
+    anyAirdrop.holder_count,
+    contractAddress,
+    liveMarket,
+  ]);
 
   const confidence = typeof anyAirdrop.ai_confidence === 'number'
     ? `${Math.round(anyAirdrop.ai_confidence)}%`
@@ -1749,12 +1993,32 @@ function SpeculativeTokenIntelligenceDashboard({
     typeof anyAirdrop.top_holder_percent === 'number' ? `${anyAirdrop.top_holder_percent}% top holder` :
     'Unknown';
   const liquidityValue =
+    liveMarket?.liquidityUsd != null ? formatMoney(liveMarket.liquidityUsd) :
     typeof anyAirdrop.liquidity_usd === 'number' ? fmt(anyAirdrop.liquidity_usd) :
     typeof anyAirdrop.liquidity === 'number' ? fmt(anyAirdrop.liquidity) :
-    'Unknown';
+    'Currently unavailable.';
   const safeDexScreenerUrl = safeExternalUrl(dexScreenerUrl, 'https://dexscreener.com');
   const safeRugCheckUrl = safeExternalUrl(rugCheckUrl, 'https://rugcheck.xyz');
   const safeSolscanUrl = safeExternalUrl(solscanUrl, 'https://solscan.io');
+  const txBuys = liveMarket?.buys24h ?? null;
+  const txSells = liveMarket?.sells24h ?? null;
+  const txSummary = txBuys == null && txSells == null
+    ? 'Currently unavailable.'
+    : `${formatCount(txBuys ?? 0)} buys / ${formatCount(txSells ?? 0)} sells`;
+  const buySellRatio = txBuys == null || txSells == null
+    ? 'Currently unavailable.'
+    : txSells === 0
+    ? `${formatCount(txBuys)}:0`
+    : `${(txBuys / txSells).toFixed(2)}:1`;
+  const pairAge = formatSince(liveMarket?.pairCreatedAt ?? null);
+  const tokenAgeTimestamp =
+    parseTimestamp(anyAirdrop.token_created_at)
+    ?? parseTimestamp(anyAirdrop.created_at)
+    ?? liveMarket?.pairCreatedAt
+    ?? null;
+  const tokenAge = formatSince(tokenAgeTimestamp);
+  const blockchainValue = liveMarket?.chainId ?? airdrop.blockchain?.[0] ?? 'Currently unavailable.';
+  const dexValue = liveMarket?.dex ?? 'Currently unavailable.';
 
   async function handleCopyContract() {
     if (!contractAddress || !navigator?.clipboard) return;
@@ -1776,6 +2040,18 @@ function SpeculativeTokenIntelligenceDashboard({
     { label: 'Honeypot Status', value: typeof anyAirdrop.honeypot_status === 'string' ? anyAirdrop.honeypot_status : 'Not verified' },
     { label: 'Ownership Renounced', value: typeof anyAirdrop.ownership_renounced === 'boolean' ? (anyAirdrop.ownership_renounced ? 'Yes' : 'No') : 'Unknown' },
     { label: 'Trading Status', value: airdrop.status === 'Active' ? 'Active' : airdrop.status },
+  ];
+
+  const scoreCards: Array<{ label: string; data: SecurityScoreDetail | null }> = [
+    { label: 'Overall Security Score', data: securityIntel?.overallSecurityScore ?? null },
+    { label: 'Liquidity Risk', data: securityIntel?.liquidityRisk ?? null },
+    { label: 'Whale Risk', data: securityIntel?.whaleRisk ?? null },
+    { label: 'Contract Risk', data: securityIntel?.contractRisk ?? null },
+    { label: 'Trading Risk', data: securityIntel?.tradingRisk ?? null },
+    { label: 'Ownership Risk', data: securityIntel?.ownershipRisk ?? null },
+    { label: 'Community Risk', data: securityIntel?.communityRisk ?? null },
+    { label: 'Scam Probability', data: securityIntel?.scamProbability ?? null },
+    { label: 'Rug Probability', data: securityIntel?.rugProbability ?? null },
   ];
 
   return (
@@ -1837,13 +2113,63 @@ function SpeculativeTokenIntelligenceDashboard({
         </div>
       </section>
 
+      <section className="glass-card p-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-white">AI Security Intelligence Engine</h3>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+            {loadingSecurityIntel ? 'Analysing...' : 'Model ready'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {scoreCards.map((card) => (
+            <div key={card.label} className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">{card.label}</div>
+              <div className="mt-1 text-xl font-black text-white">
+                {card.data ? `${Math.max(0, Math.min(100, Math.round(card.data.score)))}/100` : 'Currently unavailable.'}
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-gray-400">
+                {card.data?.explanation || 'Currently unavailable.'}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+            <h4 className="text-xs font-semibold text-emerald-200">Strengths</h4>
+            <ul className="mt-2 space-y-1.5">
+              {(securityIntel?.strengths?.length ? securityIntel.strengths : ['Currently unavailable.']).map((item) => (
+                <li key={`s-${item}`} className="text-xs leading-relaxed text-emerald-100">{item}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-4">
+            <h4 className="text-xs font-semibold text-rose-200">Weaknesses</h4>
+            <ul className="mt-2 space-y-1.5">
+              {(securityIntel?.weaknesses?.length ? securityIntel.weaknesses : ['Currently unavailable.']).map((item) => (
+                <li key={`w-${item}`} className="text-xs leading-relaxed text-rose-100">{item}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+            <h4 className="text-xs font-semibold text-cyan-200">Recommendations</h4>
+            <ul className="mt-2 space-y-1.5">
+              {(securityIntel?.recommendations?.length ? securityIntel.recommendations : ['Currently unavailable.']).map((item) => (
+                <li key={`r-${item}`} className="text-xs leading-relaxed text-cyan-100">{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <div className="glass-card p-6">
           <h3 className="text-sm font-semibold text-white">Contract Information</h3>
           <div className="mt-4 space-y-3">
             <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
               <div className="text-[10px] uppercase tracking-wider text-gray-600">Contract Address</div>
-              <div className="mt-1 break-all font-mono text-xs text-gray-200">{contractAddress || 'Unavailable'}</div>
+              <div className="mt-1 break-all font-mono text-xs text-gray-200">{contractAddress || 'Currently unavailable.'}</div>
               <button
                 type="button"
                 onClick={handleCopyContract}
@@ -1858,7 +2184,7 @@ function SpeculativeTokenIntelligenceDashboard({
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {airdrop.blockchain.length > 0 ? airdrop.blockchain.map((b) => (
                   <span key={b} className="rounded-full border border-white/10 bg-dark-600/60 px-2 py-0.5 text-[10px] text-gray-400">{b}</span>
-                )) : <span className="text-xs text-gray-500">Unknown</span>}
+                )) : <span className="text-xs text-gray-500">Currently unavailable.</span>}
               </div>
             </div>
             <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
@@ -1869,22 +2195,30 @@ function SpeculativeTokenIntelligenceDashboard({
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               ) : (
-                <div className="mt-1 text-xs text-gray-500">Unavailable for current chain data</div>
+                <div className="mt-1 text-xs text-gray-500">Currently unavailable.</div>
               )}
             </div>
           </div>
         </div>
 
         <div className="glass-card p-6">
-          <h3 className="text-sm font-semibold text-white">Market Overview</h3>
+          <h3 className="text-sm font-semibold text-white">Live Market Intelligence</h3>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Price</div>
+              <div className="mt-1 text-xs font-semibold text-white">{formatUsdPrice(liveMarket?.priceUsd ?? null)}</div>
+            </div>
             <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
               <div className="text-[10px] uppercase tracking-wider text-gray-600">Trading Since</div>
               <div className="mt-1 text-xs font-semibold text-white">{getTradingSinceLabel(airdrop)}</div>
             </div>
             <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
               <div className="text-[10px] uppercase tracking-wider text-gray-600">Market Cap</div>
-              <div className="mt-1 text-xs font-semibold text-white">{marketData?.marketCap != null ? fmt(marketData.marketCap) : (loadingMarket ? 'Loading...' : 'Unavailable')}</div>
+              <div className="mt-1 text-xs font-semibold text-white">{liveMarket?.marketCap != null ? formatMoney(liveMarket.marketCap) : (loadingMarket ? 'Loading...' : 'Currently unavailable.')}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">FDV</div>
+              <div className="mt-1 text-xs font-semibold text-white">{liveMarket?.fdv != null ? formatMoney(liveMarket.fdv) : (loadingMarket ? 'Loading...' : 'Currently unavailable.')}</div>
             </div>
             <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
               <div className="text-[10px] uppercase tracking-wider text-gray-600">Liquidity</div>
@@ -1892,15 +2226,39 @@ function SpeculativeTokenIntelligenceDashboard({
             </div>
             <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
               <div className="text-[10px] uppercase tracking-wider text-gray-600">24h Volume</div>
-              <div className="mt-1 text-xs font-semibold text-white">{marketData?.volume24h != null ? fmt(marketData.volume24h) : (loadingMarket ? 'Loading...' : 'Unavailable')}</div>
+              <div className="mt-1 text-xs font-semibold text-white">{liveMarket?.volume24h != null ? formatMoney(liveMarket.volume24h) : (loadingMarket ? 'Loading...' : 'Currently unavailable.')}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">24h Transactions</div>
+              <div className="mt-1 text-xs font-semibold text-white">{txSummary}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Buy/Sell Ratio</div>
+              <div className="mt-1 text-xs font-semibold text-white">{buySellRatio}</div>
             </div>
             <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
               <div className="text-[10px] uppercase tracking-wider text-gray-600">Holders</div>
-              <div className="mt-1 text-xs font-semibold text-white">{holders != null ? holders.toLocaleString('en-US') : 'Unknown'}</div>
+              <div className="mt-1 text-xs font-semibold text-white">{holders != null ? holders.toLocaleString('en-US') : 'Currently unavailable.'}</div>
             </div>
             <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
               <div className="text-[10px] uppercase tracking-wider text-gray-600">DEX Listed</div>
-              <div className="mt-1 text-xs font-semibold text-white">{contractAddress ? 'Yes' : 'Unknown'}</div>
+              <div className="mt-1 text-xs font-semibold text-white">{contractAddress ? 'Yes' : 'Currently unavailable.'}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">DEX</div>
+              <div className="mt-1 text-xs font-semibold text-white capitalize">{dexValue}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Pair Age</div>
+              <div className="mt-1 text-xs font-semibold text-white">{pairAge}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Token Age</div>
+              <div className="mt-1 text-xs font-semibold text-white">{tokenAge}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-600">Blockchain</div>
+              <div className="mt-1 text-xs font-semibold text-white capitalize">{blockchainValue || 'Currently unavailable.'}</div>
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">

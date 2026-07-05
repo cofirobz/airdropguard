@@ -6,7 +6,7 @@ import {
   Gauge, ShieldAlert, Database, Trophy, Crown, TrendingUp,
   BarChart3, Wand2, Eye,
   Skull, HelpCircle, ShieldQuestion,
-  ClipboardCheck, BadgeCheck, ChevronDown, Globe2, History, ArrowUpRight, ArrowDownRight, CalendarCheck2, Repeat2, ShieldCheck,
+  ClipboardCheck, BadgeCheck, ChevronDown, Globe2, History, ArrowUpRight, ArrowDownRight, CalendarCheck2, Repeat2, ShieldCheck, Flame,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
@@ -498,6 +498,162 @@ function getPortfolioProfile(result: WalletResult, cleanCount: number, unknownCo
   ];
 }
 
+type ExposureRiskBucket = 'low' | 'medium' | 'high' | 'unknown';
+
+type SpeculativeExposureProfile = {
+  overallExposureScore: number;
+  speculativePercent: number | null;
+  speculativeCount: number;
+  highestRiskHolding: Token | null;
+  estimatedRugExposure: number | null;
+  concentrationRisk: 'Low' | 'Medium' | 'High' | 'Unknown';
+  unknownTokens: number;
+  recentlyCreatedTokens: number;
+  dormantTokens: number;
+  riskDistribution: Record<ExposureRiskBucket, number>;
+  portfolioBreakdown: { speculative: number; core: number; unknown: number };
+  topRiskAssets: Token[];
+  summary: string;
+  recommendations: string[];
+};
+
+function riskWeight(level: RiskLevel): number {
+  if (level === 'High') return 3;
+  if (level === 'Medium') return 2;
+  return 1;
+}
+
+function holdingRiskScore(token: Token): number {
+  const base = token.risk ? riskWeight(token.risk.level) * 25 : 20;
+  const valueBoost = token.usdValue && token.usdValue > 0 ? Math.min(25, Math.log10(token.usdValue + 1) * 6) : 6;
+  const reasonBoost = token.risk?.reason && /rug|honeypot|scam|drainer|malicious/i.test(token.risk.reason) ? 18 : 0;
+  return Math.round(base + valueBoost + reasonBoost);
+}
+
+function getSpeculativeExposureProfile(
+  result: WalletResult,
+  suspiciousTokens: Token[],
+  deadOrUnknownTokens: Token[],
+): SpeculativeExposureProfile {
+  const finite = (value: number | null | undefined): number | null => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    return value;
+  };
+
+  const tokenList = result.tokens ?? [];
+  const speculativeSet = new Set<string>();
+  suspiciousTokens.forEach(t => speculativeSet.add(t.address));
+  deadOrUnknownTokens.forEach(t => speculativeSet.add(t.address));
+
+  const speculativeTokens = tokenList.filter(t => speculativeSet.has(t.address));
+  const speculativeCount = speculativeTokens.length;
+  const totalPortfolioValue = finite(result.totalUsdValue);
+  const speculativeValue = speculativeTokens.reduce((sum, token) => {
+    const usd = finite(token.usdValue);
+    return sum + Math.max(0, usd ?? 0);
+  }, 0);
+  const speculativePercent = totalPortfolioValue !== null && totalPortfolioValue > 0
+    ? Math.max(0, Math.min(100, (speculativeValue / totalPortfolioValue) * 100))
+    : null;
+
+  const unknownTokens = deadOrUnknownTokens.length;
+  const dormantTokens = deadOrUnknownTokens.filter(t => (t.usdValue ?? 0) <= 0).length;
+  const recentlyCreatedTokens = speculativeTokens.filter(t => {
+    const reason = `${t.risk?.reason ?? ''} ${t.risk?.action ?? ''}`.toLowerCase();
+    return /new|recent|created|deploy|launch|fresh|pair age/i.test(reason);
+  }).length;
+
+  const riskDistribution: Record<ExposureRiskBucket, number> = { low: 0, medium: 0, high: 0, unknown: 0 };
+  speculativeTokens.forEach((token) => {
+    if (!token.risk) {
+      riskDistribution.unknown += 1;
+      return;
+    }
+    if (token.risk.level === 'High') riskDistribution.high += 1;
+    else if (token.risk.level === 'Medium') riskDistribution.medium += 1;
+    else riskDistribution.low += 1;
+  });
+
+  const topRiskAssets = [...speculativeTokens]
+    .sort((a, b) => holdingRiskScore(b) - holdingRiskScore(a))
+    .slice(0, 5);
+
+  const highestRiskHolding = topRiskAssets[0] ?? null;
+  const highestRiskUsd = finite(highestRiskHolding?.usdValue);
+  const highestValueShare = speculativeValue > 0 && highestRiskUsd !== null
+    ? ((highestRiskHolding?.usdValue ?? 0) / speculativeValue) * 100
+    : null;
+
+  const concentrationRisk = highestValueShare === null
+    ? 'Unknown'
+    : highestValueShare >= 60
+    ? 'High'
+    : highestValueShare >= 35
+    ? 'Medium'
+    : 'Low';
+
+  const rugSignals = speculativeTokens.filter(t => /rug|honeypot|drainer|scam/i.test(`${t.risk?.reason ?? ''} ${t.risk?.action ?? ''}`)).length;
+  const estimatedRugExposure = speculativePercent === null
+    ? null
+    : Math.max(0, Math.min(100,
+      Math.round(
+        speculativePercent * 0.45 +
+        riskDistribution.high * 9 +
+        riskDistribution.medium * 4 +
+        rugSignals * 8 +
+        (concentrationRisk === 'High' ? 12 : concentrationRisk === 'Medium' ? 6 : 0),
+      ),
+    ));
+
+  const overallExposureScore = Math.max(0, Math.min(100,
+    Math.round(
+      (speculativePercent ?? 0) * 0.5 +
+      (estimatedRugExposure ?? 0) * 0.3 +
+      unknownTokens * 2 +
+      dormantTokens * 1.5,
+    ),
+  ));
+
+  const portfolioBreakdown = {
+    speculative: speculativeCount,
+    unknown: unknownTokens,
+    core: Math.max(0, tokenList.length - speculativeCount),
+  };
+
+  const exposureLabel = overallExposureScore >= 70 ? 'high' : overallExposureScore >= 45 ? 'moderate' : 'low';
+  const highRiskPct = speculativeCount > 0 ? Math.round((riskDistribution.high / speculativeCount) * 100) : 0;
+  const valueVisibilityLine = speculativePercent === null
+    ? 'Visible portfolio USD data is limited, so value-weighted speculative percentage is currently unavailable.'
+    : `Approximately ${Math.round(speculativePercent)}% of visible value is tied to speculative assets.`;
+  const summary = `Your wallet has ${exposureLabel} speculative exposure. ${valueVisibilityLine} ${highRiskPct}% of speculative holdings are flagged as high risk.${recentlyCreatedTokens > 0 ? ` ${recentlyCreatedTokens} potentially recently created token${recentlyCreatedTokens !== 1 ? 's show' : ' shows'} elevated uncertainty.` : ''}`;
+
+  const recommendations: string[] = [];
+  if (concentrationRisk !== 'Low') recommendations.push('Reduce concentration in your largest speculative position.');
+  if ((estimatedRugExposure ?? 0) >= 50) recommendations.push('Check RugCheck before interacting with high-risk tokens.');
+  if ((speculativePercent ?? 0) >= 25) recommendations.push('Review liquidity depth before new entries or exits.');
+  if (unknownTokens > 0) recommendations.push('Verify contract addresses and token identity from official sources.');
+  if (result.findings.some(f => /approval|permission|signature/i.test(`${f.title} ${f.detail}`))) recommendations.push('Revoke unnecessary approvals to reduce exploit surface.');
+  if (overallExposureScore >= 65) recommendations.push('Move speculative activity to a burner wallet separated from primary funds.');
+  if (recommendations.length === 0) recommendations.push('Maintain current discipline and re-scan weekly to monitor speculative drift.');
+
+  return {
+    overallExposureScore,
+    speculativePercent,
+    speculativeCount,
+    highestRiskHolding,
+    estimatedRugExposure,
+    concentrationRisk,
+    unknownTokens,
+    recentlyCreatedTokens,
+    dormantTokens,
+    riskDistribution,
+    portfolioBreakdown,
+    topRiskAssets,
+    summary,
+    recommendations,
+  };
+}
+
 function MiniMetric({ icon: Icon, label, value, tone }: { icon: React.ElementType; label: string; value: string; tone: string }) {
   return (
     <div className="rounded-2xl border border-white/5 bg-dark-700/35 p-4">
@@ -725,7 +881,7 @@ export default function WalletSafetySnapshot({ onResultStateChange }: WalletSafe
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<WalletResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'security' | 'portfolio' | 'insights' | 'actions'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'security' | 'portfolio' | 'speculative' | 'insights' | 'actions'>('overview');
   const [showAllTokens, setShowAllTokens] = useState(false);
   const [expandedRisk, setExpandedRisk] = useState<number | null>(0);
   const [scanHistory, setScanHistory] = useState<WalletScanHistory[]>([]);
@@ -777,6 +933,11 @@ export default function WalletSafetySnapshot({ onResultStateChange }: WalletSafe
   const portfolioProfile = useMemo(
     () => result ? getPortfolioProfile(result, verifiedCleanTokens.length, deadOrUnknownTokens.length, suspiciousTokens.length) : [],
     [result, verifiedCleanTokens.length, deadOrUnknownTokens.length, suspiciousTokens.length],
+  );
+
+  const speculativeExposure = useMemo(
+    () => result ? getSpeculativeExposureProfile(result, suspiciousTokens, deadOrUnknownTokens) : null,
+    [result, suspiciousTokens, deadOrUnknownTokens],
   );
 
   const executiveInsight = useMemo(
@@ -871,6 +1032,7 @@ export default function WalletSafetySnapshot({ onResultStateChange }: WalletSafe
     { id: 'overview' as const, label: 'Overview', icon: Gauge },
     { id: 'security' as const, label: 'Security', icon: ShieldAlert },
     { id: 'portfolio' as const, label: 'Portfolio', icon: Coins },
+    { id: 'speculative' as const, label: 'Speculative Exposure', icon: Flame },
     { id: 'insights' as const, label: 'Insights', icon: Fingerprint },
     { id: 'actions' as const, label: scanHistory.length > 1 ? `Evolution (${scanHistory.length})` : 'Actions', icon: ListChecks },
   ];
@@ -1357,6 +1519,129 @@ export default function WalletSafetySnapshot({ onResultStateChange }: WalletSafe
     );
   }
 
+  function SpeculativeExposureTab() {
+    if (!result || !speculativeExposure) return null;
+
+    const totalRiskBars = speculativeExposure.riskDistribution.low + speculativeExposure.riskDistribution.medium + speculativeExposure.riskDistribution.high + speculativeExposure.riskDistribution.unknown;
+    const safePercent = (value: number | null | undefined): number => {
+      if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+      return Math.max(0, Math.min(100, value));
+    };
+    const pct = (v: number) => totalRiskBars > 0 ? safePercent(Math.round((v / totalRiskBars) * 100)) : 0;
+    const concentrationTone = speculativeExposure.concentrationRisk === 'High'
+      ? 'text-rose-300 bg-rose-500/10 border-rose-500/25'
+      : speculativeExposure.concentrationRisk === 'Medium'
+      ? 'text-amber-300 bg-amber-500/10 border-amber-500/25'
+      : speculativeExposure.concentrationRisk === 'Low'
+      ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/25'
+      : 'text-gray-300 bg-white/[0.05] border-white/10';
+
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-neon-purple/15 bg-neon-purple/[0.04] p-4">
+          <div className="text-[10px] text-neon-purple uppercase tracking-wider font-semibold mb-1">AI Exposure Analysis</div>
+          <h3 className="text-sm font-bold text-white">Speculative Exposure Summary</h3>
+          <p className="text-xs text-gray-400 mt-2 leading-relaxed">{speculativeExposure.summary}</p>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <MiniMetric icon={Flame} label="Overall Speculative Exposure" value={`${speculativeExposure.overallExposureScore}/100`} tone="text-rose-300 bg-rose-500/10 border-rose-500/25" />
+          <MiniMetric icon={Activity} label="Speculative Portfolio %" value={speculativeExposure.speculativePercent === null ? 'Currently unavailable.' : `${Math.round(speculativeExposure.speculativePercent)}%`} tone="text-amber-300 bg-amber-500/10 border-amber-500/25" />
+          <MiniMetric icon={AlertTriangle} label="Estimated Rug Pull Exposure" value={speculativeExposure.estimatedRugExposure === null ? 'Currently unavailable.' : `${speculativeExposure.estimatedRugExposure}/100`} tone="text-rose-300 bg-rose-500/10 border-rose-500/25" />
+          <MiniMetric icon={Target} label="Concentration Risk" value={speculativeExposure.concentrationRisk === 'Unknown' ? 'Currently unavailable.' : speculativeExposure.concentrationRisk} tone={concentrationTone} />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-white/5 bg-dark-700/30 p-4">
+            <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Speculative Exposure Gauge</div>
+            <div className="h-3 rounded-full bg-dark-800 overflow-hidden">
+              <div className={cn('h-full rounded-full', speculativeExposure.overallExposureScore >= 70 ? 'bg-rose-500' : speculativeExposure.overallExposureScore >= 45 ? 'bg-amber-500' : 'bg-emerald-500')} style={{ width: `${safePercent(speculativeExposure.overallExposureScore)}%` }} />
+            </div>
+            <p className="text-[10px] text-gray-600 mt-2">Higher score means more wallet value is tied to high-risk or uncertain assets.</p>
+          </div>
+
+          <div className="rounded-2xl border border-white/5 bg-dark-700/30 p-4">
+            <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Portfolio Breakdown</div>
+            <div className="space-y-2 text-xs text-gray-400">
+              <div className="flex items-center justify-between"><span>Speculative tokens</span><span className="font-semibold text-white">{speculativeExposure.portfolioBreakdown.speculative}</span></div>
+              <div className="flex items-center justify-between"><span>Unknown tokens</span><span className="font-semibold text-white">{speculativeExposure.portfolioBreakdown.unknown}</span></div>
+              <div className="flex items-center justify-between"><span>Core tokens</span><span className="font-semibold text-white">{speculativeExposure.portfolioBreakdown.core}</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/5 bg-dark-700/30 p-4">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Risk Distribution Chart</div>
+          <div className="space-y-2">
+            {[
+              ['High risk', speculativeExposure.riskDistribution.high, 'bg-rose-500'],
+              ['Medium risk', speculativeExposure.riskDistribution.medium, 'bg-amber-500'],
+              ['Low risk', speculativeExposure.riskDistribution.low, 'bg-sky-500'],
+              ['Unknown', speculativeExposure.riskDistribution.unknown, 'bg-gray-500'],
+            ].map(([label, value, bar]) => (
+              <div key={String(label)}>
+                <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1"><span>{label}</span><span>{value as number} ({pct(value as number)}%)</span></div>
+                <div className="h-2 rounded-full bg-dark-800 overflow-hidden"><div className={cn('h-full rounded-full', String(bar))} style={{ width: `${pct(value as number)}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="rounded-xl bg-dark-700/35 border border-white/5 p-3"><div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Speculative Tokens</div><div className="text-sm font-black text-white">{speculativeExposure.speculativeCount}</div></div>
+          <div className="rounded-xl bg-dark-700/35 border border-white/5 p-3"><div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Unknown Tokens</div><div className="text-sm font-black text-white">{speculativeExposure.unknownTokens}</div></div>
+          <div className="rounded-xl bg-dark-700/35 border border-white/5 p-3"><div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Recently Created Tokens</div><div className="text-sm font-black text-white">{speculativeExposure.recentlyCreatedTokens}</div></div>
+          <div className="rounded-xl bg-dark-700/35 border border-white/5 p-3"><div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Dormant Tokens</div><div className="text-sm font-black text-white">{speculativeExposure.dormantTokens}</div></div>
+        </div>
+
+        <div className="rounded-2xl border border-white/5 bg-dark-700/30 p-4">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-2">Highest-Risk Holding</div>
+          {speculativeExposure.highestRiskHolding ? (
+            <div className="text-xs text-gray-300 leading-relaxed break-words">
+              <span className="font-semibold text-white">{speculativeExposure.highestRiskHolding.symbol || 'Unknown'}</span>
+              {' · '}
+              {speculativeExposure.highestRiskHolding.name || 'Unknown token'}
+              {' · '}
+              {speculativeExposure.highestRiskHolding.usdValue !== null && Number.isFinite(speculativeExposure.highestRiskHolding.usdValue)
+                ? fmtUsd(speculativeExposure.highestRiskHolding.usdValue)
+                : 'Currently unavailable.'}
+            </div>
+          ) : (
+            <div className="text-xs text-gray-500">Currently unavailable.</div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-rose-500/15 bg-rose-500/[0.04] p-4">
+          <div className="text-[10px] text-rose-300 uppercase tracking-wider font-semibold mb-2">Top Five Highest-Risk Assets</div>
+          {speculativeExposure.topRiskAssets.length > 0 ? (
+            <div className="space-y-2">
+              {speculativeExposure.topRiskAssets.map((token, index) => (
+                <div key={`${token.address || token.symbol || 'token'}-${index}`} className="rounded-xl border border-white/5 bg-dark-700/35 px-3 py-2 flex items-center justify-between gap-2 min-w-0">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-white truncate">{token.symbol || 'Unknown'} <span className="text-gray-500 font-normal">{token.name || 'Token'}</span></div>
+                    <div className="text-[10px] text-gray-600 truncate">{token.risk?.reason || 'Currently unavailable.'}</div>
+                  </div>
+                  <div className="text-[10px] font-semibold text-rose-300 shrink-0">{token.risk?.level || 'Unknown'}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs text-gray-500">Currently unavailable.</div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-sky-500/15 bg-sky-500/[0.04] p-4">
+          <div className="text-[10px] text-sky-400 uppercase tracking-wider font-semibold mb-2">Recommendations</div>
+          <ul className="space-y-1.5">
+            {speculativeExposure.recommendations.map((rec) => (
+              <li key={rec} className="text-xs text-gray-300 leading-relaxed">• {rec}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
   function ActionsTab() {
     if (!result) return null;
 
@@ -1729,6 +2014,7 @@ export default function WalletSafetySnapshot({ onResultStateChange }: WalletSafe
           {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'security' && <SecurityTab />}
           {activeTab === 'portfolio' && <PortfolioTab />}
+          {activeTab === 'speculative' && <SpeculativeExposureTab />}
           {activeTab === 'insights' && <InsightsTab />}
           {activeTab === 'actions' && <ActionsTab />}
 
