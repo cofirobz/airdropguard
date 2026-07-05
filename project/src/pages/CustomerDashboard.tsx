@@ -25,6 +25,7 @@ interface ApiSubscription {
   plan: string;
   status: string;
   current_period_end: string | null;
+  key_value?: string | null;
 }
 
 interface UserReputation {
@@ -734,6 +735,8 @@ export default function CustomerDashboard() {
   const [airdrops, setAirdrops] = useState<AirdropWithTasks[]>([]);
   const [subscription, setSubscription] = useState<ApiSubscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [apiKeyBusy, setApiKeyBusy] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'airdrops' | 'tasks' | 'api' | 'profile'>('overview');
@@ -765,7 +768,7 @@ export default function CustomerDashboard() {
         .order('sort_order', { ascending: true }),
       supabase
         .from('api_subscriptions')
-        .select('id, plan, status, current_period_end')
+        .select('id, plan, status, current_period_end, key_value')
         .eq('user_id', user.id)
         .maybeSingle(),
     ]);
@@ -833,10 +836,51 @@ export default function CustomerDashboard() {
   };
 
   const handleCopy = async () => {
-    if (!subscription) return;
-    await navigator.clipboard.writeText(subscription.id);
+    if (!subscription?.key_value) {
+      setApiKeyError('No API key found. Generate one from this panel.');
+      return;
+    }
+
+    await navigator.clipboard.writeText(subscription.key_value);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleGenerateApiKey = async () => {
+    if (!user) return;
+
+    setApiKeyError(null);
+    setApiKeyBusy(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Session expired. Please sign in again to generate an API key.');
+      }
+
+      const { data, error } = await supabase.functions.invoke('manage-api-key', {
+        body: { action: 'generate' },
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) {
+        const backendError = (data as { error?: string } | null)?.error;
+        throw new Error(backendError ?? error.message ?? 'Failed to generate API key.');
+      }
+
+      const key = (data as { key?: string } | null)?.key;
+      if (!key) {
+        throw new Error('Key generation returned an empty result. Please try again.');
+      }
+
+      setSubscription((prev) => (prev ? { ...prev, key_value: key } : prev));
+      setCopied(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate API key.';
+      setApiKeyError(message);
+    } finally {
+      setApiKeyBusy(false);
+    }
   };
 
   // ── Derived stats ─────────────────────────────────────────────────────────
@@ -1821,13 +1865,34 @@ export default function CustomerDashboard() {
                   <ExternalLink className="w-4 h-4" /> API Docs
                 </a>
                 <button
+                  type="button"
+                  onClick={() => void handleGenerateApiKey()}
+                  disabled={apiKeyBusy}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-sky-300 border border-sky-500/25 hover:text-sky-200 hover:bg-sky-500/10 transition-colors disabled:opacity-60"
+                >
+                  {apiKeyBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  {subscription.key_value ? 'Regenerate Key' : 'Generate Key'}
+                </button>
+                <button
                   onClick={handleCopy}
+                  disabled={!subscription.key_value}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-gray-400 border border-white/10 hover:text-white hover:bg-white/5 transition-colors"
                 >
                   {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  {copied ? 'Copied' : 'Copy ID'}
+                  {copied ? 'Copied' : 'Copy Key'}
                 </button>
               </div>
+              <div className="relative rounded-xl border border-white/10 bg-black/20 p-3">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-gray-500">API Key</p>
+                <p className="mt-1 font-mono text-xs text-cyan-100 break-all">
+                  {subscription.key_value ?? 'No key generated yet. Click Generate Key.'}
+                </p>
+              </div>
+              {apiKeyError && (
+                <p className="relative text-xs text-rose-300 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2">
+                  API key error: {apiKeyError}
+                </p>
+              )}
             </div>
           </div>
         )}

@@ -42,6 +42,16 @@ Deno.serve(async (req: Request) => {
     );
     if (authError || !user) throw new Error("Invalid or expired token");
 
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from("api_subscriptions")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (subscriptionError) throw new Error(subscriptionError.message);
+    if (!subscription) throw new Error("No API subscription found. Choose a plan first.");
+    if (subscription.status !== "active") throw new Error("Your API subscription is not active.");
+
     const { action, keyId } = await req.json();
 
     if (action === "generate") {
@@ -64,6 +74,13 @@ Deno.serve(async (req: Request) => {
 
       if (insertError) throw new Error(insertError.message);
 
+      const { error: subscriptionUpdateError } = await supabase
+        .from("api_subscriptions")
+        .update({ key_value: plainKey, updated_at: new Date().toISOString() })
+        .eq("user_id", user.id);
+
+      if (subscriptionUpdateError) throw new Error(subscriptionUpdateError.message);
+
       return new Response(JSON.stringify({ key: plainKey, prefix }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -78,6 +95,13 @@ Deno.serve(async (req: Request) => {
         .eq("user_id", user.id);
 
       if (error) throw new Error(error.message);
+
+      const { error: subscriptionUpdateError } = await supabase
+        .from("api_subscriptions")
+        .update({ key_value: null, updated_at: new Date().toISOString() })
+        .eq("user_id", user.id);
+
+      if (subscriptionUpdateError) throw new Error(subscriptionUpdateError.message);
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

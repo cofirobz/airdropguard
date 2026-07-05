@@ -1,0 +1,35 @@
+{
+  "name": "airdropguard-discord-bot",
+  "version": "1.0.0",
+  "description": "AirdropGuard AI Discord bot - Check Before You Connect.",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "register:commands": "tsx src/register-commands.ts"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "discord.js": "^14.19.3",
+    "dotenv": "^16.6.1",
+    "node-cron": "^4.2.1",
+    "openai": "^5.12.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.15",
+    "@typescript-eslint/eslint-plugin": "^8.37.0",
+    "@typescript-eslint/parser": "^8.37.0",
+    "eslint": "^9.31.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
