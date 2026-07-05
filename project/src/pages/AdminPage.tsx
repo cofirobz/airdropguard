@@ -2360,6 +2360,18 @@ export default function AdminPage() {
   const [subNotes, setSubNotes] = useState<Record<string, string>>({});
   const [analyzingSub, setAnalyzingSub] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!expandedSub) return;
+    const present = submissions.some((row) => row.id === expandedSub);
+    console.warn('[CW_TRACE]', {
+      step: 'submissions_table_render_check',
+      functionName: 'AdminPage render',
+      table: 'airdrop_submissions',
+      recordId: expandedSub,
+      success: present,
+    });
+  }, [expandedSub, submissions]);
+
   const [scamReports, setScamReports] = useState<ScamReport[]>([]);
   const [scamReportsLoading, setScamReportsLoading] = useState(true);
   const [expandedScamReport, setExpandedScamReport] = useState<string | null>(null);
@@ -4107,6 +4119,23 @@ export default function AdminPage() {
   }, [logAdminAudit, showToast, setCompetitorUiError]);
 
   const createDraftFromOpportunity = useCallback(async (opportunity: CompetitorOpportunity) => {
+    const traceId = `cw-${opportunity.id}-${Date.now()}`;
+    const trace = (step: string, payload: Record<string, unknown>) => {
+      console.warn('[CW_TRACE]', {
+        traceId,
+        step,
+        ...payload,
+      });
+    };
+
+    trace('handler_called', {
+      functionName: 'createDraftFromOpportunity',
+      table: 'competitor_opportunities',
+      recordId: opportunity.id,
+      success: true,
+      status: opportunity.status,
+    });
+
     const details = getOpportunityDiscoveryDetails(opportunity);
     const sourceTag = `CW_OPPORTUNITY_ID:${opportunity.id}`;
 
@@ -4117,6 +4146,19 @@ export default function AdminPage() {
     };
 
     try {
+      trace('mapping_complete', {
+        functionName: 'createDraftFromOpportunity',
+        table: 'airdrop_submissions',
+        recordId: null,
+        success: true,
+        projectName: opportunity.project_name,
+        sourceUrl: details.listingUrl,
+        reasonDetected: details.reasonDetected,
+        detectedKeywords: details.detectedKeywords,
+        confidenceScore: details.confidenceScore,
+        sourceStatus: opportunity.status,
+      });
+
       const { data: existing, error: existingError } = await supabase
         .from('airdrop_submissions')
         .select('id, project_name, status')
@@ -4125,9 +4167,31 @@ export default function AdminPage() {
         .limit(1)
         .maybeSingle();
 
-      if (existingError) throw existingError;
+      if (existingError) {
+        trace('existing_lookup_failed', {
+          functionName: 'createDraftFromOpportunity',
+          table: 'airdrop_submissions',
+          recordId: null,
+          success: false,
+          error: describeError(existingError),
+        });
+        throw existingError;
+      }
+
+      trace('existing_lookup_complete', {
+        functionName: 'createDraftFromOpportunity',
+        table: 'airdrop_submissions',
+        recordId: existing?.id ?? null,
+        success: true,
+      });
 
       if (existing?.id) {
+        trace('navigate_existing_submission', {
+          functionName: 'createDraftFromOpportunity',
+          table: 'airdrop_submissions',
+          recordId: existing.id,
+          success: true,
+        });
         navigateToSubmission(existing.id);
         showToast('Created submission and moved to Submissions');
         return;
@@ -4154,35 +4218,130 @@ export default function AdminPage() {
         opportunity.notes ? `Competitor notes: ${opportunity.notes}` : null,
       ].filter((value): value is string => Boolean(value));
 
-      const { data: inserted, error: insertError } = await supabase
+      const baseInsertPayload = {
+        project_name: opportunity.project_name,
+        website_url: details.projectUrl || details.listingUrl,
+        twitter_url: details.officialXUrl || null,
+        discord_url: details.officialDiscordUrl || null,
+        github_url: details.githubUrl || null,
+        whitepaper_url: details.officialDocsUrl || null,
+        blockchain: opportunity.blockchain || null,
+        category: opportunity.category || null,
+        airdrop_type: 'Competitor Watch Opportunity',
+        description: descriptionParts.join('\n'),
+        tasks_required: detectedKeywords.length ? `Detected keywords: ${detectedKeywords.join(', ')}` : null,
+        funding_investors: details.fundingInfo || null,
+        team_info: details.teamInfo || null,
+        additional_notes: submissionNotes.join('\n'),
+        admin_notes: `Imported from Competitor Watch (${details.sourceLabel}).`,
+        status: 'pending',
+      };
+
+      trace('insert_attempt', {
+        functionName: 'createDraftFromOpportunity',
+        table: 'airdrop_submissions',
+        recordId: null,
+        success: true,
+        payloadKeys: [...Object.keys(baseInsertPayload), 'ai_recommendation'],
+      });
+
+      let inserted: Submission | null = null;
+      const firstInsert = await supabase
         .from('airdrop_submissions')
         .insert({
-          project_name: opportunity.project_name,
-          website_url: details.projectUrl || details.listingUrl,
-          twitter_url: details.officialXUrl || null,
-          discord_url: details.officialDiscordUrl || null,
-          github_url: details.githubUrl || null,
-          whitepaper_url: details.officialDocsUrl || null,
-          blockchain: opportunity.blockchain || null,
-          category: opportunity.category || null,
-          airdrop_type: 'Competitor Watch Opportunity',
-          description: descriptionParts.join('\n'),
-          tasks_required: detectedKeywords.length ? `Detected keywords: ${detectedKeywords.join(', ')}` : null,
-          funding_investors: details.fundingInfo || null,
-          team_info: details.teamInfo || null,
-          additional_notes: submissionNotes.join('\n'),
-          admin_notes: `Imported from Competitor Watch (${details.sourceLabel}).`,
-          status: 'pending',
+          ...baseInsertPayload,
           ai_recommendation: 'review_further',
         })
         .select('*')
         .single();
 
-      if (insertError) throw insertError;
+      if (firstInsert.error) {
+        const exactInsertError = describeError(firstInsert.error);
+        trace('insert_failed', {
+          functionName: 'createDraftFromOpportunity',
+          table: 'airdrop_submissions',
+          recordId: null,
+          success: false,
+          error: exactInsertError,
+        });
+
+        const isSchemaDrift = exactInsertError.toLowerCase().includes('ai_recommendation')
+          && (exactInsertError.toLowerCase().includes('column') || exactInsertError.toLowerCase().includes('schema'));
+
+        if (!isSchemaDrift) {
+          throw firstInsert.error;
+        }
+
+        trace('insert_retry_without_ai_recommendation', {
+          functionName: 'createDraftFromOpportunity',
+          table: 'airdrop_submissions',
+          recordId: null,
+          success: true,
+        });
+
+        const retryInsert = await supabase
+          .from('airdrop_submissions')
+          .insert(baseInsertPayload)
+          .select('*')
+          .single();
+
+        if (retryInsert.error) {
+          trace('insert_retry_failed', {
+            functionName: 'createDraftFromOpportunity',
+            table: 'airdrop_submissions',
+            recordId: null,
+            success: false,
+            error: describeError(retryInsert.error),
+          });
+          throw retryInsert.error;
+        }
+
+        inserted = retryInsert.data as Submission;
+      } else {
+        inserted = firstInsert.data as Submission;
+      }
+
+      trace('insert_success', {
+        functionName: 'createDraftFromOpportunity',
+        table: 'airdrop_submissions',
+        recordId: inserted?.id ?? null,
+        success: true,
+      });
 
       if (!inserted?.id) {
+        trace('insert_missing_id', {
+          functionName: 'createDraftFromOpportunity',
+          table: 'airdrop_submissions',
+          recordId: null,
+          success: false,
+          error: 'Insert returned no id',
+        });
         showToast('Submission was created but could not be located. Refresh Submissions.', 'error');
         return;
+      }
+
+      const { data: insertedRow, error: insertedRowError } = await supabase
+        .from('airdrop_submissions')
+        .select('*')
+        .eq('id', inserted.id)
+        .maybeSingle();
+
+      if (insertedRowError) {
+        trace('post_insert_query_failed', {
+          functionName: 'createDraftFromOpportunity',
+          table: 'airdrop_submissions',
+          recordId: inserted.id,
+          success: false,
+          error: describeError(insertedRowError),
+        });
+      } else {
+        trace('post_insert_query_success', {
+          functionName: 'createDraftFromOpportunity',
+          table: 'airdrop_submissions',
+          recordId: inserted.id,
+          success: Boolean(insertedRow),
+          status: (insertedRow as Submission | null)?.status ?? null,
+        });
       }
 
       await updateOpportunityStatus(
@@ -4194,10 +4353,43 @@ export default function AdminPage() {
 
       setSubmissions((prev) => [inserted as Submission, ...prev.filter((item) => item.id !== inserted.id)]);
       setSubNotes((prev) => ({ ...prev, [inserted.id]: inserted.admin_notes ?? '' }));
+
+      const { data: latestSubs, error: latestSubsError } = await supabase
+        .from('airdrop_submissions')
+        .select('*')
+        .order('submitted_at', { ascending: false });
+
+      if (latestSubsError) {
+        trace('submissions_query_failed', {
+          functionName: 'createDraftFromOpportunity',
+          table: 'airdrop_submissions',
+          recordId: inserted.id,
+          success: false,
+          error: describeError(latestSubsError),
+        });
+      } else if (latestSubs) {
+        const rows = latestSubs as Submission[];
+        setSubmissions(rows);
+        trace('submissions_query_success', {
+          functionName: 'createDraftFromOpportunity',
+          table: 'airdrop_submissions',
+          recordId: inserted.id,
+          success: rows.some((row) => row.id === inserted.id),
+          returnedRows: rows.length,
+        });
+      }
+
       navigateToSubmission(inserted.id);
       showToast('Created submission and moved to Submissions');
     } catch (error) {
       const exact = describeError(error);
+      trace('handler_failed', {
+        functionName: 'createDraftFromOpportunity',
+        table: 'airdrop_submissions',
+        recordId: null,
+        success: false,
+        error: exact,
+      });
       setCompetitorUiError('Unable to create submission from Competitor Watch.', error);
       showToast(`Create submission failed: ${exact}`, 'error');
     }
