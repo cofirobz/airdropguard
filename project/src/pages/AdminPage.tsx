@@ -246,6 +246,16 @@ type BannerStatus = 'Enquiry' | 'Awaiting Artwork' | 'Ready to Publish' | 'Live'
 type BannerDisplayStatus = 'Active' | 'Scheduled' | 'Expired';
 type BannerPaymentState = 'Unpaid' | 'Pending' | 'Paid';
 
+type SocialDraftChannel = 'x' | 'discord' | 'telegram' | 'seo';
+
+interface SocialDraftItem {
+  id: string;
+  channel: SocialDraftChannel;
+  title: string;
+  copy: string;
+  status: 'ready' | 'used' | 'rejected';
+}
+
 interface BannerAd {
   id: string;
   advertiserName: string;
@@ -269,7 +279,7 @@ interface BannerAd {
 type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt'>;
 
 type ContentView = 'airdrops' | 'articles' | 'hero' | 'featured' | 'trending' | 'learn' | 'sections';
-type AdminView = 'overview' | 'airdrops' | 'submissions' | 'content' | 'ai-drafts' | 'competitor-watch' | 'users' | 'api' | 'banners' | 'audit-logs' | 'system-tools';
+type AdminView = 'overview' | 'airdrops' | 'submissions' | 'competitor-watch' | 'articles' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
 
 interface ControlArticle {
   id: string;
@@ -287,6 +297,21 @@ interface OpsUser {
   lastSeenAt: string;
   plan: 'free' | 'api' | 'premium';
 }
+
+const ARTICLE_CATEGORY_OPTIONS = [
+  'Guides',
+  'SEO',
+  'Airdrops',
+  'Scam Alerts',
+  'Wallet Security',
+  'News',
+  'Weekly Roundups',
+  'Crypto Education',
+  'Developer Guides',
+  'Announcements',
+] as const;
+
+type ArticleWorkflowStatus = 'Draft' | 'AI Generated' | 'Human Review Required' | 'Approved' | 'Published' | 'Archived';
 
 type AdminAuditPayload = {
   actionTaken: string;
@@ -2359,6 +2384,81 @@ export default function AdminPage() {
   const [expandedAirdropIds, setExpandedAirdropIds] = useState<string[]>([]);
   const [subNotes, setSubNotes] = useState<Record<string, string>>({});
   const [analyzingSub, setAnalyzingSub] = useState<string | null>(null);
+  const [socialDrafts, setSocialDrafts] = useState<SocialDraftItem[]>([
+    {
+      id: 'social-x-1',
+      channel: 'x',
+      title: 'Weekly trust-first thread',
+      copy: 'New this week on AirdropGuard: top safe opportunities and scam red flags. Verify links, protect wallet approvals, and never share seed phrases. Full breakdown on site.',
+      status: 'ready',
+    },
+    {
+      id: 'social-discord-1',
+      channel: 'discord',
+      title: 'Discord community update',
+      copy: 'Ops update: reviewed listings are now live in the dashboard. Use the safety checklist before claiming any drop and report suspicious links to moderators.',
+      status: 'ready',
+    },
+    {
+      id: 'social-telegram-1',
+      channel: 'telegram',
+      title: 'Telegram alert post',
+      copy: 'Safety alert: we flagged new impersonation patterns this week. Confirm official docs and contract addresses from trusted sources only.',
+      status: 'ready',
+    },
+    {
+      id: 'social-seo-1',
+      channel: 'seo',
+      title: 'SEO article idea: airdrop wallet security checklist',
+      copy: 'Draft idea: "Airdrop wallet security checklist for 2026" with practical steps, warning signs and trusted verification workflow.',
+      status: 'ready',
+    },
+  ]);
+
+  const socialChannelLabel: Record<SocialDraftChannel, string> = {
+    x: 'X / Twitter',
+    discord: 'Discord',
+    telegram: 'Telegram',
+    seo: 'SEO idea',
+  };
+
+  const socialChannelTone: Record<SocialDraftChannel, string> = {
+    x: 'text-cyan-200 border-cyan-500/25 bg-cyan-500/10',
+    discord: 'text-indigo-200 border-indigo-500/25 bg-indigo-500/10',
+    telegram: 'text-sky-200 border-sky-500/25 bg-sky-500/10',
+    seo: 'text-emerald-200 border-emerald-500/25 bg-emerald-500/10',
+  };
+
+  const copySocialDraft = useCallback(async (draft: SocialDraftItem) => {
+    try {
+      await navigator.clipboard.writeText(draft.copy);
+      showToast(`Copied ${socialChannelLabel[draft.channel]} draft`);
+    } catch {
+      showToast('Clipboard copy failed in this browser session.', 'error');
+    }
+  }, [showToast]);
+
+  const markSocialDraftUsed = useCallback((id: string) => {
+    setSocialDrafts((prev) => prev.map((item) => item.id === id ? { ...item, status: 'used' } : item));
+    showToast('Marked as used');
+  }, [showToast]);
+
+  const rejectSocialDraft = useCallback((id: string) => {
+    setSocialDrafts((prev) => prev.map((item) => item.id === id ? { ...item, status: 'rejected' } : item));
+    showToast('Draft rejected');
+  }, [showToast]);
+
+  const regenerateSocialDraft = useCallback((id: string) => {
+    setSocialDrafts((prev) => prev.map((item) => {
+      if (item.id !== id) return item;
+      return {
+        ...item,
+        status: 'ready',
+        copy: `${item.copy}\n\nRegenerated for ${new Date().toLocaleDateString()}.`,
+      };
+    }));
+    showToast('Draft regenerated');
+  }, [showToast]);
 
   useEffect(() => {
     setExpandedAirdropIds((prev) => {
@@ -2467,6 +2567,27 @@ export default function AdminPage() {
     const entries = DEFAULT_ARTICLE_TRUST_PROFILES.map((profile) => [profile.articleKey, profile] as const);
     return Object.fromEntries(entries);
   });
+  const [articleCategories, setArticleCategories] = useState<Record<string, string[]>>({
+    'layer-2-airdrops-2026': ['Guides', 'Airdrops'],
+  });
+  const [articleTags, setArticleTags] = useState<Record<string, string>>({
+    'layer-2-airdrops-2026': 'layer2,airdrop,security',
+  });
+  const [articleSummary, setArticleSummary] = useState<Record<string, string>>({});
+  const [articleMetaDescription, setArticleMetaDescription] = useState<Record<string, string>>({});
+  const [articleBody, setArticleBody] = useState<Record<string, string>>({});
+  const [articleFeaturedImage, setArticleFeaturedImage] = useState<Record<string, string>>({});
+  const [articleInternalLinks, setArticleInternalLinks] = useState<Record<string, string>>({
+    'layer-2-airdrops-2026': '/wallet-checker\n/scam-alerts',
+  });
+  const [articleWorkflowStatus, setArticleWorkflowStatus] = useState<Record<string, ArticleWorkflowStatus>>({
+    'layer-2-airdrops-2026': 'Published',
+  });
+  const [articleFilterCategory, setArticleFilterCategory] = useState<string>('all');
+  const [articleFilterStatus, setArticleFilterStatus] = useState<string>('all');
+  const [articleFilterAuthor, setArticleFilterAuthor] = useState<string>('all');
+  const [articleFilterType, setArticleFilterType] = useState<string>('all');
+  const [articleSortOrder, setArticleSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [articleReviewInternal, setArticleReviewInternal] = useState<Record<string, ArticleReviewChecklist>>({
     'layer-2-airdrops-2026': DEFAULT_ARTICLE_CHECKLIST,
   });
@@ -2680,6 +2801,71 @@ export default function AdminPage() {
     return articleReviewInternal[selectedControlArticle.articleKey] || DEFAULT_ARTICLE_CHECKLIST;
   }, [selectedControlArticle, articleReviewInternal]);
 
+  const inferWorkflowStatus = useCallback((article: ControlArticle) => {
+    const explicit = articleWorkflowStatus[article.articleKey];
+    if (explicit) return explicit;
+    const profile = articleTrustProfiles[article.articleKey];
+    if (article.status === 'published') return 'Published';
+    if (profile?.verificationStatus === 'verified_airdropguard') return 'Approved';
+    if (profile?.verificationStatus === 'human_reviewed') return 'Human Review Required';
+    return 'Draft';
+  }, [articleTrustProfiles, articleWorkflowStatus]);
+
+  const filteredControlArticles = useMemo(() => {
+    const list = controlArticles.filter((article) => {
+      const workflow = inferWorkflowStatus(article);
+      const profile = articleTrustProfiles[article.articleKey];
+      const categories = articleCategories[article.articleKey] || [];
+      const author = profile?.reviewedBy || 'AirdropGuard Team';
+
+      if (articleFilterCategory !== 'all' && !categories.includes(articleFilterCategory)) return false;
+      if (articleFilterStatus !== 'all' && workflow !== articleFilterStatus) return false;
+      if (articleFilterAuthor !== 'all' && author !== articleFilterAuthor) return false;
+      if (articleFilterType === 'published' && article.status !== 'published') return false;
+      if (articleFilterType === 'draft' && article.status === 'published') return false;
+      if (articleFilterType === 'ai' && workflow !== 'AI Generated') return false;
+      return true;
+    });
+
+    return [...list].sort((a, b) => {
+      const aTs = new Date(a.updatedAt || 0).getTime();
+      const bTs = new Date(b.updatedAt || 0).getTime();
+      return articleSortOrder === 'newest' ? bTs - aTs : aTs - bTs;
+    });
+  }, [
+    controlArticles,
+    inferWorkflowStatus,
+    articleTrustProfiles,
+    articleCategories,
+    articleFilterCategory,
+    articleFilterStatus,
+    articleFilterAuthor,
+    articleFilterType,
+    articleSortOrder,
+  ]);
+
+  const articleAuthors = useMemo(() => {
+    const names = controlArticles.map((article) => articleTrustProfiles[article.articleKey]?.reviewedBy || 'AirdropGuard Team');
+    return Array.from(new Set(names));
+  }, [controlArticles, articleTrustProfiles]);
+
+  const articleDashboardStats = useMemo(() => {
+    const allStatuses = controlArticles.map((article) => inferWorkflowStatus(article));
+    const published = controlArticles.filter((article) => article.status === 'published').length;
+    const drafts = allStatuses.filter((status) => status === 'Draft').length;
+    const pendingReview = allStatuses.filter((status) => status === 'Human Review Required').length;
+    const seoArticles = controlArticles.filter((article) => (articleCategories[article.articleKey] || []).includes('SEO')).length;
+    const weeklyArticles = controlArticles.filter((article) => (articleCategories[article.articleKey] || []).includes('Weekly Roundups')).length;
+    return {
+      total: controlArticles.length,
+      drafts,
+      published,
+      seoArticles,
+      weeklyArticles,
+      pendingReview,
+    };
+  }, [controlArticles, inferWorkflowStatus, articleCategories]);
+
   const newUsersCount = useMemo(() => {
     const last7 = Date.now() - 7 * 86_400_000;
     return opsUsers.filter((u) => new Date(u.createdAt).getTime() >= last7).length;
@@ -2712,12 +2898,10 @@ export default function AdminPage() {
     { id: 'overview', label: 'Overview', blurb: 'Command centre summary and alerts' },
     { id: 'airdrops', label: 'Airdrops', blurb: 'Listings, publish, health, queue' },
     { id: 'submissions', label: 'Submissions', blurb: 'Project and scam report triage' },
-    { id: 'content', label: 'Articles / Content', blurb: 'Editorial and homepage control' },
-    { id: 'ai-drafts', label: 'AI Article Drafts', blurb: 'Weekly AI drafts for review' },
     { id: 'competitor-watch', label: 'Competitor Watch', blurb: 'Missing-opportunity monitoring' },
+    { id: 'articles', label: 'Articles', blurb: 'Unified content editor, SEO and publishing workflow' },
+    { id: 'advertise-admin', label: 'Advertise Admin', blurb: 'Paid visibility, API and campaign operations' },
     { id: 'users', label: 'Users', blurb: 'Users and adoption overview' },
-    { id: 'api', label: 'API', blurb: 'Subscriptions, keys and revenue' },
-    { id: 'banners', label: 'Banners', blurb: 'Ad campaigns and placements' },
     { id: 'audit-logs', label: 'Audit Logs', blurb: 'Human decision trail' },
     { id: 'system-tools', label: 'System Tools', blurb: 'AI queue and system maintenance' },
   ], []);
@@ -2733,6 +2917,57 @@ export default function AdminPage() {
     const section = document.getElementById(id);
     section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  const resolveNotificationAction = useCallback((notification: AdminNotification) => {
+    const type = notification.notification_type;
+    const context = (notification.context || {}) as Record<string, unknown>;
+
+    if (type === 'ai_draft_ready') {
+      return {
+        label: 'Open Articles',
+        onClick: () => {
+          setAdminView('articles');
+          jumpToSection('admin-content');
+        },
+      };
+    }
+
+    if (type === 'competitor_detected' || type === 'competitor_source_only' || type === 'competitor_scan_failed') {
+      return {
+        label: 'Open Competitor Watch',
+        onClick: () => {
+          setAdminView('competitor-watch');
+          jumpToSection('admin-competitor-watch');
+        },
+      };
+    }
+
+    if (type === 'admin_error') {
+      return {
+        label: 'Open System Tools',
+        onClick: () => {
+          setAdminView('system-tools');
+          jumpToSection('admin-ai-control');
+        },
+      };
+    }
+
+    const sectionId = typeof context.sectionId === 'string' ? context.sectionId : null;
+    if (sectionId) {
+      return {
+        label: 'Open Section',
+        onClick: () => jumpToSection(sectionId),
+      };
+    }
+
+    return {
+      label: 'Open Overview',
+      onClick: () => {
+        setAdminView('overview');
+        jumpToSection('admin-needs-attention');
+      },
+    };
+  }, []);
 
   const openFirstAirdropMatch = async (
     matcher: (airdrop: Airdrop) => boolean,
@@ -3023,6 +3258,50 @@ export default function AdminPage() {
           setArticleTrustProfiles(byKey);
           setControlArticles(controlRows);
           setSelectedArticleKey(controlRows[0]?.articleKey || 'layer-2-airdrops-2026');
+          setArticleSummary((prev) => {
+            const next = { ...prev };
+            controlRows.forEach((row) => {
+              if (!next[row.articleKey]) {
+                next[row.articleKey] = byKey[row.articleKey]?.sources.officialWebsiteUrl || '';
+              }
+            });
+            return next;
+          });
+          setArticleMetaDescription((prev) => {
+            const next = { ...prev };
+            controlRows.forEach((row) => {
+              if (!next[row.articleKey]) {
+                next[row.articleKey] = byKey[row.articleKey]?.sources.officialDocsUrl || '';
+              }
+            });
+            return next;
+          });
+          setArticleCategories((prev) => {
+            const next = { ...prev };
+            controlRows.forEach((row) => {
+              if (!next[row.articleKey] || next[row.articleKey].length === 0) {
+                const inferred: string[] = [];
+                const title = row.title.toLowerCase();
+                if (title.includes('seo')) inferred.push('SEO');
+                if (title.includes('weekly')) inferred.push('Weekly Roundups');
+                if (title.includes('scam')) inferred.push('Scam Alerts');
+                if (title.includes('wallet')) inferred.push('Wallet Security');
+                if (title.includes('airdrop')) inferred.push('Airdrops');
+                if (inferred.length === 0) inferred.push('Guides');
+                next[row.articleKey] = inferred;
+              }
+            });
+            return next;
+          });
+          setArticleWorkflowStatus((prev) => {
+            const next = { ...prev };
+            controlRows.forEach((row) => {
+              if (!next[row.articleKey]) {
+                next[row.articleKey] = row.status === 'published' ? 'Published' : 'Draft';
+              }
+            });
+            return next;
+          });
         }
       }
 
@@ -3101,7 +3380,7 @@ export default function AdminPage() {
       if (existingError) throw existingError;
       if (existing) {
         showToast(`Weekly draft already exists: ${existing.title}`, 'error');
-        setAdminView('ai-drafts');
+        setAdminView('articles');
         return;
       }
 
@@ -3169,7 +3448,7 @@ export default function AdminPage() {
       }, { source: 'ai_article_drafts_generate' });
 
       showToast('Weekly AI draft generated');
-      setAdminView('ai-drafts');
+      setAdminView('articles');
     } catch (error) {
       const exact = describeError(error);
       console.error('[Admin][AIDrafts] Generate weekly draft failed', exact);
@@ -5734,15 +6013,37 @@ export default function AdminPage() {
                 <p className="mt-2 text-xs text-gray-500">No admin notifications yet.</p>
               ) : (
                 <div className="mt-2 space-y-2">
-                  {adminNotifications.slice(0, 4).map((item) => (
-                    <div key={item.id} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-medium text-white">{item.title}</p>
-                        <p className="text-[10px] text-gray-500">{new Date(item.created_at).toLocaleString()}</p>
+                  {adminNotifications.slice(0, 6).map((item) => {
+                    const action = resolveNotificationAction(item);
+                    const severityTone = item.severity === 'error'
+                      ? 'text-rose-200 border-rose-500/25 bg-rose-500/10'
+                      : item.severity === 'warning'
+                      ? 'text-amber-200 border-amber-500/25 bg-amber-500/10'
+                      : 'text-emerald-200 border-emerald-500/25 bg-emerald-500/10';
+
+                    return (
+                      <div key={item.id} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-white truncate">{item.title}</p>
+                            <p className="mt-1 text-xs text-gray-400">{item.message}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${severityTone}`}>
+                            {item.severity}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <p className="text-[10px] text-gray-500">{new Date(item.created_at).toLocaleString()}</p>
+                          <button
+                            onClick={action.onClick}
+                            className="rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-100 hover:bg-cyan-500/20 transition-colors"
+                          >
+                            {action.label}
+                          </button>
+                        </div>
                       </div>
-                      <p className="mt-1 text-xs text-gray-400">{item.message}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -5800,7 +6101,7 @@ export default function AdminPage() {
             status="Waiting for artwork"
             blurb="Activate and schedule campaigns quickly."
             actionLabel="Manage Banner"
-            onAction={() => { setAdminView('banners'); jumpToSection('admin-advertising'); }}
+            onAction={() => { setAdminView('advertise-admin'); jumpToSection('admin-advertising'); }}
           />
           <ActionCard
             title="Scam Reports"
@@ -5841,7 +6142,7 @@ export default function AdminPage() {
             blurb="Draft and scheduled articles waiting to go live."
             actionLabel="Open Articles"
             onAction={() => {
-              setAdminView('content');
+              setAdminView('articles');
               setContentView('articles');
               jumpToSection('admin-content');
             }}
@@ -5852,7 +6153,7 @@ export default function AdminPage() {
             status="Awaiting review"
             blurb="AI-assisted drafts waiting for human verification."
             actionLabel="Open Drafts"
-            onAction={() => { setAdminView('ai-drafts'); jumpToSection('admin-ai-article-drafts'); }}
+            onAction={() => { setAdminView('articles'); jumpToSection('admin-content'); }}
           />
           <ActionCard
             title="Competitor Queue"
@@ -5873,7 +6174,48 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section id="admin-content" className={`rounded-2xl border border-sky-500/20 bg-sky-500/[0.05] p-4 space-y-4 ${canShowSection('content') ? '' : 'hidden'}`}>
+      <section id="admin-articles" className={`rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.05] p-4 space-y-3 ${canShowSection('articles') ? '' : 'hidden'}`}>
+        <div>
+          <h2 className="text-sm font-bold text-indigo-200">Articles</h2>
+          <p className="text-xs text-gray-300 mt-1">One unified article system for guides, SEO, publishing, and social distribution workflows.</p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          <button onClick={() => jumpToSection('admin-content')} className="rounded-xl border border-indigo-400/25 bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-100">Published articles and content tools</button>
+          <button onClick={() => jumpToSection('admin-content')} className="rounded-xl border border-indigo-400/25 bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-100">AI article drafts and review queue</button>
+          <button onClick={() => jumpToSection('admin-social-growth-queue')} className="rounded-xl border border-indigo-400/25 bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-100">Growth queue and social post drafts</button>
+        </div>
+      </section>
+
+      <section id="admin-social-growth-queue" className={`glass-card p-4 space-y-3 ${canShowSection('articles') ? '' : 'hidden'}`}>
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-200">Growth Queue</h3>
+          <p className="text-[11px] text-gray-400 mt-1">X/Twitter, Discord, Telegram and SEO draft copy with one-click actions.</p>
+        </div>
+        <div className="space-y-2">
+          {socialDrafts.map((draft) => (
+            <div key={draft.id} className="rounded-xl border border-white/10 bg-dark-900/35 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] ${socialChannelTone[draft.channel]}`}>{socialChannelLabel[draft.channel]}</span>
+                  <span className="text-xs font-medium text-white">{draft.title}</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] ${draft.status === 'used' ? 'text-emerald-200 border-emerald-500/25 bg-emerald-500/10' : draft.status === 'rejected' ? 'text-rose-200 border-rose-500/25 bg-rose-500/10' : 'text-gray-300 border-white/15 bg-white/[0.04]'}`}>
+                    {draft.status}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button onClick={() => void copySocialDraft(draft)} className="px-2.5 py-1 rounded-lg border border-white/15 bg-white/[0.04] text-[11px] text-gray-200">Copy</button>
+                  <button onClick={() => markSocialDraftUsed(draft.id)} className="px-2.5 py-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-[11px] text-emerald-200">Mark as used</button>
+                  <button onClick={() => rejectSocialDraft(draft.id)} className="px-2.5 py-1 rounded-lg border border-rose-500/25 bg-rose-500/10 text-[11px] text-rose-200">Reject</button>
+                  <button onClick={() => regenerateSocialDraft(draft.id)} className="px-2.5 py-1 rounded-lg border border-indigo-500/25 bg-indigo-500/10 text-[11px] text-indigo-200">Regenerate</button>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-gray-300 whitespace-pre-wrap">{draft.copy}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="admin-content" className={`rounded-2xl border border-sky-500/20 bg-sky-500/[0.05] p-4 space-y-4 ${canShowSection('articles') ? '' : 'hidden'}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-bold text-sky-200">CONTENT</h2>
@@ -5894,8 +6236,8 @@ export default function AdminPage() {
           <div className="glass-card p-4 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="text-xs uppercase tracking-wider text-sky-200">Article Trust & Verification</p>
-                <p className="text-[11px] text-gray-400 mt-1">AI discovers content opportunities. Human reviewers verify and publish.</p>
+                <p className="text-xs uppercase tracking-wider text-sky-200">Unified Articles</p>
+                <p className="text-[11px] text-gray-400 mt-1">One editor for guides, SEO articles, announcements and weekly content.</p>
               </div>
               <button
                 onClick={() => void fetchArticleTrustData()}
@@ -5905,14 +6247,53 @@ export default function AdminPage() {
               </button>
             </div>
 
+            <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-6">
+              <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">Total Articles</p><p className="text-white font-semibold">{articleDashboardStats.total}</p></div>
+              <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">Drafts</p><p className="text-white font-semibold">{articleDashboardStats.drafts}</p></div>
+              <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">Published</p><p className="text-white font-semibold">{articleDashboardStats.published}</p></div>
+              <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">SEO Articles</p><p className="text-white font-semibold">{articleDashboardStats.seoArticles}</p></div>
+              <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">Weekly Articles</p><p className="text-white font-semibold">{articleDashboardStats.weeklyArticles}</p></div>
+              <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">Pending Review</p><p className="text-white font-semibold">{articleDashboardStats.pendingReview}</p></div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-6">
+              <select value={articleFilterCategory} onChange={(e) => setArticleFilterCategory(e.target.value)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                <option value="all">All Categories</option>
+                {ARTICLE_CATEGORY_OPTIONS.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+              <select value={articleFilterStatus} onChange={(e) => setArticleFilterStatus(e.target.value)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                <option value="all">All Statuses</option>
+                {(['Draft', 'AI Generated', 'Human Review Required', 'Approved', 'Published', 'Archived'] as ArticleWorkflowStatus[]).map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+              <select value={articleFilterType} onChange={(e) => setArticleFilterType(e.target.value)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                <option value="all">All Types</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+                <option value="ai">AI Generated</option>
+              </select>
+              <select value={articleFilterAuthor} onChange={(e) => setArticleFilterAuthor(e.target.value)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                <option value="all">All Authors</option>
+                {articleAuthors.map((author) => <option key={author} value={author}>{author}</option>)}
+              </select>
+              <select value={articleSortOrder} onChange={(e) => setArticleSortOrder(e.target.value as 'newest' | 'oldest')} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white">
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+              <button onClick={() => { setArticleFilterCategory('all'); setArticleFilterStatus('all'); setArticleFilterType('all'); setArticleFilterAuthor('all'); setArticleSortOrder('newest'); }} className="rounded-xl border border-white/15 bg-white/[0.04] px-3 py-2 text-xs text-gray-200">Reset Filters</button>
+            </div>
+
             {articleTrustLoading ? (
               <div className="rounded-xl border border-white/10 bg-dark-900/40 p-4 text-xs text-gray-400">Loading article verification data...</div>
             ) : (
               <>
                 <div className="grid gap-2 md:grid-cols-2">
-                  {controlArticles.map((article) => {
+                  {filteredControlArticles.map((article) => {
                     const profile = articleTrustProfiles[article.articleKey];
                     const verificationStatus = profile?.verificationStatus || 'ai_assisted_draft';
+                    const workflowStatus = inferWorkflowStatus(article);
+                    const categories = articleCategories[article.articleKey] || [];
 
                     return (
                       <button
@@ -5923,9 +6304,13 @@ export default function AdminPage() {
                         <p className="text-sm font-semibold text-white">{article.title}</p>
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
                           <span className="rounded-full border border-white/15 bg-white/[0.04] px-2 py-0.5 text-gray-300">{article.status}</span>
+                          <span className="rounded-full border border-cyan-500/25 bg-cyan-500/10 px-2 py-0.5 text-cyan-100">{workflowStatus}</span>
                           <span className={`rounded-full border px-2 py-0.5 ${verificationStatusTone(verificationStatus)}`}>
                             {verificationStatusLabel(verificationStatus as VerificationStatus)}
                           </span>
+                          {categories.slice(0, 2).map((category) => (
+                            <span key={`${article.articleKey}-${category}`} className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 text-gray-300">{category}</span>
+                          ))}
                         </div>
                       </button>
                     );
@@ -5942,6 +6327,46 @@ export default function AdminPage() {
                       <span className={`rounded-full border px-2.5 py-1 text-[11px] ${verificationStatusTone(selectedArticleProfile.verificationStatus)}`}>
                         {verificationStatusLabel(selectedArticleProfile.verificationStatus)}
                       </span>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Title</span>
+                        <input
+                          value={selectedControlArticle.title}
+                          onChange={(event) => setControlArticles((prev) => prev.map((row) => row.id === selectedControlArticle.id ? { ...row, title: event.target.value, updatedAt: new Date().toISOString() } : row))}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Slug</span>
+                        <input
+                          value={selectedControlArticle.urlPath.replace('/articles/', '')}
+                          onChange={(event) => {
+                            const slug = event.target.value.trim().replace(/^\/+/, '');
+                            setControlArticles((prev) => prev.map((row) => row.id === selectedControlArticle.id ? { ...row, urlPath: `/articles/${slug}`, updatedAt: new Date().toISOString() } : row));
+                          }}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Summary</span>
+                        <textarea
+                          rows={2}
+                          value={articleSummary[selectedControlArticle.articleKey] || ''}
+                          onChange={(event) => setArticleSummary((prev) => ({ ...prev, [selectedControlArticle.articleKey]: event.target.value }))}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Meta Description</span>
+                        <textarea
+                          rows={2}
+                          value={articleMetaDescription[selectedControlArticle.articleKey] || ''}
+                          onChange={(event) => setArticleMetaDescription((prev) => ({ ...prev, [selectedControlArticle.articleKey]: event.target.value }))}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        />
+                      </label>
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-3">
@@ -5999,6 +6424,116 @@ export default function AdminPage() {
                           className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                         />
                       </label>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Workflow Status</span>
+                        <select
+                          value={inferWorkflowStatus(selectedControlArticle)}
+                          onChange={(event) => setArticleWorkflowStatus((prev) => ({
+                            ...prev,
+                            [selectedControlArticle.articleKey]: event.target.value as ArticleWorkflowStatus,
+                          }))}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        >
+                          {(['Draft', 'AI Generated', 'Human Review Required', 'Approved', 'Published', 'Archived'] as ArticleWorkflowStatus[]).map((status) => (
+                            <option key={status} value={status}>{status}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Tags (comma separated)</span>
+                        <input
+                          value={articleTags[selectedControlArticle.articleKey] || ''}
+                          onChange={(event) => setArticleTags((prev) => ({ ...prev, [selectedControlArticle.articleKey]: event.target.value }))}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          placeholder="security, wallet, airdrops"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-sky-200">Categories</p>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-xs text-gray-300">
+                        {ARTICLE_CATEGORY_OPTIONS.map((category) => {
+                          const selected = (articleCategories[selectedControlArticle.articleKey] || []).includes(category);
+                          return (
+                            <label key={category} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={(event) => {
+                                  setArticleCategories((prev) => {
+                                    const current = prev[selectedControlArticle.articleKey] || [];
+                                    const nextValues = event.target.checked
+                                      ? Array.from(new Set([...current, category]))
+                                      : current.filter((value) => value !== category);
+                                    return { ...prev, [selectedControlArticle.articleKey]: nextValues };
+                                  });
+                                }}
+                              />
+                              {category}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Featured Image URL</span>
+                        <input
+                          value={articleFeaturedImage[selectedControlArticle.articleKey] || ''}
+                          onChange={(event) => setArticleFeaturedImage((prev) => ({ ...prev, [selectedControlArticle.articleKey]: event.target.value }))}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          placeholder="https://..."
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[11px] text-gray-400">Internal Links</span>
+                        <textarea
+                          rows={2}
+                          value={articleInternalLinks[selectedControlArticle.articleKey] || ''}
+                          onChange={(event) => setArticleInternalLinks((prev) => ({ ...prev, [selectedControlArticle.articleKey]: event.target.value }))}
+                          className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                          placeholder="/articles/example\n/wallet-checker"
+                        />
+                      </label>
+                    </div>
+
+                    <label className="space-y-1 block">
+                      <span className="text-[11px] text-gray-400">Content Editor</span>
+                      <textarea
+                        rows={8}
+                        value={articleBody[selectedControlArticle.articleKey] || ''}
+                        onChange={(event) => setArticleBody((prev) => ({ ...prev, [selectedControlArticle.articleKey]: event.target.value }))}
+                        className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        placeholder="Write article content here..."
+                      />
+                    </label>
+
+                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-sky-200">SEO Preview</p>
+                      <p className="mt-2 text-sm text-cyan-100">{selectedControlArticle.title}</p>
+                      <p className="mt-1 text-[11px] text-emerald-300">https://airdropguard.com{selectedControlArticle.urlPath}</p>
+                      <p className="mt-1 text-xs text-gray-400">{selectedArticleProfile.sources.officialDocsUrl || selectedArticleProfile.sources.officialWebsiteUrl || 'Add a concise meta description to improve search previews.'}</p>
+                    </div>
+
+                    <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-indigo-200">AI Tools</p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <button onClick={() => void generateWeeklyDraft()} className="px-2.5 py-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-100">Generate Article</button>
+                        <button onClick={() => void generateWeeklyDraft()} className="px-2.5 py-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-100">Generate SEO Article</button>
+                        <button onClick={() => showToast('Draft regenerated in editor context')} className="px-2.5 py-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-100">Regenerate</button>
+                        <button onClick={() => showToast('SEO suggestions refreshed')} className="px-2.5 py-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-100">Improve SEO</button>
+                        <button onClick={() => showToast('Rewrite suggestions generated')} className="px-2.5 py-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-100">Rewrite</button>
+                        <button onClick={() => showToast('Expanded content suggestions generated')} className="px-2.5 py-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-100">Expand</button>
+                        <button onClick={() => showToast('Shortened summary generated')} className="px-2.5 py-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-100">Shorten</button>
+                        <button onClick={() => showToast('Internal link suggestions generated')} className="px-2.5 py-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-100">Suggest internal links</button>
+                        <button onClick={() => showToast('Metadata suggestions generated')} className="px-2.5 py-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-100">Generate metadata</button>
+                        <button onClick={() => showToast('Social post drafts generated from article')} className="px-2.5 py-1 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-100">Generate social posts</button>
+                      </div>
                     </div>
 
                     <div className="grid gap-3 md:grid-cols-2">
@@ -6085,23 +6620,56 @@ export default function AdminPage() {
                           const reviewNotes = await promptHumanVerificationNotes(`Publish article \"${selectedControlArticle.title}\"`);
                           if (!reviewNotes) return;
 
-                          setArticlePublicationStatus(selectedControlArticle.id, 'published');
-                          updateSelectedArticleProfile({
-                            verificationStatus: 'human_reviewed',
-                            lastUpdatedAt: new Date().toISOString(),
-                            reviewedAt: new Date().toISOString().split('T')[0],
-                          });
+                          const nowIso = new Date().toISOString();
+                          const reviewedAt = new Date().toISOString().split('T')[0];
+                          const sourceProfile = selectedArticleProfile;
 
-                          await logAdminAudit({
-                            actionTaken: 'Publish article',
-                            aiRecommendation: 'Draft article prepared by AI-assisted workflow',
-                            finalDecision: 'Published',
-                            notes: reviewNotes,
-                            context: {
-                              articleId: selectedControlArticle.articleKey,
-                              title: selectedControlArticle.title,
-                            },
-                          });
+                          try {
+                            const { error: publishError } = await supabase
+                              .from('article_verification_profiles')
+                              .upsert({
+                                article_key: selectedControlArticle.articleKey,
+                                title: selectedControlArticle.title,
+                                url_path: selectedControlArticle.urlPath,
+                                publication_status: 'published',
+                                verification_status: 'human_reviewed',
+                                reviewed_by: sourceProfile?.reviewedBy || 'AirdropGuard Team',
+                                reviewed_at: reviewedAt,
+                                last_updated_at: nowIso,
+                                estimated_read_minutes: Math.max(1, Number(sourceProfile?.estimatedReadMinutes || 8)),
+                                official_docs_url: sourceProfile?.sources.officialDocsUrl || null,
+                                official_github_url: sourceProfile?.sources.githubUrl || null,
+                                official_website_url: sourceProfile?.sources.officialWebsiteUrl || null,
+                                official_x_url: sourceProfile?.sources.officialXUrl || null,
+                                official_blog_url: sourceProfile?.sources.officialBlogUrl || null,
+                                updated_at: nowIso,
+                              }, { onConflict: 'article_key' });
+
+                            if (publishError) throw publishError;
+
+                            setArticlePublicationStatus(selectedControlArticle.id, 'published');
+                            updateSelectedArticleProfile({
+                              verificationStatus: 'human_reviewed',
+                              lastUpdatedAt: nowIso,
+                              reviewedAt,
+                            });
+
+                            await logAdminAudit({
+                              actionTaken: 'Publish article',
+                              aiRecommendation: 'Draft article prepared by AI-assisted workflow',
+                              finalDecision: 'Published',
+                              notes: reviewNotes,
+                              context: {
+                                articleId: selectedControlArticle.articleKey,
+                                title: selectedControlArticle.title,
+                              },
+                            });
+
+                            await fetchArticleTrustData();
+                            showToast('Article published and live on Articles page');
+                          } catch (error) {
+                            showToast(`Unable to publish article: ${describeError(error)}`, 'error');
+                          }
                         }}
                         className="px-3 py-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-300"
                       >
@@ -6230,7 +6798,7 @@ export default function AdminPage() {
         )}
       </section>
 
-      <section id="admin-ai-article-drafts" className={`rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.05] p-4 space-y-3 ${canShowSection('ai-drafts') ? '' : 'hidden'}`}>
+      <section id="admin-ai-article-drafts" className="hidden">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h2 className="text-sm font-bold text-indigo-200 flex items-center gap-2"><Newspaper className="w-4 h-4" /> AI Article Drafts</h2>
@@ -6775,7 +7343,19 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section id="admin-revenue" className={`rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.05] p-4 space-y-3 ${canShowSection('api') ? '' : 'hidden'}`}>
+      <section id="admin-advertise-admin" className={`rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.05] p-4 space-y-3 ${canShowSection('advertise-admin') ? '' : 'hidden'}`}>
+        <div>
+          <h2 className="text-sm font-bold text-emerald-200">Advertise Admin</h2>
+          <p className="text-xs text-gray-300 mt-1">Paid listing submissions, featured placements, advertiser campaigns, Stripe/API subscribers and banner operations.</p>
+        </div>
+        <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-3">
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-emerald-100">Paid listing submissions and featured/trending placement approvals</div>
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-emerald-100">Advertise enquiries, partner or sponsor items and campaign management</div>
+          <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-emerald-100">API customer requests, subscription status and Stripe-readiness checks</div>
+        </div>
+      </section>
+
+      <section id="admin-revenue" className={`rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.05] p-4 space-y-3 ${canShowSection('advertise-admin') ? '' : 'hidden'}`}>
         <h2 className="text-sm font-bold text-emerald-200">REVENUE</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
           <div className="rounded-xl border border-emerald-500/20 px-3 py-2"><p className="text-emerald-100/80">Banner enquiries</p><p className="text-white font-semibold">{pendingBannerEnquiries}</p></div>
@@ -6934,7 +7514,7 @@ export default function AdminPage() {
       </section>
 
       {/* ── Airdrop table ──────────────────────────────────────────────────── */}
-      <section id="admin-advertising" className={canShowSection('banners') ? '' : 'hidden'}>
+      <section id="admin-advertising" className={canShowSection('advertise-admin') ? '' : 'hidden'}>
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">

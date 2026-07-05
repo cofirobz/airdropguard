@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BadgeCheck, Bot, Eye, UserCheck } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Bot, Eye, ShieldCheck, Sparkles, UserCheck } from 'lucide-react';
 import SEO from '../components/SEO';
 import { supabase } from '../lib/supabase';
 import {
@@ -67,8 +67,23 @@ export default function ArticlesPage() {
     description: 'AirdropGuard educational articles with transparent AI and human verification provenance.',
   }), []);
 
+  const publishedProfiles = useMemo(
+    () => profiles.filter((article) => article.publicationStatus === 'published'),
+    [profiles]
+  );
+
+  const fullyVerifiedCount = useMemo(
+    () => publishedProfiles.filter((article) => article.verificationStatus === 'verified_airdropguard').length,
+    [publishedProfiles]
+  );
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+    <div className="relative mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute left-0 top-10 h-56 w-56 rounded-full bg-cyan-500/10 blur-3xl" />
+        <div className="absolute right-0 top-28 h-72 w-72 rounded-full bg-indigo-500/10 blur-3xl" />
+      </div>
+
       <SEO
         title="Articles"
         description="Security-first crypto education with transparent AI and human verification metadata."
@@ -77,25 +92,46 @@ export default function ArticlesPage() {
         schema={articleSchema}
       />
 
-      <header className="mb-8 rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-200">Knowledge Base</p>
-        <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">Articles</h1>
-        <p className="mt-2 max-w-3xl text-sm text-gray-400">
-          Security-first research with transparent provenance. Every article clearly shows whether it is AI-assisted, human reviewed, or fully verified by AirdropGuard.
-        </p>
+      <header className="mb-8 overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(135deg,rgba(9,18,35,0.95),rgba(18,28,52,0.9))] p-6 sm:p-7">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 rounded-full border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-100">
+              <Sparkles className="h-3.5 w-3.5" />
+              Welcome To Articles
+            </p>
+            <h1 className="mt-3 text-3xl font-black text-white sm:text-4xl">Learn Safely, Move Confidently</h1>
+            <p className="mt-3 text-sm leading-relaxed text-gray-300">
+              Explore practical crypto guides reviewed with a trust-first workflow. Each article shows clear verification metadata so you know what is AI-assisted, human-reviewed, or fully verified.
+            </p>
+          </div>
+          <div className="grid min-w-[240px] grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+              <p className="text-gray-400">Published Articles</p>
+              <p className="mt-1 text-lg font-semibold text-white">{publishedProfiles.length}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+              <p className="text-gray-400">Fully Verified</p>
+              <p className="mt-1 text-lg font-semibold text-emerald-200">{fullyVerifiedCount}</p>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-[11px] text-emerald-100">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          Always verify links before connecting your wallet
+        </div>
       </header>
 
       <section className="grid gap-4">
-        {profiles.map((article) => (
+        {publishedProfiles.map((article) => (
           <Link
             key={article.articleKey}
             to={article.urlPath}
-            className="group block rounded-2xl border border-white/10 bg-white/[0.02] p-5 transition-colors hover:border-cyan-400/30 hover:bg-white/[0.04]"
+            className="group block rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-cyan-400/30 hover:bg-white/[0.06]"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-white group-hover:text-cyan-100">{article.title}</h2>
-                <p className="mt-1 text-sm text-gray-400">Professional educational documentation with trust metadata.</p>
+                <p className="mt-1 text-sm text-gray-400">Clear, practical guidance with transparent trust metadata.</p>
               </div>
               <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium ${verificationStatusTone(article.verificationStatus)}`}>
                 <VerificationIcon status={article.verificationStatus} />
@@ -115,8 +151,19 @@ export default function ArticlesPage() {
               <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5">Reviewed {formatCompactDate(article.reviewedAt)}</span>
               <span className="rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5">Updated {formatCompactDate(article.lastUpdatedAt)}</span>
             </div>
+
+            <div className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-cyan-200 transition-colors group-hover:text-cyan-100">
+              Read article
+              <ArrowRight className="h-3.5 w-3.5" />
+            </div>
           </Link>
         ))}
+
+        {publishedProfiles.length === 0 && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-gray-400">
+            No published articles yet. Once an admin marks an article as published, it will appear here.
+          </div>
+        )}
       </section>
     </div>
   );
