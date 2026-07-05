@@ -5911,10 +5911,12 @@ export default function AdminPage() {
           <button onClick={() => void addCompetitorSource()} className="px-3 py-1.5 rounded-lg border border-fuchsia-500/25 bg-fuchsia-500/10 text-xs text-fuchsia-200">Add Source</button>
           <div className="space-y-2">
             {sourceDashboardRows.map(({ source, scan }) => {
+              const scanStatusMetaMap = COMPETITOR_SOURCE_SCAN_META as Record<string, { label: string; tone: string }>;
+              const healthMetaMap = SOURCE_HEALTH_META as Record<string, { label: string; tone: string }>;
               const scanMeta = checkingCompetitors && source.is_active
                 ? COMPETITOR_SOURCE_SCAN_META.working
-                : COMPETITOR_SOURCE_SCAN_META[scan.status];
-              const healthMeta = SOURCE_HEALTH_META[scan.health];
+                : (scanStatusMetaMap[String(scan.status ?? '')] || COMPETITOR_SOURCE_SCAN_META.none_found);
+              const healthMeta = healthMetaMap[String(scan.health ?? '')] || SOURCE_HEALTH_META.amber;
 
               return (
                 <div key={source.id} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
@@ -5984,8 +5986,10 @@ export default function AdminPage() {
           ) : (
             <div className="space-y-2">
               {prioritizedPendingDiscoveryCandidates.slice(0, 80).map((pending) => {
-                const priorityMeta = DISCOVERY_PRIORITY_META[pending.discoveryPriority];
-                const comparisonMeta = DISCOVERY_COMPARISON_META[pending.comparisonType];
+                const priorityMetaMap = DISCOVERY_PRIORITY_META as Record<string, { label: string; tone: string }>;
+                const comparisonMetaMap = DISCOVERY_COMPARISON_META as Record<string, { label: string; tone: string }>;
+                const priorityMeta = priorityMetaMap[String(pending.discoveryPriority ?? '')] || DISCOVERY_PRIORITY_META.medium;
+                const comparisonMeta = comparisonMetaMap[String(pending.comparisonType ?? '')] || DISCOVERY_COMPARISON_META.new_project;
 
                 return (
                   <div key={pending.id} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
@@ -6061,9 +6065,12 @@ export default function AdminPage() {
           ) : (
             <div className="space-y-2">
               {prioritizedCompetitorOpportunities.slice(0, 50).map(({ opportunity, details, dynamicScore, dynamicPriority, dynamicMentions }) => {
-                const statusMeta = COMPETITOR_STATUS_META[opportunity.status];
-                const comparisonMeta = DISCOVERY_COMPARISON_META[details.comparisonType];
-                const priorityMeta = DISCOVERY_PRIORITY_META[dynamicPriority];
+                const opportunityStatusMetaMap = COMPETITOR_STATUS_META as Record<string, { label: string; tone: string }>;
+                const comparisonMetaMap = DISCOVERY_COMPARISON_META as Record<string, { label: string; tone: string }>;
+                const priorityMetaMap = DISCOVERY_PRIORITY_META as Record<string, { label: string; tone: string }>;
+                const statusMeta = opportunityStatusMetaMap[String(opportunity.status ?? '')] || COMPETITOR_STATUS_META.new;
+                const comparisonMeta = comparisonMetaMap[String(details.comparisonType ?? '')] || DISCOVERY_COMPARISON_META.new_project;
+                const priorityMeta = priorityMetaMap[String(dynamicPriority ?? '')] || DISCOVERY_PRIORITY_META.medium;
                 const canQueue = opportunity.status !== 'queued' && opportunity.status !== 'drafted';
                 const canIgnore = opportunity.status !== 'ignored' && opportunity.status !== 'drafted';
                 const canMarkDuplicate = opportunity.status !== 'duplicate' && opportunity.status !== 'drafted';
@@ -6096,9 +6103,9 @@ export default function AdminPage() {
                       <p>Discovered: {new Date(opportunity.discovered_at).toLocaleString()}</p>
                     </div>
                     <div className="mt-1 grid gap-1 text-[11px] text-gray-500 md:grid-cols-3">
-                      <p>Reason detected: {details.reasonDetected}</p>
-                      <p>Duplicate status: {details.duplicateStatus}</p>
-                      <p>Detected keywords: {details.detectedKeywords.length ? details.detectedKeywords.join(', ') : 'None'}</p>
+                      <p>Reason detected: {details.reasonDetected || 'Not provided'}</p>
+                      <p>Duplicate status: {details.duplicateStatus || 'new'}</p>
+                      <p>Detected keywords: {Array.isArray(details.detectedKeywords) && details.detectedKeywords.length ? details.detectedKeywords.join(', ') : 'None'}</p>
                     </div>
                     {details.listingDate && <p className="mt-1 text-[11px] text-gray-400">Listing date: {details.listingDate}</p>}
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
@@ -6158,7 +6165,8 @@ export default function AdminPage() {
           ) : (
             <div className="space-y-2">
               {discoveryHistoryRows.slice(0, 50).map((row) => {
-                const statusMeta = COMPETITOR_STATUS_META[row.status];
+                const historyStatusMetaMap = COMPETITOR_STATUS_META as Record<string, { label: string; tone: string }>;
+                const statusMeta = historyStatusMetaMap[String(row.status ?? '')] || COMPETITOR_STATUS_META.new;
                 return (
                   <div key={`${row.projectName}-${row.firstDiscovered}`} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
                     <div className="flex flex-wrap items-center justify-between gap-2">
