@@ -354,7 +354,7 @@ type CompetitorOpportunity = {
   created_at: string;
 };
 
-type CompetitorSourceScanStatus = 'never_scanned' | 'source_only' | 'none_found' | 'found' | 'failed';
+type CompetitorSourceScanStatus = 'never_scanned' | 'working' | 'none_found' | 'no_extractable' | 'js_needs_adapter' | 'found' | 'fetch_failed' | 'parser_failed';
 
 type CompetitorSourceScanResult = {
   status: CompetitorSourceScanStatus;
@@ -391,6 +391,8 @@ type DiscoveryCandidate = {
   officialDiscordUrl: string | null;
   fundingInfo: string | null;
   teamInfo: string | null;
+  detectedKeywords: string[];
+  reasonDetected: string;
 };
 
 type DiscoveryExtractionResult = {
@@ -452,9 +454,12 @@ type CompetitorWatchScanResult = {
     | 'timeout'
     | 'no_html'
     | 'javascript_rendered'
+    | 'needs_adapter'
     | 'no_adapter_matched'
     | 'no_cards_found'
+    | 'no_extractable_content'
     | 'all_candidates_rejected'
+    | 'parser_failed'
     | 'fetch_failed';
   outcomeMessage: string;
 };
@@ -709,9 +714,9 @@ function getDiscoveryPriority(score: number): DiscoveryPriority {
 }
 
 function getSourceHealthIndicator(successRate: number, lastStatus: CompetitorSourceScanStatus): 'green' | 'amber' | 'red' {
-  if (lastStatus === 'failed' || successRate < 0.5) return 'red';
-  if (successRate < 0.8) return 'amber';
-  return 'green';
+  if (lastStatus === 'fetch_failed' || lastStatus === 'parser_failed' || successRate < 0.4) return 'red';
+  if (lastStatus === 'found' && successRate >= 0.7) return 'green';
+  return 'amber';
 }
 
 const BLOCKCHAIN_KEYWORDS: Array<{ keyword: string; value: string }> = [
@@ -1180,6 +1185,8 @@ function extractDiscoveryCandidatesFromHtml(
       officialDiscordUrl: officialUrls.discordUrl,
       fundingInfo,
       teamInfo,
+      detectedKeywords: [],
+      reasonDetected: 'Detected by adapter card extraction.',
     });
   }
 
@@ -1220,20 +1227,32 @@ const COMPETITOR_SOURCE_SCAN_META: Record<CompetitorSourceScanStatus, { label: s
     label: 'Never scanned',
     tone: 'border-white/20 bg-white/[0.03] text-gray-300',
   },
-  source_only: {
-    label: 'Source-only detection',
-    tone: 'border-violet-500/30 bg-violet-500/10 text-violet-200',
+  working: {
+    label: 'Working',
+    tone: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200',
   },
   none_found: {
-    label: 'Source scanned - no project opportunities found',
+    label: 'No opportunities found',
     tone: 'border-sky-500/30 bg-sky-500/10 text-sky-200',
   },
+  no_extractable: {
+    label: 'No extractable content',
+    tone: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+  },
+  js_needs_adapter: {
+    label: 'JS-rendered / needs adapter',
+    tone: 'border-violet-500/30 bg-violet-500/10 text-violet-200',
+  },
   found: {
-    label: 'Project opportunities found',
+    label: 'Opportunities found',
     tone: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
   },
-  failed: {
-    label: 'Scan failed',
+  fetch_failed: {
+    label: 'Fetch failed',
+    tone: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
+  },
+  parser_failed: {
+    label: 'Parser failed',
     tone: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
   },
 };
@@ -1316,6 +1335,9 @@ function getOpportunityDiscoveryDetails(opportunity: CompetitorOpportunity): {
   sourceMentions: number;
   discoveryScore: number;
   discoveryPriority: DiscoveryPriority;
+  detectedKeywords: string[];
+  reasonDetected: string;
+  duplicateStatus: 'new' | 'duplicate';
 } {
   const fallback = {
     sourceLabel: 'Unknown source',
@@ -1340,6 +1362,9 @@ function getOpportunityDiscoveryDetails(opportunity: CompetitorOpportunity): {
     sourceMentions: 1,
     discoveryScore: 55,
     discoveryPriority: 'medium' as DiscoveryPriority,
+    detectedKeywords: [],
+    reasonDetected: 'Detected by adapter extraction signals.',
+    duplicateStatus: 'new' as const,
   };
 
   if (!opportunity.notes) return fallback;
@@ -1373,6 +1398,11 @@ function getOpportunityDiscoveryDetails(opportunity: CompetitorOpportunity): {
       discoveryPriority: parsed.discovery_priority === 'high' || parsed.discovery_priority === 'medium' || parsed.discovery_priority === 'low'
         ? parsed.discovery_priority
         : fallback.discoveryPriority,
+      detectedKeywords: Array.isArray(parsed.detected_keywords)
+        ? parsed.detected_keywords.filter((value): value is string => typeof value === 'string' && value.trim().length > 0).slice(0, 8)
+        : fallback.detectedKeywords,
+      reasonDetected: typeof parsed.reason_detected === 'string' && parsed.reason_detected.trim() ? parsed.reason_detected : fallback.reasonDetected,
+      duplicateStatus: parsed.duplicate_status === 'duplicate' ? 'duplicate' : 'new',
     };
   } catch {
     return fallback;
@@ -1613,8 +1643,8 @@ function AirdropFormModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 bg-black/70 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-2xl glass-card p-6 space-y-5 relative mb-12">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-6 sm:p-4 sm:pt-10 bg-black/70 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-2xl glass-card p-4 sm:p-6 space-y-5 relative mb-12 overflow-x-hidden">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-bold text-white">{mode === 'add' ? 'Add New Airdrop' : 'Edit Airdrop'}</h2>
           <button onClick={onClose} aria-label="Close airdrop form" className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
@@ -1622,7 +1652,7 @@ function AirdropFormModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Project Name *</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. LayerZero" className={inp} />
@@ -1633,7 +1663,7 @@ function AirdropFormModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Logo URL</label>
             <input value={form.logo_url} onChange={e => setForm(f => ({ ...f, logo_url: e.target.value }))} placeholder="https://..." className={inp} />
@@ -1644,7 +1674,7 @@ function AirdropFormModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Website</label>
             <input value={form.website_url} onChange={e => setForm(f => ({ ...f, website_url: e.target.value }))} placeholder="https://..." className={inp} />
@@ -1666,7 +1696,7 @@ function AirdropFormModal({
         {/* Trust score hints — used directly by the scorer */}
         <div className="pt-3 border-t border-white/5">
           <p className="text-[10px] text-gray-600 uppercase tracking-wider font-semibold mb-2.5">Trust Score Hints</p>
-          <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div>
               <label className={lbl}>Docs URL</label>
               <input value={form.docs_url} onChange={e => setForm(f => ({ ...f, docs_url: e.target.value }))} placeholder="https://docs.project.io" className={inp} />
@@ -1676,7 +1706,7 @@ function AirdropFormModal({
               <input value={form.github_url} onChange={e => setForm(f => ({ ...f, github_url: e.target.value }))} placeholder="https://github.com/..." className={inp} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div>
               <label className={lbl}>Funding Info</label>
               <input value={form.funding_info} onChange={e => setForm(f => ({ ...f, funding_info: e.target.value }))} placeholder='e.g. "$42M Series A"' className={inp} />
@@ -1798,12 +1828,12 @@ Check eligibility updates`}
           ))}
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-1">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-white border border-white/10 hover:border-white/20 transition-colors">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-1">
+          <button onClick={onClose} className="w-full sm:w-auto min-h-[44px] px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-white border border-white/10 hover:border-white/20 transition-colors">
             Cancel
           </button>
           <button onClick={onSave} disabled={saving || !form.name.trim()}
-            className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-medium bg-neon-purple/15 border border-neon-purple/30 text-neon-purple hover:bg-neon-purple/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-1.5 px-5 py-2 rounded-xl text-sm font-medium bg-neon-purple/15 border border-neon-purple/30 text-neon-purple hover:bg-neon-purple/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'add' ? <Plus className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
             {mode === 'add' ? 'Add Airdrop' : 'Save Changes'}
           </button>
@@ -1876,8 +1906,8 @@ function BannerFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-10 bg-black/70 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-3xl glass-card p-6 space-y-5 relative mb-12">
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-6 sm:p-4 sm:pt-10 bg-black/70 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-3xl glass-card p-4 sm:p-6 space-y-5 relative mb-12 overflow-x-hidden">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-white">{mode === 'add' ? 'Create Banner' : 'Edit Banner'}</h2>
@@ -2326,6 +2356,7 @@ export default function AdminPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [subLoading, setSubLoading] = useState(true);
   const [expandedSub, setExpandedSub] = useState<string | null>(null);
+  const [expandedAirdrop, setExpandedAirdrop] = useState<string | null>(null);
   const [subNotes, setSubNotes] = useState<Record<string, string>>({});
   const [analyzingSub, setAnalyzingSub] = useState<string | null>(null);
 
@@ -2427,7 +2458,7 @@ export default function AdminPage() {
   const [competitorNotConfigured, setCompetitorNotConfigured] = useState(false);
   const [competitorSourceScanResults, setCompetitorSourceScanResults] = useState<Record<string, CompetitorSourceScanResult>>({});
   const [competitorScanDebugResults, setCompetitorScanDebugResults] = useState<Record<string, CompetitorScanDebugResult>>({});
-  const [previewScanModeEnabled, setPreviewScanModeEnabled] = useState(true);
+  const [previewScanModeEnabled, setPreviewScanModeEnabled] = useState(false);
   const [pendingDiscoveryCandidates, setPendingDiscoveryCandidates] = useState<PendingDiscoveryCandidate[]>([]);
   const [checkingCompetitors, setCheckingCompetitors] = useState(false);
   const [newSourceName, setNewSourceName] = useState('');
@@ -2858,14 +2889,14 @@ export default function AdminPage() {
           status: 'none_found',
           lastCheckedAt: source.last_checked_at,
           totalScans: 1,
-          successfulScans: 1,
+          successfulScans: 0,
           opportunitiesFound: 0,
           newProjects: 0,
           duplicateProjects: 0,
           failedExtractions: 0,
           durationMs: null,
-          lastSuccessfulScan: source.last_checked_at,
-          successRate: 1,
+          lastSuccessfulScan: null,
+          successRate: 0,
           health: 'amber',
           note: 'Only source-level signals detected in recent scans.',
         };
@@ -3325,14 +3356,14 @@ export default function AdminPage() {
         status: source.last_checked_at ? 'none_found' : 'never_scanned',
         lastCheckedAt: source.last_checked_at,
         totalScans: source.last_checked_at ? 1 : 0,
-        successfulScans: source.last_checked_at ? 1 : 0,
+        successfulScans: 0,
         opportunitiesFound: 0,
         newProjects: 0,
         duplicateProjects: 0,
         failedExtractions: 0,
         durationMs: null,
-        lastSuccessfulScan: source.last_checked_at,
-        successRate: source.last_checked_at ? 1 : 0,
+        lastSuccessfulScan: null,
+        successRate: 0,
         health: source.last_checked_at ? 'amber' : 'red',
         note: source.last_checked_at ? 'No recent project opportunities recorded.' : 'No scan recorded yet.',
       } satisfies CompetitorSourceScanResult;
@@ -3403,7 +3434,7 @@ export default function AdminPage() {
 
     const successfulScansToday = sourceDashboardRows.filter((row) => {
       if (!row.scan.lastCheckedAt) return false;
-      return new Date(row.scan.lastCheckedAt).getTime() >= startOfToday && row.scan.status !== 'failed';
+      return new Date(row.scan.lastCheckedAt).getTime() >= startOfToday && row.scan.status === 'found';
     }).length;
 
     const newProjectsFoundToday = prioritizedCompetitorOpportunities.filter((item) => {
@@ -3509,8 +3540,10 @@ export default function AdminPage() {
       let discoveredProjects = 0;
       let duplicateDetections = 0;
       let previewCandidatesAdded = 0;
-      let noProjectSources = 0;
-      let failedScans = 0;
+      let noOpportunityScans = 0;
+      let jsNeedsAdapterScans = 0;
+      let fetchFailedScans = 0;
+      let parserFailedScans = 0;
       const scanUpdates: Record<string, CompetitorSourceScanResult> = {};
       const debugUpdates: Record<string, CompetitorScanDebugResult> = {};
       const pendingAdds: PendingDiscoveryCandidate[] = [];
@@ -3579,12 +3612,19 @@ export default function AdminPage() {
         const previousScan = competitorSourceScanResults[source.id];
         const totalScans = (previousScan?.totalScans ?? 0) + 1;
         const previousSuccessfulScans = previousScan?.successfulScans ?? 0;
-        const isFailedStatus = result.finalOutcome === 'blocked_by_cloudflare'
+        const hasValidCandidates = result.candidatesExtracted.length > 0;
+        const isFetchFailure = result.finalOutcome === 'blocked_by_cloudflare'
           || result.finalOutcome === 'http_403'
           || result.finalOutcome === 'http_429'
           || result.finalOutcome === 'timeout'
-          || result.finalOutcome === 'fetch_failed';
-        const successfulScans = isFailedStatus ? previousSuccessfulScans : previousSuccessfulScans + 1;
+          || result.finalOutcome === 'fetch_failed'
+          || result.finalOutcome === 'no_html';
+        const isParserFailure = result.finalOutcome === 'parser_failed' || result.finalOutcome === 'all_candidates_rejected';
+        const isJsNeedsAdapter = result.finalOutcome === 'javascript_rendered'
+          || result.finalOutcome === 'needs_adapter'
+          || result.finalOutcome === 'no_adapter_matched';
+        const isNoExtractableContent = result.finalOutcome === 'no_cards_found' || result.finalOutcome === 'no_extractable_content';
+        const successfulScans = hasValidCandidates ? previousSuccessfulScans + 1 : previousSuccessfulScans;
         const successRate = totalScans > 0 ? successfulScans / totalScans : 0;
 
         await supabase
@@ -3605,11 +3645,25 @@ export default function AdminPage() {
         };
 
         if (result.candidatesExtracted.length === 0) {
-          if (isFailedStatus) failedScans += 1;
-          else noProjectSources += 1;
+          let status: CompetitorSourceScanStatus = 'none_found';
+          if (isFetchFailure) {
+            status = 'fetch_failed';
+            fetchFailedScans += 1;
+          } else if (isParserFailure) {
+            status = 'parser_failed';
+            parserFailedScans += 1;
+          } else if (isJsNeedsAdapter) {
+            status = 'js_needs_adapter';
+            jsNeedsAdapterScans += 1;
+          } else if (isNoExtractableContent) {
+            status = 'no_extractable';
+            noOpportunityScans += 1;
+          } else {
+            noOpportunityScans += 1;
+          }
 
           scanUpdates[source.id] = {
-            status: isFailedStatus ? 'failed' : 'none_found',
+            status,
             lastCheckedAt: result.checkedAt,
             totalScans,
             successfulScans,
@@ -3618,10 +3672,10 @@ export default function AdminPage() {
             duplicateProjects: 0,
             failedExtractions: result.candidatesRejected,
             durationMs: Date.now() - scanStartedAt,
-            lastSuccessfulScan: isFailedStatus ? previousScan?.lastSuccessfulScan || null : result.checkedAt,
+            lastSuccessfulScan: previousScan?.lastSuccessfulScan || null,
             successRate,
-            health: getSourceHealthIndicator(successRate, isFailedStatus ? 'failed' : 'none_found'),
-            note: `No projects extracted from this source. Reason: ${result.outcomeMessage}`,
+            health: getSourceHealthIndicator(successRate, status),
+            note: result.outcomeMessage,
           };
           continue;
         }
@@ -3699,6 +3753,9 @@ export default function AdminPage() {
             source_mentions: sourceMentions,
             discovery_score: discoveryScore,
             discovery_priority: discoveryPriority,
+            detected_keywords: candidate.detectedKeywords,
+            reason_detected: candidate.reasonDetected,
+            duplicate_status: nextStatus === 'duplicate' ? 'duplicate' : 'new',
           };
 
           if (previewScanModeEnabled) {
@@ -3770,7 +3827,7 @@ export default function AdminPage() {
         }
 
         if (foundForSource === 0) {
-          noProjectSources += 1;
+          noOpportunityScans += 1;
           const mergedRejected = result.candidatesRejected + (localRejections.already_tracked || 0) + (localRejections.already_in_preview || 0);
           scanUpdates[source.id] = {
             status: 'none_found',
@@ -3785,7 +3842,7 @@ export default function AdminPage() {
             lastSuccessfulScan: result.checkedAt,
             successRate,
             health: getSourceHealthIndicator(successRate, 'none_found'),
-            note: `No projects extracted from this source. Reason: ${result.outcomeMessage}`,
+            note: 'Valid candidates extracted, but all were already tracked or already in preview.',
           };
 
           debugUpdates[source.id] = {
@@ -3835,42 +3892,44 @@ export default function AdminPage() {
           title: 'New projects found',
           message: `${discoveredProjects} project${discoveredProjects > 1 ? 's' : ''} added to discovery queue.`,
           severity: 'info',
-          context: { discoveredProjects, duplicateDetections, noProjectSources },
+          context: { discoveredProjects, duplicateDetections, noOpportunityScans, jsNeedsAdapterScans, fetchFailedScans, parserFailedScans },
         });
       }
 
-      if (noProjectSources > 0) {
+      if (noOpportunityScans > 0 || jsNeedsAdapterScans > 0) {
         await createAdminNotification({
           notification_type: 'competitor_source_only',
-          title: 'No projects extracted',
-          message: `${noProjectSources} source${noProjectSources > 1 ? 's' : ''} produced no project opportunities.`,
+          title: 'No opportunities extracted',
+          message: `${noOpportunityScans} source${noOpportunityScans === 1 ? '' : 's'} had no opportunities. ${jsNeedsAdapterScans} source${jsNeedsAdapterScans === 1 ? '' : 's'} need adapter/runtime support.`,
           severity: 'warning',
-          context: { noProjectSources },
+          context: { noOpportunityScans, jsNeedsAdapterScans },
         });
       }
 
-      if (failedScans > 0) {
+      if (fetchFailedScans > 0 || parserFailedScans > 0) {
         await createAdminNotification({
           notification_type: 'competitor_scan_failed',
           title: 'Some source scans failed',
-          message: `${failedScans} source scan${failedScans > 1 ? 's' : ''} failed. Review source Last Scan Result notes.`,
+          message: `${fetchFailedScans} fetch failure${fetchFailedScans === 1 ? '' : 's'} and ${parserFailedScans} parser failure${parserFailedScans === 1 ? '' : 's'} detected. Review source Last Scan Result notes.`,
           severity: 'error',
-          context: { failedScans },
+          context: { fetchFailedScans, parserFailedScans },
         });
       }
 
       if (previewScanModeEnabled && previewCandidatesAdded > 0) {
         showToast(`${previewCandidatesAdded} scan candidates extracted for manual approval.`);
-      } else if (discoveredProjects > 0 && noProjectSources > 0) {
-        showToast(`${discoveredProjects} new projects found. ${duplicateDetections} duplicate detections. ${noProjectSources} sources had no extractable projects.`);
+      } else if (discoveredProjects > 0 && (noOpportunityScans > 0 || jsNeedsAdapterScans > 0 || fetchFailedScans > 0 || parserFailedScans > 0)) {
+        showToast(`${discoveredProjects} new projects found. ${duplicateDetections} duplicate detections. ${noOpportunityScans} no-opportunity, ${jsNeedsAdapterScans} needs-adapter, ${fetchFailedScans} fetch-failed, ${parserFailedScans} parser-failed sources.`);
       } else if (discoveredProjects > 0) {
         showToast(`${discoveredProjects} new projects found. ${duplicateDetections} duplicate detections.`);
-      } else if (noProjectSources > 0) {
-        showToast('No projects extracted from this source.');
-      } else if (failedScans > 0) {
-        showToast(`${failedScans} source scan${failedScans > 1 ? 's' : ''} failed. Review Last Scan Result.`,'error');
+      } else if (jsNeedsAdapterScans > 0) {
+        showToast(`${jsNeedsAdapterScans} source${jsNeedsAdapterScans === 1 ? '' : 's'} are JS-rendered or need adapter support.`);
+      } else if (noOpportunityScans > 0) {
+        showToast(`No opportunities extracted from ${noOpportunityScans} source${noOpportunityScans === 1 ? '' : 's'}.`);
+      } else if (fetchFailedScans > 0 || parserFailedScans > 0) {
+        showToast(`${fetchFailedScans} fetch failures and ${parserFailedScans} parser failures detected. Review Last Scan Result.`,'error');
       } else {
-        showToast('No projects extracted from this source.');
+        showToast('No new projects extracted this run.');
       }
     } catch (error) {
       const exact = describeError(error);
@@ -3957,6 +4016,9 @@ export default function AdminPage() {
       source_mentions: pending.sourceMentions,
       discovery_score: pending.discoveryScore,
       discovery_priority: pending.discoveryPriority,
+      detected_keywords: pending.candidate.detectedKeywords,
+      reason_detected: pending.candidate.reasonDetected,
+      duplicate_status: status === 'duplicate' ? 'duplicate' : 'new',
     };
 
     try {
@@ -4241,6 +4303,63 @@ export default function AdminPage() {
     setEditingId(a.id);
     setModalMode('edit');
   };
+
+  const moderateAirdrop = useCallback(async (
+    airdrop: Airdrop,
+    decision: 'approve' | 'reject' | 'blacklist',
+  ) => {
+    const actionLabel = decision === 'approve'
+      ? `Approve airdrop ${airdrop.name}`
+      : decision === 'reject'
+      ? `Reject airdrop ${airdrop.name}`
+      : `Blacklist airdrop ${airdrop.name}`;
+
+    const reviewNotes = await promptHumanVerificationNotes(actionLabel);
+    if (!reviewNotes) return;
+
+    const patch: { listing_state: Airdrop['listing_state']; blacklist_reason: string | null; published: boolean; human_verified: boolean } = {
+      listing_state: decision === 'approve' ? 'verified' : 'scam_alert',
+      blacklist_reason: decision === 'approve' ? null : reviewNotes,
+      published: decision === 'approve' ? airdrop.published : false,
+      human_verified: decision === 'approve',
+    };
+
+    const { error } = await supabase
+      .from('airdrops')
+      .update(patch)
+      .eq('id', airdrop.id);
+
+    if (error) {
+      showToast(`Unable to ${decision} airdrop: ${describeError(error)}`, 'error');
+      return;
+    }
+
+    setAirdrops((prev) => prev.map((row) => (
+      row.id === airdrop.id
+        ? {
+            ...row,
+            listing_state: patch.listing_state,
+            blacklist_reason: patch.blacklist_reason,
+            published: patch.published,
+            human_verified: patch.human_verified,
+          }
+        : row
+    )));
+
+    await logAdminAudit({
+      actionTaken: actionLabel,
+      aiRecommendation: `Trust ${airdrop.trust_score ?? 'unknown'} | Risk ${airdrop.risk_level}`,
+      finalDecision: decision,
+      notes: reviewNotes,
+      context: {
+        airdropId: airdrop.id,
+        projectName: airdrop.name,
+      },
+    }, { source: 'airdrop_moderation_action' });
+
+    fetchStats();
+    showToast(`Airdrop ${decision}d successfully`);
+  }, [describeError, fetchStats, logAdminAudit, promptHumanVerificationNotes, showToast]);
 
   const saveTasksForAirdrop = async (airdropId: string, tasksText: string) => {
     console.info('[Admin][AirdropSave] Updating tasks', {
@@ -5009,28 +5128,28 @@ export default function AdminPage() {
   if (!isAdmin) return null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8 overflow-x-hidden pb-24 lg:pb-8">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
           <p className="text-gray-400 text-sm mt-1">{airdrops.length} airdrops total</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={openAdd}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neon-purple/10 border border-neon-purple/25 text-neon-purple hover:bg-neon-purple/20 transition-colors text-sm font-medium">
+            className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-neon-purple/10 border border-neon-purple/25 text-neon-purple hover:bg-neon-purple/20 transition-colors text-sm font-medium">
             <Plus className="w-4 h-4" /> Add Airdrop
           </button>
           <Link to="/admin/airdrop-import"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neon-blue/10 border border-neon-blue/25 text-neon-blue hover:bg-neon-blue/20 transition-colors text-sm font-medium">
+            className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-neon-blue/10 border border-neon-blue/25 text-neon-blue hover:bg-neon-blue/20 transition-colors text-sm font-medium">
             <Download className="w-4 h-4" /> Import
           </Link>
           <button
             onClick={refreshAllAnalysis}
             disabled={refreshingAll || airdrops.length === 0}
             title="Refresh AI analysis for all airdrops"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 hover:bg-white/5 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-white/10 text-gray-400 hover:text-white hover:border-white/20 hover:bg-white/5 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {refreshingAll
               ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -5039,19 +5158,19 @@ export default function AdminPage() {
           </button>
           <button onClick={() => { fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); }}
             aria-label="Refresh admin data"
-            className="p-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
+            className="min-h-[44px] px-3 py-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
           </button>
           <button
             onClick={async () => { await signOut(); navigate('/'); }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-500/20 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-sm"
+            className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-rose-500/20 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-sm"
             title="Log out"
           >
             <LogOut className="w-4 h-4" />
             Logout
           </button>
           {lastEnrichmentStats && (
-            <div className="flex items-center gap-2 text-[10px] text-gray-500 border-l border-white/10 pl-3 ml-1">
+            <div className="w-full lg:w-auto flex flex-wrap items-center gap-2 text-[10px] text-gray-500 border-l border-white/10 pl-3 ml-1">
               <span className="text-gray-400 font-medium">Last enrichment:</span>
               <span className={lastEnrichmentStats.websites_analyzed ? 'text-sky-400' : 'text-gray-600'}>Sites {lastEnrichmentStats.websites_analyzed}</span>
               <span className={lastEnrichmentStats.docs_found ? 'text-emerald-400' : 'text-gray-600'}>Docs {lastEnrichmentStats.docs_found}</span>
@@ -5792,7 +5911,9 @@ export default function AdminPage() {
           <button onClick={() => void addCompetitorSource()} className="px-3 py-1.5 rounded-lg border border-fuchsia-500/25 bg-fuchsia-500/10 text-xs text-fuchsia-200">Add Source</button>
           <div className="space-y-2">
             {sourceDashboardRows.map(({ source, scan }) => {
-              const scanMeta = COMPETITOR_SOURCE_SCAN_META[scan.status];
+              const scanMeta = checkingCompetitors && source.is_active
+                ? COMPETITOR_SOURCE_SCAN_META.working
+                : COMPETITOR_SOURCE_SCAN_META[scan.status];
               const healthMeta = SOURCE_HEALTH_META[scan.health];
 
               return (
@@ -5974,6 +6095,11 @@ export default function AdminPage() {
                       <p>Why new: {details.whyNew}</p>
                       <p>Discovered: {new Date(opportunity.discovered_at).toLocaleString()}</p>
                     </div>
+                    <div className="mt-1 grid gap-1 text-[11px] text-gray-500 md:grid-cols-3">
+                      <p>Reason detected: {details.reasonDetected}</p>
+                      <p>Duplicate status: {details.duplicateStatus}</p>
+                      <p>Detected keywords: {details.detectedKeywords.length ? details.detectedKeywords.join(', ') : 'None'}</p>
+                    </div>
                     {details.listingDate && <p className="mt-1 text-[11px] text-gray-400">Listing date: {details.listingDate}</p>}
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
                       <span>Docs: {details.officialDocsUrl ? 'Yes' : 'No'}</span>
@@ -6117,7 +6243,21 @@ export default function AdminPage() {
           <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">Premium users</p><p className="text-white font-semibold">{premiumUsersCount}</p></div>
           <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">Latest signups</p><p className="text-white font-semibold">{opsUsers.length}</p></div>
         </div>
-        <div className="glass-card overflow-x-auto">
+        <div className="space-y-2 md:hidden">
+          {(usersLoading ? [] : filteredUsers.slice(0, 20)).map((u) => (
+            <article key={`user-mobile-${u.id}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
+              <p className="font-medium text-white break-all">{u.email}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-gray-400">
+                <span>Plan: <span className="capitalize text-gray-300">{u.plan}</span></span>
+                <span>Created: {new Date(u.createdAt).toLocaleDateString()}</span>
+                <span className="col-span-2">Last seen: {new Date(u.lastSeenAt).toLocaleDateString()}</span>
+              </div>
+            </article>
+          ))}
+          {usersLoading && <p className="px-3 py-2 text-xs text-gray-500">Loading users...</p>}
+        </div>
+
+        <div className="glass-card overflow-x-auto hidden md:block">
           <table className="w-full text-xs min-w-[680px]">
             <thead>
               <tr className="border-b border-white/10">
@@ -6351,7 +6491,40 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="glass-card overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {banners.map((banner) => {
+            const effectiveStatus = deriveBannerStatus(banner.status, banner.startDate, banner.endDate);
+            const displayStatus = getBannerDisplayStatus(banner.status, banner.startDate, banner.endDate);
+            return (
+              <article key={`banner-mobile-${banner.id}`} className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white truncate">{banner.advertiserName}</p>
+                    <p className="text-[11px] text-gray-500 mt-1 break-all">{banner.destinationUrl}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+                      <span className="rounded-full border border-white/15 bg-white/[0.04] px-2 py-0.5 text-gray-300">{banner.placement}</span>
+                      <span className={`rounded-full border px-2 py-0.5 ${getBannerDisplayClass(displayStatus)}`}>{displayStatus}</span>
+                      <span className={`rounded-full border px-2 py-0.5 ${getPaymentStateClass(banner.paymentState)}`}>{banner.paymentState}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-gray-400">
+                  <div>Start: {banner.startDate || '—'}</div>
+                  <div>End: {banner.endDate || '—'}</div>
+                  <div>Status: {effectiveStatus}</div>
+                  <div>Next: {getBannerNextAction(effectiveStatus)}</div>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <button onClick={() => setPreviewBannerId(previewBannerId === banner.id ? null : banner.id)} className="min-h-[42px] rounded-xl border border-white/20 bg-white/[0.04] text-xs text-gray-200">Preview</button>
+                  <button onClick={() => openEditBanner(banner)} className="min-h-[42px] rounded-xl border border-sky-500/25 bg-sky-500/10 text-xs text-sky-200">Edit</button>
+                  <button onClick={() => deleteBanner(banner.id)} className="min-h-[42px] rounded-xl border border-rose-500/25 bg-rose-500/10 text-xs text-rose-200">Delete</button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="glass-card overflow-x-auto hidden md:block">
           <table className="w-full text-sm min-w-[1080px]">
             <thead>
               <tr className="border-b border-white/5">
@@ -6516,7 +6689,71 @@ export default function AdminPage() {
 
       <section id="admin-airdrops" className={canShowSection('airdrops') ? '' : 'hidden'}>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Airdrops</h2>
-        <div className="glass-card overflow-x-auto">
+        <div className="space-y-3 md:hidden mb-3">
+          {airdrops.map((a) => {
+            const isOpen = expandedAirdrop === a.id;
+            const riskCls = a.risk_level === 'Low' ? 'text-emerald-400' : a.risk_level === 'High' ? 'text-rose-400' : 'text-amber-400';
+            const scoreCls = a.trust_score == null ? 'text-gray-500' : a.trust_score >= 75 ? 'text-emerald-400' : a.trust_score >= 50 ? 'text-amber-400' : 'text-rose-400';
+            return (
+              <article key={a.id} className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white truncate">{a.name}</p>
+                    <p className="text-[11px] text-gray-500 mt-1">State: {a.listing_state} · {a.published ? 'Published' : 'Draft'}</p>
+                    <div className="mt-1 flex items-center gap-2 text-[11px]">
+                      <span className={scoreCls}>Trust {a.trust_score ?? '—'}</span>
+                      <span className={riskCls}>Risk {a.risk_level}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => setExpandedAirdrop(isOpen ? null : a.id)} className="min-h-[40px] px-3 rounded-lg border border-white/10 text-xs text-gray-300">
+                    {isOpen ? 'Hide' : 'Open'}
+                  </button>
+                </div>
+
+                {isOpen && (
+                  <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
+                    <p className="text-xs text-gray-400 leading-relaxed">{a.ai_summary || 'No AI summary yet. Run AI analysis to populate.'}</p>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">AI analysis: {a.last_analyzed_at ? 'Available' : 'Not run'}</div>
+                      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">Reviewer notes: {a.blacklist_reason ? 'Available' : 'None'}</div>
+                    </div>
+                    {a.blacklist_reason && <p className="text-[11px] text-amber-300">Notes: {a.blacklist_reason}</p>}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => void openEdit(a)} className="min-h-[42px] rounded-xl border border-sky-500/25 bg-sky-500/10 text-xs text-sky-200">Edit</button>
+                      <button onClick={() => runAnalysis(a, true)} className="min-h-[42px] rounded-xl border border-neon-purple/25 bg-neon-purple/10 text-xs text-neon-purple">Run AI</button>
+                      <button onClick={() => void moderateAirdrop(a, 'approve')} className="min-h-[42px] rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-200">Approve</button>
+                      <button onClick={() => void moderateAirdrop(a, 'reject')} className="min-h-[42px] rounded-xl border border-amber-500/25 bg-amber-500/10 text-xs text-amber-200">Reject</button>
+                      <button onClick={() => void moderateAirdrop(a, 'blacklist')} className="min-h-[42px] rounded-xl border border-rose-500/25 bg-rose-500/10 text-xs text-rose-200">Blacklist</button>
+                      <button onClick={() => setDeletingAirdrop(a)} className="min-h-[42px] rounded-xl border border-rose-500/25 bg-rose-500/10 text-xs text-rose-200">Delete</button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={async () => {
+                          const patch = { published: !a.published, human_verified: !a.published ? true : a.human_verified };
+                          const { error } = await supabase.from('airdrops').update(patch).eq('id', a.id);
+                          if (error) {
+                            showToast(`Unable to ${a.published ? 'unpublish' : 'publish'}: ${describeError(error)}`, 'error');
+                            return;
+                          }
+                          setAirdrops(prev => prev.map(x => x.id === a.id ? { ...x, ...patch } : x));
+                          fetchStats();
+                          showToast(a.published ? 'Airdrop unpublished' : 'Airdrop published');
+                        }}
+                        className="min-h-[42px] rounded-xl border border-white/20 bg-white/[0.04] text-xs text-gray-200"
+                      >
+                        {a.published ? 'Unpublish' : 'Publish'}
+                      </button>
+                      <button onClick={() => window.open(`/airdrop/${a.slug}`, '_blank', 'noopener,noreferrer')} className="min-h-[42px] rounded-xl border border-white/20 bg-white/[0.04] text-xs text-gray-200">Open Listing</button>
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="glass-card overflow-x-auto hidden md:block">
           <table className="w-full text-sm min-w-[680px]">
             <thead>
               <tr className="border-b border-white/5">
@@ -6651,6 +6888,22 @@ export default function AdminPage() {
                         <button onClick={() => openEdit(a)} title="Edit"
                           className="p-1.5 rounded-lg hover:bg-sky-500/10 text-gray-500 hover:text-sky-400 transition-colors">
                           <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => moderateAirdrop(a, 'approve')} title="Approve"
+                          className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-gray-500 hover:text-emerald-400 transition-colors">
+                          <CheckCheck className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => moderateAirdrop(a, 'reject')} title="Reject"
+                          className="p-1.5 rounded-lg hover:bg-amber-500/10 text-gray-500 hover:text-amber-400 transition-colors">
+                          <Inbox className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => moderateAirdrop(a, 'blacklist')} title="Blacklist"
+                          className="p-1.5 rounded-lg hover:bg-rose-500/10 text-gray-500 hover:text-rose-400 transition-colors">
+                          <AlertTriangle className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => window.open(`/airdrop/${a.slug}`, '_blank', 'noopener,noreferrer')} title="Open listing"
+                          className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors">
+                          <ExternalLink className="w-4 h-4" />
                         </button>
                         {/* Delete */}
                         <button onClick={() => setDeletingAirdrop(a)} title="Delete"
@@ -7060,12 +7313,12 @@ export default function AdminPage() {
 
       <div className="lg:hidden fixed bottom-3 inset-x-3 z-40">
         <div className="rounded-2xl border border-white/10 bg-dark-900/90 backdrop-blur-md p-2 shadow-xl">
-          <div className="flex gap-2 overflow-x-auto pb-0.5">
+          <div className="grid grid-cols-2 gap-2">
             {adminNavItems.map((item) => (
               <button
                 key={`mobile-nav-${item.id}`}
                 onClick={() => setAdminView(item.id)}
-                className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors min-h-[42px] ${adminView === item.id ? 'border-cyan-400/40 bg-cyan-500/12 text-cyan-100' : 'border-white/10 bg-dark-900/60 text-gray-300 hover:border-white/20 hover:text-white'}`}
+                className={`rounded-xl border px-3 py-2 text-[11px] font-semibold transition-colors min-h-[44px] ${adminView === item.id ? 'border-cyan-400/40 bg-cyan-500/12 text-cyan-100' : 'border-white/10 bg-dark-900/60 text-gray-300 hover:border-white/20 hover:text-white'}`}
               >
                 {item.label}
               </button>

@@ -30,6 +30,8 @@ type DiscoveryCandidate = {
   officialDiscordUrl: string | null;
   fundingInfo: string | null;
   teamInfo: string | null;
+  detectedKeywords: string[];
+  reasonDetected: string;
 };
 
 type DiscoveryExtractionResult = {
@@ -60,9 +62,12 @@ type ScanResult = {
     | "timeout"
     | "no_html"
     | "javascript_rendered"
+    | "needs_adapter"
     | "no_adapter_matched"
     | "no_cards_found"
+    | "no_extractable_content"
     | "all_candidates_rejected"
+    | "parser_failed"
     | "fetch_failed";
   outcomeMessage: string;
 };
@@ -182,6 +187,27 @@ const CATEGORY_KEYWORDS: Array<{ keyword: string; value: string }> = [
   { keyword: "layer 2", value: "Layer2" },
   { keyword: "wallet", value: "Wallet" },
   { keyword: "dao", value: "DAO" },
+];
+
+const DISCOVERY_KEYWORD_SIGNALS = [
+  "airdrop",
+  "quest",
+  "campaign",
+  "reward",
+  "rewards",
+  "points",
+  "testnet",
+  "mainnet",
+  "retroactive",
+  "whitelist",
+  "token",
+  "defi",
+  "nft",
+  "layer2",
+  "bridge",
+  "staking",
+  "referral",
+  "invite",
 ];
 
 type AdapterParserRule = {
@@ -399,6 +425,12 @@ function extractOfficialUrlsFromSnippet(snippetHtml: string, sourceUrl: string):
   return { docsUrl, githubUrl, xUrl, discordUrl };
 }
 
+function detectKeywordsFromText(text: string): string[] {
+  const lowered = text.toLowerCase();
+  const matched = DISCOVERY_KEYWORD_SIGNALS.filter((keyword) => lowered.includes(keyword));
+  return matched.slice(0, 8);
+}
+
 function inferFundingFromText(text: string): string | null {
   const normalized = text.replace(/\s+/g, " ").trim();
   const fundingMatch = normalized.match(/\b(raised|funded|seed|series\s+[a-z]|backed\s+by)\b[^.\n]{0,120}/i);
@@ -597,12 +629,237 @@ function extractDiscoveryCandidatesFromHtml(html: string, source: SourceInput, a
       officialDiscordUrl: officialUrls.discordUrl,
       fundingInfo,
       teamInfo,
+      detectedKeywords: detectKeywordsFromText(`${projectName} ${shortDescription || ""} ${fullCardText}`),
+      reasonDetected: `Matched listing link pattern from ${adapter.label} adapter and extracted project card signals.`,
     });
   }
 
   return {
     candidates: found,
     cardsFound: listingAnchors,
+    candidatesRejected: rejectedCount,
+    rejectedByReason,
+    rejectionSamples,
+  };
+}
+
+function dedupeCandidates(candidates: DiscoveryCandidate[]): DiscoveryCandidate[] {
+  const seen = new Set<string>();
+  const result: DiscoveryCandidate[] = [];
+
+  for (const candidate of candidates) {
+    const key = `${normalizeProjectName(candidate.projectName)}::${candidate.listingUrl}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(candidate);
+  }
+
+  return result;
+}
+
+function mergeReasonMaps(a: Record<string, number>, b: Record<string, number>): Record<string, number> {
+  const merged: Record<string, number> = { ...a };
+  Object.entries(b).forEach(([key, value]) => {
+    merged[key] = (merged[key] || 0) + value;
+  });
+  return merged;
+}
+
+function extractFallbackCandidatesFromHtml(html: string, source: SourceInput, adapter: SourceAdapter): DiscoveryExtractionResult {
+  const found: DiscoveryCandidate[] = [];
+  let rejectedCount = 0;
+  const rejectedByReason: Record<string, number> = {};
+  const rejectionSamples: string[] = [];
+
+  const reject = (reason: string, sample?: string | null) => {
+    rejectedCount += 1;
+    rejectedByReason[reason] = (rejectedByReason[reason] || 0) + 1;
+    if (sample && rejectionSamples.length < 8) {
+      rejectionSamples.push(`${reason}: ${sample.slice(0, 120)}`);
+    }
+  };
+
+  const addCandidate = (input: {
+    rawName: string | null;
+    listingUrl: string;
+    projectUrl: string | null;
+    reasonDetected: string;
+    sourceText: string;
+    shortDescription?: string | null;
+    listingDate?: string | null;
+  }) => {
+    const projectName = sanitizeProjectCandidate(input.rawName);
+    if (!projectName) {
+      reject("fallback_invalid_name", input.rawName);
+      return;
+    }
+    if (isGenericOpportunityName(projectName)) {
+      reject("fallback_generic_name", projectName);
+      return;
+    }
+    if (!isProjectListingUrl(input.listingUrl, adapter)) {
+      reject("fallback_not_listing_url", input.listingUrl);
+      return;
+    }
+
+    const fullText = `${projectName} ${input.shortDescription || ""} ${input.sourceText}`;
+    const officialUrls = extractOfficialUrlsFromSnippet(input.sourceText, source.source_url);
+    const blockchain = inferBlockchainFromText(fullText);
+    const category = inferCategoryFromText(fullText);
+
+    found.push({
+      projectName,
+      projectUrl: input.projectUrl,
+      listingUrl: input.listingUrl,
+      blockchain,
+      category,
+      shortDescription: input.shortDescription || null,
+      listingDate: input.listingDate || null,
+      confidence: input.projectUrl || input.shortDescription ? "medium" : "low",
+      sourceLabel: adapter.label,
+      officialDocsUrl: officialUrls.docsUrl,
+      githubUrl: officialUrls.githubUrl,
+      officialXUrl: officialUrls.xUrl,
+      officialDiscordUrl: officialUrls.discordUrl,
+      fundingInfo: inferFundingFromText(fullText),
+      teamInfo: inferTeamFromText(fullText),
+      detectedKeywords: detectKeywordsFromText(fullText),
+      reasonDetected: input.reasonDetected,
+    });
+  };
+
+  const pageTitle = html.match(/<title[^>]*>([\s\S]{0,300}?)<\/title>/i)?.[1] ? stripHtml(html.match(/<title[^>]*>([\s\S]{0,300}?)<\/title>/i)?.[1] || "") : "";
+  const metaDescription = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]{0,400}?)["'][^>]*>/i)?.[1]
+    || html.match(/<meta[^>]+content=["']([\s\S]{0,400}?)["'][^>]+name=["']description["'][^>]*>/i)?.[1]
+    || "";
+  const headings = Array.from(html.matchAll(/<h[1-3][^>]*>([\s\S]{0,220}?)<\/h[1-3]>/gi))
+    .map((m) => stripHtml(m[1] || ""))
+    .filter(Boolean)
+    .slice(0, 20);
+
+  const pageContext = `${pageTitle} ${metaDescription} ${headings.join(" ")}`;
+
+  let fallbackCardsFound = 0;
+
+  for (const match of html.matchAll(/<a\s([^>]{0,1800})>([\s\S]{0,600}?)<\/a>/gi)) {
+    const attrs = match[1] || "";
+    const innerHtml = match[2] || "";
+    const hrefRaw = attrs.match(/href\s*=\s*["']([^"']+)["']/i)?.[1] || "";
+    if (!hrefRaw) continue;
+
+    let listingUrl: string;
+    try {
+      listingUrl = new URL(hrefRaw, source.source_url).toString();
+    } catch {
+      continue;
+    }
+
+    if (!isProjectListingUrl(listingUrl, adapter)) continue;
+    fallbackCardsFound += 1;
+
+    const titleAttr = attrs.match(/title\s*=\s*["']([^"']+)["']/i)?.[1] || null;
+    const ariaLabel = attrs.match(/aria-label\s*=\s*["']([^"']+)["']/i)?.[1] || null;
+    const anchorText = stripHtml(innerHtml);
+    const slugFallback = (() => {
+      try {
+        const pathParts = new URL(listingUrl).pathname.split("/").filter(Boolean);
+        return pathParts.length > 0 ? pathParts[pathParts.length - 1].replace(/[\-_]+/g, " ") : null;
+      } catch {
+        return null;
+      }
+    })();
+
+    addCandidate({
+      rawName: pickTextContent(titleAttr, ariaLabel, anchorText, slugFallback),
+      listingUrl,
+      projectUrl: null,
+      reasonDetected: "Detected from link/title/heading fallback extraction.",
+      sourceText: `${innerHtml} ${pageContext}`,
+      shortDescription: pickTextContent(anchorText, metaDescription),
+      listingDate: extractDateFromText(`${anchorText} ${pageContext}`),
+    });
+  }
+
+  for (const jsonLdMatch of html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]{0,20000}?)<\/script>/gi)) {
+    const scriptBody = (jsonLdMatch[1] || "").trim();
+    if (!scriptBody) continue;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(scriptBody);
+    } catch {
+      reject("jsonld_parse_error", scriptBody.slice(0, 120));
+      continue;
+    }
+
+    const records: Record<string, unknown>[] = Array.isArray(parsed)
+      ? parsed.filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
+      : parsed && typeof parsed === "object"
+      ? [parsed as Record<string, unknown>]
+      : [];
+
+    for (const record of records) {
+      const maybeName = typeof record.name === "string" ? record.name : typeof record.headline === "string" ? record.headline : null;
+      const maybeUrl = typeof record.url === "string" ? record.url : typeof record.mainEntityOfPage === "string" ? record.mainEntityOfPage : null;
+      if (!maybeName || !maybeUrl) continue;
+
+      let listingUrl: string;
+      try {
+        listingUrl = new URL(maybeUrl, source.source_url).toString();
+      } catch {
+        continue;
+      }
+
+      addCandidate({
+        rawName: maybeName,
+        listingUrl,
+        projectUrl: maybeUrl,
+        reasonDetected: "Detected from JSON-LD metadata fallback extraction.",
+        sourceText: `${JSON.stringify(record).slice(0, 2000)} ${pageContext}`,
+        shortDescription: typeof record.description === "string" ? record.description : metaDescription,
+        listingDate: typeof record.datePublished === "string" ? record.datePublished : null,
+      });
+    }
+  }
+
+  const scriptSignals = Array.from(html.matchAll(/<script[^>]*>([\s\S]{0,30000}?)<\/script>/gi))
+    .map((m) => m[1] || "")
+    .filter((value) => /quest|campaign|airdrop|token|reward/i.test(value))
+    .slice(0, 6);
+
+  for (const snippet of scriptSignals) {
+    for (const link of snippet.matchAll(/https?:\/\/[^\s"'<>]+/gi)) {
+      const raw = link[0] || "";
+      if (!raw) continue;
+      if (!isProjectListingUrl(raw, adapter)) continue;
+
+      const pathName = (() => {
+        try {
+          const parts = new URL(raw).pathname.split("/").filter(Boolean);
+          return parts.length ? parts[parts.length - 1] : "";
+        } catch {
+          return "";
+        }
+      })();
+
+      addCandidate({
+        rawName: pathName,
+        listingUrl: raw,
+        projectUrl: null,
+        reasonDetected: "Detected from embedded script URL fallback extraction.",
+        sourceText: `${snippet.slice(0, 1200)} ${pageContext}`,
+        shortDescription: metaDescription || null,
+        listingDate: extractDateFromText(snippet),
+      });
+    }
+  }
+
+  const deduped = dedupeCandidates(found);
+  const fallbackCards = fallbackCardsFound > 0 ? fallbackCardsFound : deduped.length;
+
+  return {
+    candidates: deduped,
+    cardsFound: fallbackCards,
     candidatesRejected: rejectedCount,
     rejectedByReason,
     rejectionSamples,
@@ -712,8 +969,8 @@ Deno.serve(async (req: Request) => {
           candidatesRejected: 0,
           rejectionReasons: { no_adapter_matched: 1 },
           rejectionSamples: [],
-          finalOutcome: "no_adapter_matched",
-          outcomeMessage: "No adapter matched this source URL.",
+          finalOutcome: "needs_adapter",
+          outcomeMessage: "Needs adapter: source URL does not match a supported parser.",
         });
         continue;
       }
@@ -798,15 +1055,74 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      const extraction = extractDiscoveryCandidatesFromHtml(html, source, adapter);
-      const validCandidates = extraction.candidates.filter((candidate) => !isGenericOpportunityName(candidate.projectName));
-      const pageLooksJavaScriptRendered = extraction.cardsFound === 0 && /<script|id=["']root["']|__NEXT_DATA__/i.test(html);
+      let extraction: DiscoveryExtractionResult;
+      try {
+        extraction = extractDiscoveryCandidatesFromHtml(html, source, adapter);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        results.push({
+          sourceId: source.id,
+          sourceName: source.source_name,
+          sourceUrl: source.source_url,
+          checkedAt,
+          adapterUsed: adapter.id,
+          fetchStatus: response.status,
+          cardsFound: 0,
+          candidatesExtracted: [],
+          candidatesRejected: 0,
+          rejectionReasons: { parser_failed: 1 },
+          rejectionSamples: [message],
+          finalOutcome: "parser_failed",
+          outcomeMessage: `Parser failed: ${message}`,
+        });
+        continue;
+      }
+
+      let fallbackExtraction: DiscoveryExtractionResult = {
+        candidates: [],
+        cardsFound: 0,
+        candidatesRejected: 0,
+        rejectedByReason: {},
+        rejectionSamples: [],
+      };
+
+      if (extraction.cardsFound === 0 || extraction.candidates.length === 0) {
+        try {
+          fallbackExtraction = extractFallbackCandidatesFromHtml(html, source, adapter);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          results.push({
+            sourceId: source.id,
+            sourceName: source.source_name,
+            sourceUrl: source.source_url,
+            checkedAt,
+            adapterUsed: adapter.id,
+            fetchStatus: response.status,
+            cardsFound: extraction.cardsFound,
+            candidatesExtracted: [],
+            candidatesRejected: extraction.candidatesRejected,
+            rejectionReasons: mergeReasonMaps(extraction.rejectedByReason, { parser_failed: 1 }),
+            rejectionSamples: [...extraction.rejectionSamples, message].slice(0, 8),
+            finalOutcome: "parser_failed",
+            outcomeMessage: `Fallback parser failed: ${message}`,
+          });
+          continue;
+        }
+      }
+
+      const combinedCandidates = dedupeCandidates([...extraction.candidates, ...fallbackExtraction.candidates]);
+      const validCandidates = combinedCandidates.filter((candidate) => !isGenericOpportunityName(candidate.projectName));
+      const combinedCardsFound = Math.max(extraction.cardsFound, fallbackExtraction.cardsFound);
+      const combinedRejected = extraction.candidatesRejected + fallbackExtraction.candidatesRejected;
+      const combinedReasons = mergeReasonMaps(extraction.rejectedByReason, fallbackExtraction.rejectedByReason);
+      const combinedSamples = [...extraction.rejectionSamples, ...fallbackExtraction.rejectionSamples].slice(0, 12);
+      const pageLooksJavaScriptRendered = combinedCardsFound === 0 && /__NEXT_DATA__|__NUXT__|data-reactroot|id=["'](?:root|__next|app)["']|hydrateRoot|createRoot|webpackJsonp|window\.__/i.test(html);
 
       if (validCandidates.length === 0) {
         const finalOutcome: ScanResult["finalOutcome"] = pageLooksJavaScriptRendered
           ? "javascript_rendered"
-          : extraction.cardsFound === 0
-          ? "no_cards_found"
+          : combinedCardsFound === 0
+          ? "no_extractable_content"
           : "all_candidates_rejected";
 
         results.push({
@@ -816,17 +1132,17 @@ Deno.serve(async (req: Request) => {
           checkedAt,
           adapterUsed: adapter.id,
           fetchStatus: response.status,
-          cardsFound: extraction.cardsFound,
+          cardsFound: combinedCardsFound,
           candidatesExtracted: [],
-          candidatesRejected: extraction.candidatesRejected,
-          rejectionReasons: extraction.rejectedByReason,
-          rejectionSamples: extraction.rejectionSamples,
+          candidatesRejected: combinedRejected,
+          rejectionReasons: combinedReasons,
+          rejectionSamples: combinedSamples,
           finalOutcome,
           outcomeMessage: finalOutcome === "javascript_rendered"
-            ? "Page appears JavaScript-rendered; static HTML has no extractable cards."
-            : finalOutcome === "no_cards_found"
-            ? "No cards found in fetched HTML."
-            : "All candidates were rejected by validation rules.",
+            ? "JS-rendered page detected. Static scanner could not extract project cards; adapter/runtime extraction needed."
+            : finalOutcome === "no_extractable_content"
+            ? "No extractable content detected from static HTML (title/meta/headings/links/JSON-LD/scripts)."
+            : "Parser ran but all discovered candidates were rejected by validation rules.",
         });
         continue;
       }
@@ -838,11 +1154,11 @@ Deno.serve(async (req: Request) => {
         checkedAt,
         adapterUsed: adapter.id,
         fetchStatus: response.status,
-        cardsFound: extraction.cardsFound,
+        cardsFound: combinedCardsFound,
         candidatesExtracted: validCandidates,
-        candidatesRejected: extraction.candidatesRejected,
-        rejectionReasons: extraction.rejectedByReason,
-        rejectionSamples: extraction.rejectionSamples,
+        candidatesRejected: combinedRejected,
+        rejectionReasons: combinedReasons,
+        rejectionSamples: combinedSamples,
         finalOutcome: "ok",
         outcomeMessage: `Extracted ${validCandidates.length} valid candidate(s).`,
       });

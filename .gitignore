@@ -1,2 +1,10 @@
 node_modules/
 .env
+
+# Temporary competitor-watch debug artifacts
+project/scripts/_tmp_competitor_*.mjs
+project/scripts/_tmp_competitor_*.sql
+project/scripts/_tmp_find_working_sources.mjs
+project/scripts/_tmp_airdrop*_probe.mjs
+project/scripts/_tmp_galxe_explore_probe.mjs
+project/scripts/_tmp_*.sql

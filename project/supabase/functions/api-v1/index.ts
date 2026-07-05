@@ -14,6 +14,14 @@ function json(data: unknown, status = 200) {
   });
 }
 
+function parseBoolean(value: string | null): boolean | null {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return null;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -39,16 +47,21 @@ Deno.serve(async (req: Request) => {
 
   if (subError || !sub) return json({ error: "Invalid or inactive API key" }, 401);
 
-  if (sub.requests_used >= sub.requests_limit) {
+  const ownerUserId = Deno.env.get("API_OWNER_USER_ID")?.trim();
+  const isOwner = Boolean(ownerUserId && sub.user_id === ownerUserId);
+
+  if (!isOwner && sub.requests_used >= sub.requests_limit) {
     return json({ error: "Monthly request limit reached. Upgrade your plan." }, 429);
   }
 
-  // Increment usage (fire-and-forget)
-  supabase
-    .from("api_subscriptions")
-    .update({ requests_used: sub.requests_used + 1 })
-    .eq("id", sub.id)
-    .then(() => {});
+  if (!isOwner) {
+    // Increment usage (fire-and-forget)
+    supabase
+      .from("api_subscriptions")
+      .update({ requests_used: sub.requests_used + 1 })
+      .eq("id", sub.id)
+      .then(() => {});
+  }
 
   // ── Routing ─────────────────────────────────────────────────────────────────
   const url = new URL(req.url);
@@ -57,7 +70,52 @@ Deno.serve(async (req: Request) => {
   // pathParts[0] = 'airdrops', pathParts[1] = optional slug
 
   if (pathParts[0] !== "airdrops") {
-    return json({ error: "Not found. Available: /airdrops, /airdrops/:slug" }, 404);
+    return json({ error: "Not found. Available: /airdrops, /airdrops/latest, /airdrops/:slug" }, 404);
+  }
+
+  const status = url.searchParams.get("status");
+  const blockchain = url.searchParams.get("blockchain");
+  const verified = parseBoolean(url.searchParams.get("verified"));
+  const active = parseBoolean(url.searchParams.get("active"));
+  const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 200);
+  const offset = parseInt(url.searchParams.get("offset") ?? "0", 10);
+
+  let query = supabase
+    .from("airdrops")
+    .select("*", { count: "exact" })
+    .eq("published", true)
+    .eq("review_status", "approved")
+    .eq("is_demo", false)
+    .neq("listing_state", "scam_alert")
+    .order("sort_order", { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (status) query = query.eq("status", status);
+  if (active === true) query = query.eq("status", "Active");
+  if (active === false) query = query.neq("status", "Active");
+  if (verified === true) query = query.or("listing_state.eq.verified,human_verified.eq.true");
+  if (verified === false) query = query.not("listing_state", "eq", "verified").eq("human_verified", false);
+  if (blockchain) query = query.contains("blockchain", [blockchain]);
+
+  // ── GET /airdrops/latest ───────────────────────────────────────────────────
+  if (pathParts[1] === "latest") {
+    query = query.order("updated_at", { ascending: false, nullsFirst: false });
+
+    const { data, error, count } = await query;
+    if (error) return json({ error: error.message }, 500);
+
+    return json({
+      items: data ?? [],
+      data: data ?? [],
+      total: count ?? 0,
+      meta: {
+        total: count ?? 0,
+        limit,
+        offset,
+        plan: sub.plan,
+        requests_remaining: isOwner ? Number.MAX_SAFE_INTEGER : sub.requests_limit - sub.requests_used - 1,
+      },
+    });
   }
 
   // ── GET /airdrops/:slug ──────────────────────────────────────────────────────
@@ -68,6 +126,9 @@ Deno.serve(async (req: Request) => {
       .select("*, airdrop_tasks(*)")
       .eq("slug", slug)
       .eq("published", true)
+      .eq("review_status", "approved")
+      .eq("is_demo", false)
+      .neq("listing_state", "scam_alert")
       .maybeSingle();
 
     if (error) return json({ error: error.message }, 500);
@@ -76,21 +137,6 @@ Deno.serve(async (req: Request) => {
   }
 
   // ── GET /airdrops ─────────────────────────────────────────────────────────────
-  const status = url.searchParams.get("status");
-  const blockchain = url.searchParams.get("blockchain");
-  const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 200);
-  const offset = parseInt(url.searchParams.get("offset") ?? "0", 10);
-
-  let query = supabase
-    .from("airdrops")
-    .select("*", { count: "exact" })
-    .eq("published", true)
-    .order("sort_order", { ascending: true })
-    .range(offset, offset + limit - 1);
-
-  if (status) query = query.eq("status", status);
-  if (blockchain) query = query.contains("blockchain", [blockchain]);
-
   const { data, error, count } = await query;
 
   if (error) return json({ error: error.message }, 500);
@@ -102,7 +148,7 @@ Deno.serve(async (req: Request) => {
       limit,
       offset,
       plan: sub.plan,
-      requests_remaining: sub.requests_limit - sub.requests_used - 1,
+      requests_remaining: isOwner ? Number.MAX_SAFE_INTEGER : sub.requests_limit - sub.requests_used - 1,
     },
   });
 });

@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   Shield, Search, Loader2, CheckCircle2, XCircle, Info,
   AlertTriangle, Coins, Activity, Wallet, Target,
@@ -715,7 +715,11 @@ function getNextBestAction(
   };
 }
 
-export default function WalletSafetySnapshot() {
+interface WalletSafetySnapshotProps {
+  onResultStateChange?: (hasResult: boolean) => void;
+}
+
+export default function WalletSafetySnapshot({ onResultStateChange }: WalletSafetySnapshotProps = {}) {
   const [address, setAddress] = useState('');
   const [selectedChain, setSelectedChain] = useState<SupportedChainId>('1');
   const [loading, setLoading] = useState(false);
@@ -793,6 +797,10 @@ export default function WalletSafetySnapshot() {
   const visibleTokens = showAllTokens ? verifiedCleanTokens : verifiedCleanTokens.slice(0, 6);
   const visibleUnknownTokens = showAllTokens ? deadOrUnknownTokens : deadOrUnknownTokens.slice(0, 5);
   const visibleSuspiciousTokens = showAllTokens ? suspiciousTokens : suspiciousTokens.slice(0, 5);
+
+  useEffect(() => {
+    onResultStateChange?.(Boolean(result));
+  }, [onResultStateChange, result]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
