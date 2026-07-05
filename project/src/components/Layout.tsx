@@ -26,6 +26,7 @@ import {
   UserCircle2,
 } from "lucide-react";
 import AppShell, { isAuthenticatedAppPath } from "./AppShell";
+import SocialLinksStrip from "./SocialLinksStrip";
 import { useAuth } from "../contexts/AuthContext";
 
 const PUBLIC_MENU_GROUPS_STORAGE_KEY = "ag_public_mobile_menu_groups_v1";
@@ -229,16 +230,6 @@ const footerColumns = [
   },
 ];
 
-const socialLinks = [
-  { href: "https://x.com/Dropguardai", label: "X" },
-  { href: "https://discord.gg/uDP9xm6Dv", label: "Discord" },
-  { href: "https://t.me/+yKvXlsatqKs0M2M0", label: "Telegram" },
-  {
-    href: "https://www.tiktok.com/@airdropguard1?_r=1&_t=ZN-979TcOID05e",
-    label: "TikTok",
-  },
-];
-
 function Footer() {
   return (
     <footer className="relative border-t border-white/10 bg-dark-950/95">
@@ -298,20 +289,7 @@ function Footer() {
               ))}
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              {socialLinks.map((social) => (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Visit AirdropGuard on ${social.label}`}
-                  className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-gray-400 transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white"
-                >
-                  {social.label}
-                </a>
-              ))}
-            </div>
+            <SocialLinksStrip variant="tags" className="mt-5" />
           </div>
 
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">

@@ -24,8 +24,20 @@ interface TargetSpec {
 const BRAND = "AirdropGuard";
 const TAGLINE = "Check Before You Connect.";
 
-const findChannel = (guild: Guild, aliases: string[]): GuildBasedChannel | undefined =>
-  guild.channels.cache.find((channel) => aliases.includes(channel.name));
+const normalizeName = (value: string): string =>
+  value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+
+const findChannel = (guild: Guild, aliases: string[]): GuildBasedChannel | undefined => {
+  const aliasSet = new Set(aliases.map((alias) => normalizeName(alias)));
+  return guild.channels.cache.find((channel) => {
+    const isTextLike = channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement;
+    return isTextLike && aliasSet.has(normalizeName(channel.name));
+  });
+};
 
 const isWritableGuildChannel = (channel: GuildBasedChannel): channel is TextChannel | NewsChannel =>
   channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement;
@@ -39,21 +51,21 @@ const buildWelcomeEmbed = (): EmbedBuilder =>
         "You are inside an AI-first security platform built to help you verify opportunities and avoid scams.",
         "",
         "Start in 60 seconds:",
-        "1. Read rules in #rules-and-safety",
-        "2. Complete verification in #verify-here",
-        "3. Track live intelligence in #threat-alerts and #verified-drops",
-        "4. Ask the assistant in #ask-copilot"
+        "1. Read rules in #📜-rules",
+        "2. Complete verification in #✅-get-verified",
+        "3. Track live intelligence in #🚨-threat-alerts and #🧭-verified-airdrops",
+        "4. Ask the assistant in #🤖-ask-ai"
       ].join("\n")
     )
     .addFields(
       {
         name: "New to Crypto?",
-        value: "Start with #security-academy for beginner-safe guidance.",
+        value: "Start with #🧠-learn-security for beginner-safe guidance.",
         inline: false
       },
       {
         name: "Need Help?",
-        value: "Open a private request in #open-ticket.",
+        value: "Open a private request in #🎫-create-ticket.",
         inline: false
       }
     )
@@ -134,7 +146,7 @@ const buildAnnouncementEmbed = (): EmbedBuilder =>
       },
       {
         name: "Core Spaces",
-        value: "#threat-alerts | #verified-drops | #ask-copilot | #deep-analysis"
+        value: "#🚨-threat-alerts | #🧭-verified-airdrops | #🤖-ask-ai | #🔍-ai-analysis"
       },
       {
         name: "Website",

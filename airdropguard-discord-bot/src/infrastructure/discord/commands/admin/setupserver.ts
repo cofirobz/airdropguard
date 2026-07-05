@@ -165,25 +165,25 @@ const CATEGORY_SPECS: CategorySpec[] = [
     aliases: ["🚀 Start Here", "Start Here"],
     channels: [
       {
-        name: "welcome-lobby",
-        aliases: ["👋-welcome", "welcome", "👋│welcome"],
+        name: "👋-welcome",
+        aliases: ["👋-welcome", "welcome-lobby", "welcome", "👋│welcome"],
         topic: "Premium entry point: what AirdropGuard is, what members get, and where to start fast.",
         policy: "publicReadonly"
       },
       {
-        name: "verify-here",
-        aliases: ["✅-get-verified", "get-verified", "✅│get-verified"],
+        name: "✅-get-verified",
+        aliases: ["✅-get-verified", "verify-here", "get-verified", "✅│get-verified"],
         topic: "Access gate for verified membership and full server unlock.",
         policy: "publicReadonly"
       },
       {
-        name: "platform-news",
-        aliases: ["📣-announcements", "announcements", "📣│announcements"],
+        name: "📣-announcements",
+        aliases: ["📣-announcements", "platform-news", "announcements", "📣│announcements"],
         topic: "Official product updates, release notes, and governance notices.",
         policy: "publicReadonly"
       },
       {
-        name: "rules-and-safety",
+        name: "📜-rules",
         aliases: ["📜-rules", "rules", "📜│rules"],
         topic: "Server standards and safety requirements.",
         policy: "publicReadonly"
@@ -195,20 +195,20 @@ const CATEGORY_SPECS: CategorySpec[] = [
     aliases: ["🛡️ Intelligence Feed", "Intelligence Feed"],
     channels: [
       {
-        name: "threat-alerts",
-        aliases: ["🚨-scam-alerts", "scam-alerts", "🚨│scam-alerts"],
+        name: "🚨-threat-alerts",
+        aliases: ["🚨-threat-alerts", "threat-alerts", "🚨-scam-alerts", "scam-alerts", "🚨│scam-alerts"],
         topic: "High-signal scam warnings, impersonation alerts, wallet-risk advisories.",
         policy: "verifiedChat"
       },
       {
-        name: "verified-drops",
-        aliases: ["🧭-verified-airdrops", "verified-airdrops", "🧭│verified-airdrops"],
+        name: "🧭-verified-airdrops",
+        aliases: ["🧭-verified-airdrops", "verified-airdrops", "🧭│verified-airdrops", "verified-drops"],
         topic: "Published and reviewed opportunities only, no hype noise.",
         policy: "verifiedChat"
       },
       {
-        name: "market-signals",
-        aliases: ["market-signals", "📊│market-signals"],
+        name: "📊-market-signals",
+        aliases: ["📊-market-signals", "market-signals", "📊│market-signals"],
         topic: "Daily risk sentiment, ecosystem watchlist, trust shifts.",
         policy: "verifiedChat"
       }
@@ -219,14 +219,14 @@ const CATEGORY_SPECS: CategorySpec[] = [
     aliases: ["🤖 AI Security Desk", "AI Security Desk"],
     channels: [
       {
-        name: "ask-copilot",
-        aliases: ["🤖-ask-ai", "ask-ai", "🤖│ask-ai"],
+        name: "🤖-ask-ai",
+        aliases: ["🤖-ask-ai", "ask-copilot", "ask-ai", "🤖│ask-ai"],
         topic: "Use AI assistant for quick project checks and wallet safety questions.",
         policy: "verifiedChat"
       },
       {
-        name: "deep-analysis",
-        aliases: ["🔍-ai-analysis", "ai-analysis", "🔍│ai-analysis"],
+        name: "🔍-ai-analysis",
+        aliases: ["🔍-ai-analysis", "deep-analysis", "ai-analysis", "🔍│ai-analysis"],
         topic: "Deeper AI breakdowns, trust components, evidence-based commentary.",
         policy: "verifiedChat"
       }
@@ -237,19 +237,19 @@ const CATEGORY_SPECS: CategorySpec[] = [
     aliases: ["💬 Community", "Community"],
     channels: [
       {
-        name: "member-lounge",
-        aliases: ["💬-general", "general", "💬│general"],
+        name: "💬-general",
+        aliases: ["💬-general", "member-lounge", "general", "💬│general"],
         topic: "Clean discussion space for members and newcomers.",
         policy: "verifiedChat"
       },
       {
-        name: "security-academy",
+        name: "🧠-learn-security",
         aliases: ["🧠-learn-security", "learn-security", "🧠│learn-security"],
         topic: "Beginner-friendly explainers, anti-scam education, wallet hygiene.",
         policy: "verifiedChat"
       },
       {
-        name: "wins-and-proof",
+        name: "🏆-reward-showcase",
         aliases: ["🏆-reward-showcase", "reward-showcase", "🏆│reward-showcase"],
         topic: "Member wins, claimed rewards, verified progress snapshots.",
         policy: "verifiedChat"
@@ -261,14 +261,14 @@ const CATEGORY_SPECS: CategorySpec[] = [
     aliases: ["🆘 Support", "Support"],
     channels: [
       {
-        name: "open-ticket",
-        aliases: ["🎫-create-ticket", "create-ticket", "🎫│create-ticket"],
+        name: "🎫-create-ticket",
+        aliases: ["🎫-create-ticket", "open-ticket", "create-ticket", "🎫│create-ticket"],
         topic: "Open private support tickets for account, billing, and access issues.",
         policy: "ticketEntry"
       },
       {
-        name: "help-faq",
-        aliases: ["❓-faq", "faq", "❓│faq"],
+        name: "❓-faq",
+        aliases: ["❓-faq", "help-faq", "faq", "❓│faq"],
         topic: "Short answers to common questions and quick troubleshooting.",
         policy: "publicReadonly"
       }
@@ -291,8 +291,8 @@ const CATEGORY_SPECS: CategorySpec[] = [
         policy: "premiumOnly"
       },
       {
-        name: "request-research",
-        aliases: ["alpha-requests"],
+        name: "🛰️-request-research",
+        aliases: ["🛰️-request-research", "request-research", "alpha-requests"],
         topic: "Premium queue for project due-diligence and custom intelligence requests.",
         policy: "premiumOnly"
       }
@@ -303,26 +303,26 @@ const CATEGORY_SPECS: CategorySpec[] = [
     aliases: ["🧱 Staff Ops", "Staff Ops"],
     channels: [
       {
-        name: "mod-command",
-        aliases: ["🛡️-mod-chat", "mod-chat", "🛡️│mod-chat"],
+        name: "🛡️-mod-chat",
+        aliases: ["🛡️-mod-chat", "mod-command", "mod-chat", "🛡️│mod-chat"],
         topic: "Moderation coordination and routine decisions.",
         policy: "staffOnly"
       },
       {
-        name: "incident-room",
-        aliases: ["incident-room", "🚫│incident-room"],
+        name: "🚫-incident-room",
+        aliases: ["🚫-incident-room", "incident-room", "🚫│incident-room"],
         topic: "Live scam and abuse incidents, escalation-only channel.",
         policy: "staffOnly"
       },
       {
-        name: "content-ops",
-        aliases: ["content-ops", "🗂️│content-ops"],
+        name: "🗂️-content-ops",
+        aliases: ["🗂️-content-ops", "content-ops", "🗂️│content-ops"],
         topic: "Announcement drafting, feed scheduling, weekly planning.",
         policy: "staffOnly"
       },
       {
-        name: "automation-control",
-        aliases: ["⚙️-bot-control", "bot-control", "⚙️│bot-control"],
+        name: "⚙️-bot-control",
+        aliases: ["⚙️-bot-control", "automation-control", "bot-control", "⚙️│bot-control"],
         topic: "Automation status, command logs, operational checks.",
         policy: "staffOnly"
       }
@@ -560,7 +560,7 @@ export const runSetupServer = async (guild: Guild): Promise<SetupServerSummary> 
         channel = findChannel(guild, names);
       }
 
-      if (!channel || !isConfigurableChannel(channel)) {
+      if (!channel) {
         const created = await executeAction(`Create channel: ${channelSpec.name}`, () =>
           guild.channels.create({
             name: channelSpec.name,
@@ -572,6 +572,12 @@ export const runSetupServer = async (guild: Guild): Promise<SetupServerSummary> 
         );
         createdChannels.push(channelSpec.name);
         channel = created;
+      }
+
+      // If a channel already exists but is not text/announcement (for example a forum),
+      // preserve it in place to avoid creating a duplicate channel with the same purpose.
+      if (channel && !isConfigurableChannel(channel)) {
+        continue;
       }
 
       if (!isConfigurableChannel(channel)) {

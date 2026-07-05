@@ -3441,7 +3441,7 @@ export default function AdminPage() {
       return item.details.comparisonType === 'new_project' && new Date(item.opportunity.discovered_at).getTime() >= startOfToday;
     }).length;
 
-    const projectsImported = competitorOpportunities.filter((item) => item.status === 'drafted').length;
+    const projectsImported = competitorOpportunities.filter((item) => item.status === 'drafted' || item.status === 'queued').length;
     const projectsIgnored = competitorOpportunities.filter((item) => item.status === 'ignored').length;
     const duplicateDetectionsCount = prioritizedCompetitorOpportunities.filter((item) => item.details.comparisonType !== 'new_project').length;
     const averageScanSuccess = sourceDashboardRows.length
@@ -4108,35 +4108,100 @@ export default function AdminPage() {
 
   const createDraftFromOpportunity = useCallback(async (opportunity: CompetitorOpportunity) => {
     const details = getOpportunityDiscoveryDetails(opportunity);
-    const normalizedCategory = CATEGORY_OPTIONS.find((item) => item.toLowerCase() === String(opportunity.category || '').toLowerCase()) || 'Other';
-    setForm({
-      ...BLANK_FORM,
-      name: opportunity.project_name,
-      website_url: details.projectUrl || details.listingUrl,
-      docs_url: details.officialDocsUrl || '',
-      github_url: details.githubUrl || '',
-      twitter_url: details.officialXUrl || '',
-      discord_url: details.officialDiscordUrl || '',
-      funding_info: details.fundingInfo || '',
-      team_info: details.teamInfo || '',
-      category: [normalizedCategory],
-      blockchain: opportunity.blockchain ? [opportunity.blockchain as Blockchain] : [],
-      ai_summary: `Candidate discovered from ${details.sourceLabel}. Listing: ${details.listingUrl}`,
-      status: 'Active',
-      published: false,
-      is_featured: false,
-      is_trending: false,
-      is_sponsored: false,
-    });
-    setModalMode('add');
+    const sourceTag = `CW_OPPORTUNITY_ID:${opportunity.id}`;
 
-    await updateOpportunityStatus(
-      opportunity,
-      'drafted',
-      'Create airdrop draft from competitor opportunity',
-      'Draft airdrop created'
-    );
-  }, [updateOpportunityStatus]);
+    const navigateToSubmission = (submissionId: string) => {
+      setAdminView('submissions');
+      setExpandedSub(submissionId);
+      setTimeout(() => jumpToSection('admin-submissions'), 0);
+    };
+
+    try {
+      const { data: existing, error: existingError } = await supabase
+        .from('airdrop_submissions')
+        .select('id, project_name, status')
+        .ilike('additional_notes', `%${sourceTag}%`)
+        .order('submitted_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      if (existing?.id) {
+        navigateToSubmission(existing.id);
+        showToast('Created submission and moved to Submissions');
+        return;
+      }
+
+      const detectedKeywords = Array.isArray(details.detectedKeywords)
+        ? details.detectedKeywords.filter((value) => value && value.trim().length > 0)
+        : [];
+
+      const descriptionParts = [
+        details.shortDescription,
+        `Reason detected: ${details.reasonDetected}`,
+        `Why matched: ${opportunity.why_matched}`,
+      ].filter((value): value is string => Boolean(value && value.trim().length > 0));
+
+      const submissionNotes = [
+        sourceTag,
+        `Source: ${details.sourceLabel}`,
+        `Source URL: ${details.listingUrl}`,
+        `Detected keywords: ${detectedKeywords.length ? detectedKeywords.join(', ') : 'None'}`,
+        `Confidence score: ${details.confidenceScore}`,
+        `Discovery score: ${details.discoveryScore}`,
+        `Opportunity status at import: ${opportunity.status}`,
+        opportunity.notes ? `Competitor notes: ${opportunity.notes}` : null,
+      ].filter((value): value is string => Boolean(value));
+
+      const { data: inserted, error: insertError } = await supabase
+        .from('airdrop_submissions')
+        .insert({
+          project_name: opportunity.project_name,
+          website_url: details.projectUrl || details.listingUrl,
+          twitter_url: details.officialXUrl || null,
+          discord_url: details.officialDiscordUrl || null,
+          github_url: details.githubUrl || null,
+          whitepaper_url: details.officialDocsUrl || null,
+          blockchain: opportunity.blockchain || null,
+          category: opportunity.category || null,
+          airdrop_type: 'Competitor Watch Opportunity',
+          description: descriptionParts.join('\n'),
+          tasks_required: detectedKeywords.length ? `Detected keywords: ${detectedKeywords.join(', ')}` : null,
+          funding_investors: details.fundingInfo || null,
+          team_info: details.teamInfo || null,
+          additional_notes: submissionNotes.join('\n'),
+          admin_notes: `Imported from Competitor Watch (${details.sourceLabel}).`,
+          status: 'pending',
+          ai_recommendation: 'review_further',
+        })
+        .select('*')
+        .single();
+
+      if (insertError) throw insertError;
+
+      if (!inserted?.id) {
+        showToast('Submission was created but could not be located. Refresh Submissions.', 'error');
+        return;
+      }
+
+      await updateOpportunityStatus(
+        opportunity,
+        'queued',
+        'Accept competitor opportunity to submissions',
+        'Created submission and moved to Submissions'
+      );
+
+      setSubmissions((prev) => [inserted as Submission, ...prev.filter((item) => item.id !== inserted.id)]);
+      setSubNotes((prev) => ({ ...prev, [inserted.id]: inserted.admin_notes ?? '' }));
+      navigateToSubmission(inserted.id);
+      showToast('Created submission and moved to Submissions');
+    } catch (error) {
+      const exact = describeError(error);
+      setCompetitorUiError('Unable to create submission from Competitor Watch.', error);
+      showToast(`Create submission failed: ${exact}`, 'error');
+    }
+  }, [updateOpportunityStatus, describeError, setCompetitorUiError, showToast]);
 
   const openAdd = () => { setForm(BLANK_FORM); setEditingId(null); setModalMode('add'); };
 
@@ -4822,6 +4887,43 @@ export default function AdminPage() {
     }
     fetchStats();
   };
+
+  const deleteSubmission = useCallback(async (submission: Submission) => {
+    const confirmed = window.confirm(`Delete submission for ${submission.project_name}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('airdrop_submissions')
+        .delete()
+        .eq('id', submission.id);
+
+      if (error) throw error;
+
+      setSubmissions((prev) => prev.filter((row) => row.id !== submission.id));
+      setSubNotes((prev) => {
+        const next = { ...prev };
+        delete next[submission.id];
+        return next;
+      });
+      if (expandedSub === submission.id) setExpandedSub(null);
+
+      await logAdminAudit({
+        actionTaken: 'Delete airdrop submission',
+        aiRecommendation: submission.ai_recommendation || 'No AI recommendation available',
+        finalDecision: 'deleted',
+        context: {
+          submissionId: submission.id,
+          projectName: submission.project_name,
+        },
+      });
+
+      fetchStats();
+      showToast('Submission deleted');
+    } catch (error) {
+      showToast(`Delete submission failed: ${describeError(error)}`, 'error');
+    }
+  }, [describeError, expandedSub, logAdminAudit, showToast, fetchStats]);
 
 
   const updateScamReportStatus = async (report: ScamReport, status: 'approved' | 'rejected' | 'pending') => {
@@ -6070,7 +6172,7 @@ export default function AdminPage() {
                 const canQueue = opportunity.status !== 'queued' && opportunity.status !== 'drafted';
                 const canIgnore = opportunity.status !== 'ignored' && opportunity.status !== 'drafted';
                 const canMarkDuplicate = opportunity.status !== 'duplicate' && opportunity.status !== 'drafted';
-                const canCreateDraft = opportunity.status !== 'drafted' && dynamicPriority === 'high';
+                const canCreateDraft = opportunity.status !== 'drafted';
 
                 return (
                   <div key={opportunity.id} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
@@ -6139,10 +6241,10 @@ export default function AdminPage() {
                         </button>
                       )}
                       {canCreateDraft && (
-                        <button onClick={() => void createDraftFromOpportunity(opportunity)} className="px-2.5 py-1 rounded border border-emerald-500/25 text-emerald-200 text-xs">Create Draft Airdrop</button>
+                        <button onClick={() => void createDraftFromOpportunity(opportunity)} className="px-2.5 py-1 rounded border border-emerald-500/25 text-emerald-200 text-xs">Accept → Submissions</button>
                       )}
-                      {!canCreateDraft && dynamicPriority !== 'high' && (
-                        <span className="text-[11px] text-gray-500">Draft import enabled automatically for high-priority discoveries.</span>
+                      {!canCreateDraft && (
+                        <span className="text-[11px] text-gray-500">Submission already created from this opportunity.</span>
                       )}
                     </div>
                   </div>
@@ -7207,6 +7309,13 @@ export default function AdminPage() {
                                 <Inbox className="w-4 h-4" />
                               </button>
                             )}
+                            <button
+                              onClick={() => void deleteSubmission(sub)}
+                              className="p-1.5 rounded-lg hover:bg-rose-500/10 text-gray-600 hover:text-rose-400 transition-colors"
+                              title="Delete submission"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </td>
                       </tr>

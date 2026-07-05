@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { createDiscordClient } = require('./dist/infrastructure/discord/client.js');
 const { runSetupServer } = require('./dist/infrastructure/discord/commands/admin/setupserver.js');
 
