@@ -1260,6 +1260,101 @@ export default function CustomerDashboard() {
 
   if (!user) return null;
 
+  const hasApiSubscription = Boolean(subscription);
+  const subscriptionStatus = subscription?.status ?? 'none';
+  const keyExists = Boolean(subscription?.key_value);
+  const canManageApiKey = hasApiSubscription && subscriptionStatus === 'active';
+
+  const apiAccessSection = (
+    <div className="space-y-4">
+      <div className="glass-card p-4 border border-white/10">
+        <h2 className="text-lg font-bold text-white">API Access</h2>
+        <p className="mt-1 text-xs text-gray-500">Manage your subscription and credentials for programmatic access.</p>
+      </div>
+
+      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
+        <div>hasApiSubscription: {String(hasApiSubscription)}</div>
+        <div>subscriptionStatus: {subscriptionStatus}</div>
+        <div>keyExists: {String(keyExists)}</div>
+      </div>
+
+      {hasApiSubscription ? (
+        <div>
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">API Subscription</h2>
+          <div className="relative overflow-hidden rounded-3xl border border-neon-purple/20 bg-gradient-to-br from-neon-purple/[0.10] via-dark-800 to-sky-500/[0.06] p-6 space-y-4">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.16),transparent_30%)] pointer-events-none" />
+            <div className="relative flex items-center justify-between">
+              <div>
+                <p className="text-base font-semibold text-white capitalize">{subscription?.plan} Plan</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {subscriptionStatus === 'active' ? 'Active subscription' : `Subscription status: ${subscriptionStatus}`}
+                </p>
+              </div>
+              <span className={`text-xs px-2.5 py-1 rounded-lg border font-medium ${
+                subscriptionStatus === 'active'
+                  ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+                  : 'bg-amber-500/10 border-amber-500/25 text-amber-400'
+              }`}>{subscriptionStatus}</span>
+            </div>
+            <div className="relative flex flex-wrap gap-3">
+              <a href="/api-docs" className="flex-1 btn-secondary text-sm flex items-center justify-center gap-2 min-w-[140px]">
+                <ExternalLink className="w-4 h-4" /> API Docs
+              </a>
+              <button
+                type="button"
+                onClick={() => void handleGenerateApiKey()}
+                disabled={!canManageApiKey || apiKeyBusy}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-sky-300 border border-sky-500/25 hover:text-sky-200 hover:bg-sky-500/10 transition-colors disabled:opacity-60"
+              >
+                {apiKeyBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                {keyExists ? 'Regenerate Key' : 'Generate Key'}
+              </button>
+              {keyExists && (
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-gray-400 border border-white/10 hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  {copied ? 'Copied' : 'Copy Key'}
+                </button>
+              )}
+            </div>
+            {!canManageApiKey && (
+              <p className="relative text-xs text-amber-200 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                API key actions are unavailable because subscriptionStatus is {subscriptionStatus}.
+              </p>
+            )}
+            <div className="relative rounded-xl border border-white/10 bg-black/20 p-3">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-gray-500">API Key</p>
+              <p className="mt-1 font-mono text-xs text-cyan-100 break-all">
+                {subscription?.key_value ?? 'No key generated yet. Click Generate Key.'}
+              </p>
+            </div>
+            {apiKeyError && (
+              <p className="relative text-xs text-rose-300 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2">
+                API key error: {apiKeyError}
+              </p>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="relative overflow-hidden rounded-3xl border border-neon-purple/20 bg-gradient-to-br from-neon-purple/[0.10] via-dark-800 to-sky-500/[0.06] p-6 flex items-center gap-4">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.16),transparent_30%)] pointer-events-none" />
+          <div className="relative w-10 h-10 rounded-xl bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center shrink-0">
+            <Key className="w-5 h-5 text-neon-purple" />
+          </div>
+          <div className="relative flex-1 min-w-0">
+            <p className="text-sm font-semibold text-white">Unlock API Access</p>
+            <p className="text-xs text-gray-500 mt-0.5">No API subscription row was found for this user. Choose a plan to create API access.</p>
+          </div>
+          <Link to="/pricing" className="relative btn-primary text-sm px-4 py-2 shrink-0 whitespace-nowrap">
+            View Plans
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+
  return (
   <>
     {activeTab === 'overview' && (
@@ -1578,6 +1673,10 @@ export default function CustomerDashboard() {
           </div>
         </div>
 
+        <section>
+          {apiAccessSection}
+        </section>
+
         <section className="rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(6,14,32,0.96),rgba(8,20,42,0.92))] p-4 shadow-[0_18px_45px_rgba(3,8,24,0.45)] sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -1837,82 +1936,7 @@ export default function CustomerDashboard() {
     )}
 
     {activeTab === 'api' && (
-      <div className="space-y-4">
-        <div className="glass-card p-4 border border-white/10">
-          <h2 className="text-lg font-bold text-white">API Access</h2>
-          <p className="mt-1 text-xs text-gray-500">Manage your subscription and credentials for programmatic access.</p>
-        </div>
-        {subscription && (
-          <div>
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">API Subscription</h2>
-            <div className="relative overflow-hidden rounded-3xl border border-neon-purple/20 bg-gradient-to-br from-neon-purple/[0.10] via-dark-800 to-sky-500/[0.06] p-6 space-y-4">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.16),transparent_30%)] pointer-events-none" />
-              <div className="relative flex items-center justify-between">
-                <div>
-                  <p className="text-base font-semibold text-white capitalize">{subscription.plan} Plan</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {subscription.status === 'active' ? 'Active subscription' : subscription.status}
-                  </p>
-                </div>
-                <span className={`text-xs px-2.5 py-1 rounded-lg border font-medium ${
-                  subscription.status === 'active'
-                    ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
-                    : 'bg-amber-500/10 border-amber-500/25 text-amber-400'
-                }`}>{subscription.status}</span>
-              </div>
-              <div className="relative flex gap-3">
-                <a href="/api-docs" className="flex-1 btn-secondary text-sm flex items-center justify-center gap-2">
-                  <ExternalLink className="w-4 h-4" /> API Docs
-                </a>
-                <button
-                  type="button"
-                  onClick={() => void handleGenerateApiKey()}
-                  disabled={apiKeyBusy}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-sky-300 border border-sky-500/25 hover:text-sky-200 hover:bg-sky-500/10 transition-colors disabled:opacity-60"
-                >
-                  {apiKeyBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                  {subscription.key_value ? 'Regenerate Key' : 'Generate Key'}
-                </button>
-                <button
-                  onClick={handleCopy}
-                  disabled={!subscription.key_value}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-gray-400 border border-white/10 hover:text-white hover:bg-white/5 transition-colors"
-                >
-                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  {copied ? 'Copied' : 'Copy Key'}
-                </button>
-              </div>
-              <div className="relative rounded-xl border border-white/10 bg-black/20 p-3">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-gray-500">API Key</p>
-                <p className="mt-1 font-mono text-xs text-cyan-100 break-all">
-                  {subscription.key_value ?? 'No key generated yet. Click Generate Key.'}
-                </p>
-              </div>
-              {apiKeyError && (
-                <p className="relative text-xs text-rose-300 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2">
-                  API key error: {apiKeyError}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {!subscription && (
-          <div className="relative overflow-hidden rounded-3xl border border-neon-purple/20 bg-gradient-to-br from-neon-purple/[0.10] via-dark-800 to-sky-500/[0.06] p-6 flex items-center gap-4">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.16),transparent_30%)] pointer-events-none" />
-            <div className="relative w-10 h-10 rounded-xl bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center shrink-0">
-              <Key className="w-5 h-5 text-neon-purple" />
-            </div>
-            <div className="relative flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white">Unlock API Access</p>
-              <p className="text-xs text-gray-500 mt-0.5">Get programmatic access to all airdrop data.</p>
-            </div>
-            <Link to="/pricing" className="relative btn-primary text-sm px-4 py-2 shrink-0 whitespace-nowrap">
-              View Plans
-            </Link>
-          </div>
-        )}
-      </div>
+      apiAccessSection
     )}
 
     {activeTab === 'profile' && (
@@ -1953,6 +1977,8 @@ export default function CustomerDashboard() {
             </div>
           </div>
         </div>
+
+        {apiAccessSection}
 
         <ReputationCard reputation={reputation} unlocks={unlocks} onRefresh={fetchReputation} />
         <ReputationRulesNotice />
