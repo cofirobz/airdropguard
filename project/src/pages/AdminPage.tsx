@@ -2372,6 +2372,11 @@ export default function AdminPage() {
     });
   }, [expandedSub, submissions]);
 
+  const approvedSubmissions = useMemo(
+    () => submissions.filter((submission) => submission.status === 'approved').slice(0, 6),
+    [submissions]
+  );
+
   const [scamReports, setScamReports] = useState<ScamReport[]>([]);
   const [scamReportsLoading, setScamReportsLoading] = useState(true);
   const [expandedScamReport, setExpandedScamReport] = useState<string | null>(null);
@@ -5061,24 +5066,193 @@ export default function AdminPage() {
     }
   }, [isAdmin, fetchOpsUsers]);
 
-  const updateSubmissionStatus = async (id: string, status: string) => {
-    await supabase.from('airdrop_submissions').update({ status, reviewed_at: new Date().toISOString() }).eq('id', id);
-    setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status } : s));
-    const submission = submissions.find((row) => row.id === id);
-    if (submission) {
-      await logAdminAudit({
-        actionTaken: 'Review airdrop submission',
-        aiRecommendation: submission.ai_recommendation || 'No AI recommendation available',
-        finalDecision: status,
-        notes: subNotes[id] || undefined,
-        context: {
-          submissionId: id,
-          projectName: submission.project_name,
-        },
-      });
+  const isCompetitorWatchSubmission = useCallback((submission: Submission) => {
+    const type = (submission.airdrop_type ?? '').toLowerCase();
+    const adminNotes = (submission.admin_notes ?? '').toLowerCase();
+    const notes = (submission.additional_notes ?? '').toLowerCase();
+    return (
+      type.includes('competitor watch')
+      || adminNotes.includes('imported from competitor watch')
+      || notes.includes('competitor opportunity id')
+    );
+  }, []);
+
+  const promoteSubmissionToAirdrop = useCallback(async (submission: Submission) => {
+    const projectName = submission.project_name.trim();
+    if (!projectName) {
+      throw new Error('Submission is missing a project name.');
     }
-    fetchStats();
-  };
+
+    const websiteUrl = (submission.website_url ?? '').trim();
+    const source = isCompetitorWatchSubmission(submission) ? 'competitor_watch' : 'submission_review';
+
+    let existing: { id: string; name: string } | null = null;
+
+    if (websiteUrl) {
+      const existingByUrl = await supabase
+        .from('airdrops')
+        .select('id, name')
+        .eq('is_demo', false)
+        .eq('website_url', websiteUrl)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingByUrl.error) throw existingByUrl.error;
+      existing = existingByUrl.data as { id: string; name: string } | null;
+    }
+
+    if (!existing) {
+      const existingByName = await supabase
+        .from('airdrops')
+        .select('id, name')
+        .eq('is_demo', false)
+        .ilike('name', projectName)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingByName.error) throw existingByName.error;
+      existing = existingByName.data as { id: string; name: string } | null;
+    }
+
+    if (existing) {
+      const { error } = await supabase
+        .from('airdrops')
+        .update({
+          published: true,
+          human_verified: true,
+          review_status: 'approved',
+          listing_state: 'verified',
+          blacklist_reason: null,
+          source,
+        })
+        .eq('id', existing.id);
+
+      if (error) throw error;
+      return { airdropId: existing.id, created: false as const };
+    }
+
+    const slugBase = projectName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 48);
+    const slug = `${slugBase || 'submission'}-${submission.id.slice(0, 8)}`;
+
+    const riskLevel = (submission.requires_seed_phrase || submission.requires_payment)
+      ? 'High'
+      : 'Medium';
+
+    const insertPayload = {
+      name: projectName,
+      slug,
+      ticker: (submission.token_symbol ?? '').trim().toUpperCase(),
+      logo_url: '',
+      blockchain: submission.blockchain ? [submission.blockchain] : [],
+      category: submission.category ? [submission.category] : [],
+      reward_potential: 'Medium',
+      difficulty: 'Moderate',
+      time_required: 'Unknown',
+      expiry_date: submission.deadline || null,
+      risk_level: riskLevel,
+      status: 'Active',
+      ai_summary: submission.description ?? '',
+      ai_risk_analysis: '',
+      ai_reward_estimate: '',
+      overview: submission.description ?? '',
+      why_airdrop: submission.tasks_required ?? '',
+      estimated_reward: submission.reward_confirmed ?? 'TBA',
+      website_url: websiteUrl,
+      twitter_url: submission.twitter_url ?? '',
+      discord_url: submission.discord_url ?? '',
+      telegram_url: submission.telegram_url ?? '',
+      github_url: submission.github_url ?? '',
+      contract_address: submission.contract_address ?? '',
+      docs_url: submission.whitepaper_url ?? null,
+      funding_info: submission.funding_investors ?? null,
+      investors: submission.funding_investors ?? null,
+      team_info: submission.team_info ?? null,
+      is_trending: false,
+      is_featured: false,
+      is_sponsored: false,
+      published: true,
+      trust_score: null,
+      listing_state: 'verified',
+      blacklist_reason: null,
+      sort_order: airdrops.length,
+      source,
+      human_verified: true,
+      review_status: 'approved',
+      is_demo: false,
+      trust_label: null,
+      cryptorank_id: null,
+      source_url: websiteUrl || null,
+    };
+
+    const { data, error } = await supabase
+      .from('airdrops')
+      .insert(insertPayload)
+      .select('id')
+      .single();
+
+    if (error) throw error;
+    return { airdropId: data.id as string, created: true as const };
+  }, [airdrops.length, isCompetitorWatchSubmission]);
+
+  const updateSubmissionStatus = useCallback(async (id: string, status: string) => {
+    try {
+      const submission = submissions.find((row) => row.id === id) ?? null;
+      let publishedAirdropId: string | null = null;
+
+      if (status === 'approved' && submission) {
+        const publishResult = await promoteSubmissionToAirdrop(submission);
+        publishedAirdropId = publishResult.airdropId;
+      }
+
+      const { error: statusError } = await supabase
+        .from('airdrop_submissions')
+        .update({ status, reviewed_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (statusError) throw statusError;
+
+      setSubmissions((prev) => prev.map((s) => s.id === id ? { ...s, status } : s));
+
+      if (submission) {
+        await logAdminAudit({
+          actionTaken: 'Review airdrop submission',
+          aiRecommendation: submission.ai_recommendation || 'No AI recommendation available',
+          finalDecision: status,
+          notes: subNotes[id] || undefined,
+          context: {
+            submissionId: id,
+            projectName: submission.project_name,
+            publishedAirdropId,
+          },
+        });
+      }
+
+      if (status === 'approved') {
+        fetchAirdrops();
+        showToast('Submission approved and published to main airdrop list.');
+      }
+
+      fetchStats();
+    } catch (error) {
+      showToast(`Unable to update submission status: ${describeError(error)}`, 'error');
+    }
+  }, [describeError, fetchAirdrops, fetchStats, logAdminAudit, promoteSubmissionToAirdrop, showToast, subNotes, submissions]);
+
+  const requestSubmissionApproval = useCallback((submission: Submission, isOpen: boolean) => {
+    if (isCompetitorWatchSubmission(submission) && !isOpen) {
+      setExpandedSub(submission.id);
+      showToast('Review the full submission form before approving this Competitor Watch item.');
+      return;
+    }
+
+    void updateSubmissionStatus(submission.id, 'approved');
+  }, [isCompetitorWatchSubmission, showToast, updateSubmissionStatus]);
 
   const deleteSubmission = useCallback(async (submission: Submission) => {
     const confirmed = window.confirm(`Delete submission for ${submission.project_name}? This cannot be undone.`);
@@ -7413,6 +7587,27 @@ export default function AdminPage() {
           </h2>
           {subLoading && <Loader2 className="w-3 h-3 text-gray-600 animate-spin" />}
         </div>
+        {approvedSubmissions.length > 0 && (
+          <div className="mb-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Recently Approved</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {approvedSubmissions.map((approved) => (
+                <button
+                  key={`approved-${approved.id}`}
+                  onClick={() => {
+                    setExpandedSub(approved.id);
+                    setAdminView('submissions');
+                    setTimeout(() => jumpToSection('admin-submissions'), 0);
+                  }}
+                  className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-100 hover:bg-emerald-500/20 transition-colors"
+                  title="Open approved submission"
+                >
+                  {approved.project_name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {submissions.length === 0 && !subLoading ? (
           <div className="glass-card p-10 text-center text-gray-600 text-sm">No submissions yet.</div>
         ) : (
@@ -7484,7 +7679,7 @@ export default function AdminPage() {
                               {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             </button>
                             {sub.status !== 'approved' && (
-                              <button onClick={() => updateSubmissionStatus(sub.id, 'approved')}
+                              <button onClick={() => requestSubmissionApproval(sub, isOpen)}
                                 className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-gray-600 hover:text-emerald-400 transition-colors" title="Approve">
                                 <CheckCheck className="w-4 h-4" />
                               </button>
