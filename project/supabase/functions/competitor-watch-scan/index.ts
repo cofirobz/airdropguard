@@ -20,6 +20,7 @@ type DiscoveryCandidate = {
   listingUrl: string;
   blockchain: string | null;
   category: string | null;
+  opportunityType: "Verified Airdrop" | "Testnet" | "Points Program" | "Speculative Token" | "Scam Alert" | null;
   shortDescription: string | null;
   listingDate: string | null;
   confidence: "low" | "medium" | "high";
@@ -28,8 +29,16 @@ type DiscoveryCandidate = {
   githubUrl: string | null;
   officialXUrl: string | null;
   officialDiscordUrl: string | null;
+  contractAddress: string | null;
+  knownAliases: string[];
   fundingInfo: string | null;
   teamInfo: string | null;
+  riskLevel: "Low" | "Medium" | "High";
+  officialSourcesFound: number;
+  estimatedQuality: "High" | "Medium" | "Low";
+  estimatedDifficulty: "Easy" | "Moderate" | "Hard";
+  estimatedTime: string;
+  analystSummary: string;
   detectedKeywords: string[];
   reasonDetected: string;
 };
@@ -129,6 +138,60 @@ const DISCOVERY_SOURCE_ADAPTERS: SourceAdapter[] = [
     label: "CoinMarketCap Airdrops",
     hostPatterns: [/^coinmarketcap\.com$/i, /(^|\.)coinmarketcap\.com$/i],
     listingPathPatterns: [/\/airdrop\/[a-z0-9-]{3,}/i],
+  },
+  {
+    id: "github-releases",
+    label: "GitHub Releases",
+    hostPatterns: [/^github\.com$/i, /(^|\.)github\.com$/i],
+    listingPathPatterns: [/\/releases\/tag\//i, /^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/i],
+  },
+  {
+    id: "github-repository",
+    label: "GitHub Repository",
+    hostPatterns: [/^github\.com$/i, /(^|\.)github\.com$/i],
+    listingPathPatterns: [/^https?:\/\/github\.com\/[^/]+\/[^/]+\/?$/i, /\/blob\//i, /\/tree\//i],
+  },
+  {
+    id: "rss-feed",
+    label: "RSS Feed",
+    hostPatterns: [/.*/],
+    listingPathPatterns: [/./],
+  },
+  {
+    id: "xml-sitemap",
+    label: "XML Sitemap",
+    hostPatterns: [/.*/],
+    listingPathPatterns: [/./],
+  },
+  {
+    id: "official-docs",
+    label: "Official Docs",
+    hostPatterns: [/.*/],
+    listingPathPatterns: [/\/docs/i, /\/guide/i, /\/learn/i, /\/announcement/i, /\/blog/i, /./],
+  },
+  {
+    id: "official-blog",
+    label: "Official Blog",
+    hostPatterns: [/.*/],
+    listingPathPatterns: [/\/blog/i, /\/news/i, /\/announcement/i, /\/updates?/i, /./],
+  },
+  {
+    id: "foundation-announcements",
+    label: "Foundation Announcements",
+    hostPatterns: [/.*/],
+    listingPathPatterns: [/\/foundation/i, /\/announcements?/i, /\/news/i, /./],
+  },
+  {
+    id: "crypto-news",
+    label: "Crypto News",
+    hostPatterns: [/.*/],
+    listingPathPatterns: [/\/news/i, /\/airdrop/i, /\/campaign/i, /\/token/i, /./],
+  },
+  {
+    id: "static-html",
+    label: "Static HTML",
+    hostPatterns: [/.*/],
+    listingPathPatterns: [/./],
   },
 ];
 
@@ -303,6 +366,43 @@ function normalizeProjectName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function normalizeComparableUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value.trim());
+    const normalizedPath = url.pathname.replace(/\/$/, "").toLowerCase() || "/";
+    return `${url.hostname.replace(/^www\./, "").toLowerCase()}${normalizedPath}`;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeContract(value: string | null | undefined): string | null {
+  const trimmed = String(value ?? "").trim().toLowerCase();
+  if (!trimmed) return null;
+  return /^0x[a-f0-9]{40}$/.test(trimmed) ? trimmed : null;
+}
+
+function buildCandidateIdentityKeys(candidate: DiscoveryCandidate): Set<string> {
+  const keys = new Set<string>();
+  const add = (value: string | null | undefined, prefix: string) => {
+    const trimmed = String(value ?? "").trim();
+    if (!trimmed) return;
+    keys.add(`${prefix}:${trimmed.toLowerCase()}`);
+  };
+
+  add(normalizeProjectName(candidate.projectName), "name");
+  (candidate.knownAliases ?? []).forEach((alias) => add(normalizeProjectName(alias), "alias"));
+  add(normalizeComparableUrl(candidate.listingUrl), "listing");
+  add(normalizeComparableUrl(candidate.projectUrl), "url");
+  add(normalizeComparableUrl(candidate.officialDocsUrl), "url");
+  add(normalizeComparableUrl(candidate.githubUrl), "url");
+  add(normalizeComparableUrl(candidate.officialXUrl), "url");
+  add(normalizeComparableUrl(candidate.officialDiscordUrl), "url");
+  add(normalizeContract(candidate.contractAddress), "contract");
+  return keys;
+}
+
 function toTitleCase(value: string): string {
   return value
     .split(" ")
@@ -352,9 +452,9 @@ function isGenericOpportunityName(name: string): boolean {
 function resolveSourceAdapter(sourceUrl: string): SourceAdapter | null {
   try {
     const hostname = new URL(sourceUrl).hostname.replace(/^www\./, "").toLowerCase();
-    return DISCOVERY_SOURCE_ADAPTERS.find((adapter) => adapter.hostPatterns.some((pattern) => pattern.test(hostname))) || null;
+    return DISCOVERY_SOURCE_ADAPTERS.find((adapter) => adapter.hostPatterns.some((pattern) => pattern.test(hostname))) || inferSourceAdapterFromUrl(sourceUrl);
   } catch {
-    return null;
+    return inferSourceAdapterFromUrl(sourceUrl);
   }
 }
 
@@ -441,6 +541,90 @@ function inferTeamFromText(text: string): string | null {
   const normalized = text.replace(/\s+/g, " ").trim();
   const teamMatch = normalized.match(/\b(founder|founded\s+by|team|co-?founder)\b[^.\n]{0,120}/i);
   return teamMatch ? teamMatch[0] : null;
+}
+
+function extractContractAddress(text: string): string | null {
+  const match = text.match(/\b0x[a-fA-F0-9]{40}\b/);
+  return match ? match[0] : null;
+}
+
+function extractKnownAliases(projectName: string, listingUrl: string, projectUrl: string | null): string[] {
+  const aliases = new Set<string>();
+  const addSlug = (raw: string | null) => {
+    if (!raw) return;
+    try {
+      const parts = new URL(raw).pathname.split("/").filter(Boolean);
+      const slug = parts.length ? parts[parts.length - 1].replace(/[\-_]+/g, " ").trim() : "";
+      const cleaned = sanitizeProjectCandidate(slug);
+      if (cleaned && normalizeProjectName(cleaned) !== normalizeProjectName(projectName)) aliases.add(cleaned);
+    } catch {
+      // ignore bad urls
+    }
+  };
+
+  addSlug(listingUrl);
+  addSlug(projectUrl);
+  return Array.from(aliases).slice(0, 6);
+}
+
+function countOfficialSources(projectUrl: string | null, docsUrl: string | null, githubUrl: string | null, xUrl: string | null, discordUrl: string | null): number {
+  return [projectUrl, docsUrl, githubUrl, xUrl, discordUrl].filter(Boolean).length;
+}
+
+function inferOpportunityType(text: string): "Verified Airdrop" | "Testnet" | "Points Program" | "Speculative Token" | "Scam Alert" {
+  const lowered = text.toLowerCase();
+  if (/scam|phishing|drainer|fake claim|fake airdrop|exploit|blacklist/i.test(lowered)) return "Scam Alert";
+  if (/testnet|devnet|incentivized testnet|beta network/i.test(lowered)) return "Testnet";
+  if (/points|xp|leaderboard|season|missions|quests/i.test(lowered)) return "Points Program";
+  if (/token launch|trading live|memecoin|speculative token|dex pair|liquidity pool/i.test(lowered)) return "Speculative Token";
+  return "Verified Airdrop";
+}
+
+function inferRiskLevel(text: string, opportunityType: string): "Low" | "Medium" | "High" {
+  const lowered = text.toLowerCase();
+  if (opportunityType === "Scam Alert" || /scam|phishing|drainer|fake|impersonat|rug|honeypot/i.test(lowered)) return "High";
+  if (opportunityType === "Speculative Token" || /token launch|no audit|unverified|anonymous|rumou?r/i.test(lowered)) return "Medium";
+  return "Low";
+}
+
+function inferEstimatedQuality(officialSourcesFound: number, confidence: "low" | "medium" | "high", fundingInfo: string | null, teamInfo: string | null): "High" | "Medium" | "Low" {
+  const score = officialSourcesFound + (confidence === "high" ? 2 : confidence === "medium" ? 1 : 0) + (fundingInfo ? 1 : 0) + (teamInfo ? 1 : 0);
+  if (score >= 5) return "High";
+  if (score >= 3) return "Medium";
+  return "Low";
+}
+
+function inferEstimatedDifficulty(text: string, opportunityType: string): "Easy" | "Moderate" | "Hard" {
+  const lowered = text.toLowerCase();
+  if (opportunityType === "Testnet" || /bridge|swap|stake|deploy|multiple tasks|multi-step/i.test(lowered)) return "Hard";
+  if (/quest|campaign|points|signup|social/i.test(lowered)) return "Moderate";
+  return "Easy";
+}
+
+function inferEstimatedTime(text: string, difficulty: "Easy" | "Moderate" | "Hard"): string {
+  const lowered = text.toLowerCase();
+  if (/daily|weekly|ongoing|season/i.test(lowered)) return "Ongoing";
+  if (difficulty === "Hard") return "2-6 hours";
+  if (difficulty === "Moderate") return "30-90 minutes";
+  return "10-30 minutes";
+}
+
+function buildAnalystSummary(projectName: string, opportunityType: string, officialSourcesFound: number, riskLevel: string, detectedKeywords: string[]): string {
+  const keywordText = detectedKeywords.length ? detectedKeywords.slice(0, 4).join(", ") : "limited keyword evidence";
+  return `${projectName} was detected as a ${opportunityType.toLowerCase()} because scan signals matched ${keywordText}. ${officialSourcesFound} official or semi-official source${officialSourcesFound === 1 ? " was" : "s were"} found, and the current risk profile is ${riskLevel.toLowerCase()}.`;
+}
+
+function inferSourceAdapterFromUrl(sourceUrl: string): SourceAdapter {
+  const lowered = sourceUrl.toLowerCase();
+  if (/github\.com\/.+\/.+\/releases/.test(lowered)) return DISCOVERY_SOURCE_ADAPTERS.find((item) => item.id === "github-releases") || DISCOVERY_SOURCE_ADAPTERS[0];
+  if (/github\.com\/.+\/.+/.test(lowered)) return DISCOVERY_SOURCE_ADAPTERS.find((item) => item.id === "github-repository") || DISCOVERY_SOURCE_ADAPTERS[0];
+  if (/sitemap|\.xml($|\?)/.test(lowered)) return DISCOVERY_SOURCE_ADAPTERS.find((item) => item.id === "xml-sitemap") || DISCOVERY_SOURCE_ADAPTERS[0];
+  if (/rss|feed|atom/.test(lowered)) return DISCOVERY_SOURCE_ADAPTERS.find((item) => item.id === "rss-feed") || DISCOVERY_SOURCE_ADAPTERS[0];
+  if (/docs\.|\/docs|\/guide|\/learn/.test(lowered)) return DISCOVERY_SOURCE_ADAPTERS.find((item) => item.id === "official-docs") || DISCOVERY_SOURCE_ADAPTERS[0];
+  if (/foundation|announcements?/.test(lowered)) return DISCOVERY_SOURCE_ADAPTERS.find((item) => item.id === "foundation-announcements") || DISCOVERY_SOURCE_ADAPTERS[0];
+  if (/coindesk|theblock|decrypt|cointelegraph|blockworks/.test(lowered)) return DISCOVERY_SOURCE_ADAPTERS.find((item) => item.id === "crypto-news") || DISCOVERY_SOURCE_ADAPTERS[0];
+  if (/blog|news|updates?/.test(lowered)) return DISCOVERY_SOURCE_ADAPTERS.find((item) => item.id === "official-blog") || DISCOVERY_SOURCE_ADAPTERS[0];
+  return DISCOVERY_SOURCE_ADAPTERS.find((item) => item.id === "static-html") || DISCOVERY_SOURCE_ADAPTERS[0];
 }
 
 function getAdapterParserRule(adapter: SourceAdapter): AdapterParserRule {
@@ -570,10 +754,12 @@ function extractDiscoveryCandidatesFromHtml(html: string, source: SourceInput, a
     const officialUrls = extractOfficialUrlsFromSnippet(snippetHtml, source.source_url);
     const fundingInfo = inferFundingFromText(fullCardText);
     const teamInfo = inferTeamFromText(fullCardText);
+    const contractAddress = extractContractAddress(fullCardText);
 
     const combinedText = [projectName, shortDescription, fullCardText].join(" ");
     const blockchain = inferBlockchainFromText(combinedText);
     const category = inferCategoryFromText(combinedText);
+    const opportunityType = inferOpportunityType(combinedText);
     const hasDescription = Boolean(shortDescription && shortDescription.trim());
     const hasEcosystemSignal = Boolean(blockchain || category);
 
@@ -605,6 +791,14 @@ function extractDiscoveryCandidatesFromHtml(html: string, source: SourceInput, a
       : shortDescription || listingDate
       ? "medium"
       : "low";
+    const officialSourcesFound = countOfficialSources(projectUrl, officialUrls.docsUrl, officialUrls.githubUrl, officialUrls.xUrl, officialUrls.discordUrl);
+    const riskLevel = inferRiskLevel(combinedText, opportunityType);
+    const estimatedQuality = inferEstimatedQuality(officialSourcesFound, confidence, fundingInfo, teamInfo);
+    const estimatedDifficulty = inferEstimatedDifficulty(combinedText, opportunityType);
+    const estimatedTime = inferEstimatedTime(combinedText, estimatedDifficulty);
+    const detectedKeywords = detectKeywordsFromText(`${projectName} ${shortDescription || ""} ${fullCardText}`);
+    const knownAliases = extractKnownAliases(projectName, listingUrl, projectUrl);
+    const analystSummary = buildAnalystSummary(projectName, opportunityType, officialSourcesFound, riskLevel, detectedKeywords);
 
     const dedupeKey = `${normalizeProjectName(projectName)}::${listingUrl}`;
     if (dedupe.has(dedupeKey)) {
@@ -619,6 +813,7 @@ function extractDiscoveryCandidatesFromHtml(html: string, source: SourceInput, a
       listingUrl,
       blockchain,
       category,
+      opportunityType,
       shortDescription,
       listingDate,
       confidence,
@@ -627,9 +822,17 @@ function extractDiscoveryCandidatesFromHtml(html: string, source: SourceInput, a
       githubUrl: officialUrls.githubUrl,
       officialXUrl: officialUrls.xUrl,
       officialDiscordUrl: officialUrls.discordUrl,
+      contractAddress,
+      knownAliases,
       fundingInfo,
       teamInfo,
-      detectedKeywords: detectKeywordsFromText(`${projectName} ${shortDescription || ""} ${fullCardText}`),
+      riskLevel,
+      officialSourcesFound,
+      estimatedQuality,
+      estimatedDifficulty,
+      estimatedTime,
+      analystSummary,
+      detectedKeywords,
       reasonDetected: `Matched listing link pattern from ${adapter.label} adapter and extracted project card signals.`,
     });
   }
@@ -645,12 +848,24 @@ function extractDiscoveryCandidatesFromHtml(html: string, source: SourceInput, a
 
 function dedupeCandidates(candidates: DiscoveryCandidate[]): DiscoveryCandidate[] {
   const seen = new Set<string>();
+  const seenIdentityKeys = new Set<string>();
   const result: DiscoveryCandidate[] = [];
 
   for (const candidate of candidates) {
     const key = `${normalizeProjectName(candidate.projectName)}::${candidate.listingUrl}`;
+    const identityKeys = buildCandidateIdentityKeys(candidate);
     if (seen.has(key)) continue;
+    let identityDuplicate = false;
+    for (const identityKey of identityKeys) {
+      if (seenIdentityKeys.has(identityKey)) {
+        identityDuplicate = true;
+        break;
+      }
+    }
+    if (identityDuplicate) continue;
+
     seen.add(key);
+    identityKeys.forEach((identityKey) => seenIdentityKeys.add(identityKey));
     result.push(candidate);
   }
 
@@ -706,6 +921,16 @@ function extractFallbackCandidatesFromHtml(html: string, source: SourceInput, ad
     const officialUrls = extractOfficialUrlsFromSnippet(input.sourceText, source.source_url);
     const blockchain = inferBlockchainFromText(fullText);
     const category = inferCategoryFromText(fullText);
+    const opportunityType = inferOpportunityType(fullText);
+    const contractAddress = extractContractAddress(fullText);
+    const detectedKeywords = detectKeywordsFromText(fullText);
+    const officialSourcesFound = countOfficialSources(input.projectUrl, officialUrls.docsUrl, officialUrls.githubUrl, officialUrls.xUrl, officialUrls.discordUrl);
+    const riskLevel = inferRiskLevel(fullText, opportunityType);
+    const estimatedQuality = inferEstimatedQuality(officialSourcesFound, input.projectUrl || input.shortDescription ? "medium" : "low", inferFundingFromText(fullText), inferTeamFromText(fullText));
+    const estimatedDifficulty = inferEstimatedDifficulty(fullText, opportunityType);
+    const estimatedTime = inferEstimatedTime(fullText, estimatedDifficulty);
+    const knownAliases = extractKnownAliases(projectName, input.listingUrl, input.projectUrl);
+    const analystSummary = buildAnalystSummary(projectName, opportunityType, officialSourcesFound, riskLevel, detectedKeywords);
 
     found.push({
       projectName,
@@ -713,6 +938,7 @@ function extractFallbackCandidatesFromHtml(html: string, source: SourceInput, ad
       listingUrl: input.listingUrl,
       blockchain,
       category,
+      opportunityType,
       shortDescription: input.shortDescription || null,
       listingDate: input.listingDate || null,
       confidence: input.projectUrl || input.shortDescription ? "medium" : "low",
@@ -721,9 +947,17 @@ function extractFallbackCandidatesFromHtml(html: string, source: SourceInput, ad
       githubUrl: officialUrls.githubUrl,
       officialXUrl: officialUrls.xUrl,
       officialDiscordUrl: officialUrls.discordUrl,
+      contractAddress,
+      knownAliases,
       fundingInfo: inferFundingFromText(fullText),
       teamInfo: inferTeamFromText(fullText),
-      detectedKeywords: detectKeywordsFromText(fullText),
+      riskLevel,
+      officialSourcesFound,
+      estimatedQuality,
+      estimatedDifficulty,
+      estimatedTime,
+      analystSummary,
+      detectedKeywords,
       reasonDetected: input.reasonDetected,
     });
   };
@@ -866,6 +1100,102 @@ function extractFallbackCandidatesFromHtml(html: string, source: SourceInput, ad
   };
 }
 
+function extractDiscoveryCandidatesFromXml(xml: string, source: SourceInput, adapter: SourceAdapter): DiscoveryExtractionResult {
+  const candidates: DiscoveryCandidate[] = [];
+  const rejectedByReason: Record<string, number> = {};
+  const rejectionSamples: string[] = [];
+
+  const addRejection = (reason: string, sample?: string | null) => {
+    rejectedByReason[reason] = (rejectedByReason[reason] || 0) + 1;
+    if (sample && rejectionSamples.length < 8) rejectionSamples.push(`${reason}: ${sample.slice(0, 120)}`);
+  };
+
+  const entryMatches = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/(item|entry)>/gi)];
+  const urlMatches = entryMatches.length === 0 ? [...xml.matchAll(/<url>\s*<loc>([^<]+)<\/loc>[\s\S]*?<\/url>/gi)] : [];
+
+  const pushCandidate = (rawName: string | null, listingUrl: string | null, description: string | null, listingDate: string | null) => {
+    if (!listingUrl) {
+      addRejection('missing_listing_url', rawName);
+      return;
+    }
+    const safeName = sanitizeProjectCandidate(rawName || listingUrl.split('/').filter(Boolean).pop() || '');
+    if (!safeName) {
+      addRejection('invalid_project_name', rawName || listingUrl);
+      return;
+    }
+    const fullText = `${safeName} ${description || ''}`;
+    const blockchain = inferBlockchainFromText(fullText);
+    const category = inferCategoryFromText(fullText);
+    const opportunityType = inferOpportunityType(fullText);
+    const contractAddress = extractContractAddress(fullText);
+    const knownAliases = extractKnownAliases(safeName, listingUrl, listingUrl);
+    const detectedKeywords = detectKeywordsFromText(fullText);
+    const officialSourcesFound = countOfficialSources(listingUrl, null, null, null, null);
+    const riskLevel = inferRiskLevel(fullText, opportunityType);
+    const estimatedQuality = inferEstimatedQuality(officialSourcesFound, description ? 'medium' : 'low', null, null);
+    const estimatedDifficulty = inferEstimatedDifficulty(fullText, opportunityType);
+    const estimatedTime = inferEstimatedTime(fullText, estimatedDifficulty);
+    const analystSummary = buildAnalystSummary(safeName, opportunityType, officialSourcesFound, riskLevel, detectedKeywords);
+
+    candidates.push({
+      projectName: safeName,
+      projectUrl: listingUrl,
+      listingUrl,
+      blockchain,
+      category,
+      opportunityType,
+      shortDescription: description,
+      listingDate,
+      confidence: description ? 'medium' : 'low',
+      sourceLabel: adapter.label,
+      officialDocsUrl: null,
+      githubUrl: null,
+      officialXUrl: null,
+      officialDiscordUrl: null,
+      contractAddress,
+      knownAliases,
+      fundingInfo: inferFundingFromText(fullText),
+      teamInfo: inferTeamFromText(fullText),
+      riskLevel,
+      officialSourcesFound,
+      estimatedQuality,
+      estimatedDifficulty,
+      estimatedTime,
+      analystSummary,
+      detectedKeywords,
+      reasonDetected: `Detected from ${adapter.label} feed or sitemap extraction.`,
+    });
+  };
+
+  if (entryMatches.length > 0) {
+    for (const match of entryMatches) {
+      const block = match[0] || '';
+      const title = stripHtml(block.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '');
+      const description = stripHtml(block.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1] || block.match(/<summary[^>]*>([\s\S]*?)<\/summary>/i)?.[1] || '');
+      const link = block.match(/<link[^>]*>([^<]+)<\/link>/i)?.[1]
+        || block.match(/<link[^>]*href=["']([^"']+)["']/i)?.[1]
+        || block.match(/<guid[^>]*>([^<]+)<\/guid>/i)?.[1]
+        || null;
+      const listingDate = stripHtml(block.match(/<pubDate[^>]*>([\s\S]*?)<\/pubDate>/i)?.[1] || block.match(/<updated[^>]*>([\s\S]*?)<\/updated>/i)?.[1] || '');
+      pushCandidate(title || null, link, description || null, listingDate || null);
+    }
+  } else {
+    for (const match of urlMatches) {
+      const listingUrl = (match[1] || '').trim();
+      pushCandidate(null, listingUrl, null, null);
+    }
+  }
+
+  const deduped = dedupeCandidates(candidates);
+  return {
+    candidates: deduped,
+    cardsFound: entryMatches.length > 0 ? entryMatches.length : urlMatches.length,
+    candidatesRejected: Object.values(rejectedByReason).reduce((sum, value) => sum + value, 0),
+    rejectedByReason,
+    rejectionSamples,
+  };
+}
+
 async function ensureAdminUser(
   authHeader: string,
   supabaseUrl: string,
@@ -980,7 +1310,7 @@ Deno.serve(async (req: Request) => {
         response = await fetch(source.source_url, {
           method: "GET",
           headers: {
-            "Accept": "text/html,application/xhtml+xml",
+            "Accept": "text/html,application/xhtml+xml,application/xml,text/xml,application/rss+xml,application/atom+xml",
             "User-Agent": USER_AGENT,
           },
           signal: AbortSignal.timeout(timeoutMs),
@@ -1055,9 +1385,14 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
+      const contentType = (response.headers.get("content-type") || "").toLowerCase();
+      const looksLikeXml = /xml|rss|atom/.test(contentType) || /^\s*</.test(html) && /<(rss|feed|urlset|sitemapindex)\b/i.test(html);
+
       let extraction: DiscoveryExtractionResult;
       try {
-        extraction = extractDiscoveryCandidatesFromHtml(html, source, adapter);
+        extraction = looksLikeXml
+          ? extractDiscoveryCandidatesFromXml(html, source, adapter)
+          : extractDiscoveryCandidatesFromHtml(html, source, adapter);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         results.push({

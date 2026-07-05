@@ -327,7 +327,7 @@ interface BannerAd {
 type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt'>;
 
 type ContentView = 'airdrops' | 'articles' | 'hero' | 'featured' | 'trending' | 'learn' | 'sections';
-type AdminView = 'overview' | 'airdrops' | 'submissions' | 'competitor-watch' | 'articles' | 'social-admin' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
+type AdminView = 'overview' | 'airdrops' | 'speculative-tokens' | 'submissions' | 'competitor-watch' | 'articles' | 'social-admin' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
 
 interface ControlArticle {
   id: string;
@@ -456,6 +456,7 @@ type DiscoveryCandidate = {
   listingUrl: string;
   blockchain: string | null;
   category: string | null;
+  opportunityType?: 'Verified Airdrop' | 'Testnet' | 'Points Program' | 'Speculative Token' | 'Scam Alert' | null;
   shortDescription: string | null;
   listingDate: string | null;
   confidence: 'low' | 'medium' | 'high';
@@ -464,8 +465,16 @@ type DiscoveryCandidate = {
   githubUrl: string | null;
   officialXUrl: string | null;
   officialDiscordUrl: string | null;
+  contractAddress?: string | null;
+  knownAliases?: string[];
   fundingInfo: string | null;
   teamInfo: string | null;
+  riskLevel?: 'Low' | 'Medium' | 'High';
+  officialSourcesFound?: number;
+  estimatedQuality?: 'High' | 'Medium' | 'Low';
+  estimatedDifficulty?: 'Easy' | 'Moderate' | 'Hard';
+  estimatedTime?: string;
+  analystSummary?: string;
   detectedKeywords: string[];
   reasonDetected: string;
 };
@@ -711,6 +720,101 @@ function tokenOverlapScore(a: string, b: string): number {
   return overlap / Math.max(aTokens.size, bTokens.size);
 }
 
+function normalizeComparableUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value.trim());
+    const normalizedPath = url.pathname.replace(/\/$/, '').toLowerCase() || '/';
+    return `${url.hostname.replace(/^www\./, '').toLowerCase()}${normalizedPath}`;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeContract(value: string | null | undefined): string | null {
+  const trimmed = String(value ?? '').trim().toLowerCase();
+  if (!trimmed) return null;
+  return /^0x[a-f0-9]{40}$/.test(trimmed) ? trimmed : null;
+}
+
+function buildCandidateIdentityKeys(candidate: DiscoveryCandidate): Set<string> {
+  const keys = new Set<string>();
+  const add = (value: string | null | undefined, prefix: string) => {
+    const trimmed = String(value ?? '').trim();
+    if (!trimmed) return;
+    keys.add(`${prefix}:${trimmed.toLowerCase()}`);
+  };
+
+  add(normalizeProjectName(candidate.projectName), 'name');
+  (candidate.knownAliases ?? []).forEach((alias) => add(normalizeProjectName(alias), 'alias'));
+  add(normalizeComparableUrl(candidate.projectUrl), 'url');
+  add(normalizeComparableUrl(candidate.officialDocsUrl), 'url');
+  add(normalizeComparableUrl(candidate.githubUrl), 'url');
+  add(normalizeComparableUrl(candidate.officialXUrl), 'url');
+  add(normalizeComparableUrl(candidate.officialDiscordUrl), 'url');
+  add(normalizeContract(candidate.contractAddress), 'contract');
+  return keys;
+}
+
+function buildAirdropIdentityKeys(airdrop: Airdrop): Set<string> {
+  const keys = new Set<string>();
+  const add = (value: string | null | undefined, prefix: string) => {
+    const trimmed = String(value ?? '').trim();
+    if (!trimmed) return;
+    keys.add(`${prefix}:${trimmed.toLowerCase()}`);
+  };
+
+  add(normalizeProjectName(airdrop.name), 'name');
+  add(normalizeProjectName(airdrop.ticker ?? ''), 'alias');
+  add(normalizeComparableUrl(airdrop.website_url), 'url');
+  add(normalizeComparableUrl(airdrop.docs_url), 'url');
+  add(normalizeComparableUrl(airdrop.github_url), 'url');
+  add(normalizeComparableUrl(airdrop.twitter_url), 'url');
+  add(normalizeComparableUrl(airdrop.discord_url), 'url');
+  add(normalizeComparableUrl(airdrop.telegram_url), 'url');
+  add(normalizeContract(airdrop.contract_address), 'contract');
+  return keys;
+}
+
+function hasIdentityOverlap(left: Set<string>, right: Set<string>): boolean {
+  for (const key of left) {
+    if (right.has(key)) return true;
+  }
+  return false;
+}
+
+function buildOpportunityIdentityKeys(opportunity: CompetitorOpportunity): Set<string> {
+  const details = getOpportunityDiscoveryDetails(opportunity);
+  return buildCandidateIdentityKeys({
+    projectName: opportunity.project_name,
+    projectUrl: details.projectUrl,
+    listingUrl: details.listingUrl,
+    blockchain: opportunity.blockchain,
+    category: opportunity.category,
+    opportunityType: details.opportunityType,
+    shortDescription: details.shortDescription,
+    listingDate: details.listingDate,
+    confidence: opportunity.confidence_level,
+    sourceLabel: details.sourceLabel,
+    officialDocsUrl: details.officialDocsUrl,
+    githubUrl: details.githubUrl,
+    officialXUrl: details.officialXUrl,
+    officialDiscordUrl: details.officialDiscordUrl,
+    contractAddress: details.contractAddress,
+    knownAliases: details.knownAliases,
+    fundingInfo: details.fundingInfo,
+    teamInfo: details.teamInfo,
+    riskLevel: details.riskLevel,
+    officialSourcesFound: details.officialSourcesFound,
+    estimatedQuality: details.estimatedQuality,
+    estimatedDifficulty: details.estimatedDifficulty,
+    estimatedTime: details.estimatedTime || undefined,
+    analystSummary: details.analystSummary || undefined,
+    detectedKeywords: details.detectedKeywords,
+    reasonDetected: details.reasonDetected,
+  });
+}
+
 function compareCandidateAgainstAirdrops(
   candidate: DiscoveryCandidate,
   airdrops: Airdrop[]
@@ -720,13 +824,17 @@ function compareCandidateAgainstAirdrops(
   whyNew: string;
   matchedProject: string | null;
 } {
+  const candidateIdentity = buildCandidateIdentityKeys(candidate);
   const normalizedCandidate = normalizeProjectName(candidate.projectName);
-  const exactMatch = airdrops.find((airdrop) => normalizeProjectName(airdrop.name) === normalizedCandidate);
+  const exactMatch = airdrops.find((airdrop) => {
+    if (normalizeProjectName(airdrop.name) === normalizedCandidate) return true;
+    return hasIdentityOverlap(candidateIdentity, buildAirdropIdentityKeys(airdrop));
+  });
   if (exactMatch) {
     return {
       comparison: 'exact_match',
       confidenceScore: 96,
-      whyNew: `Matches existing listing exactly (${exactMatch.name}).`,
+      whyNew: `Matches an existing listing identity (${exactMatch.name}).`,
       matchedProject: exactMatch.name,
     };
   }
@@ -1393,6 +1501,15 @@ function getOpportunityDiscoveryDetails(opportunity: CompetitorOpportunity): {
   listingUrl: string;
   shortDescription: string | null;
   listingDate: string | null;
+  opportunityType: 'Verified Airdrop' | 'Testnet' | 'Points Program' | 'Speculative Token' | 'Scam Alert';
+  riskLevel: 'Low' | 'Medium' | 'High';
+  officialSourcesFound: number;
+  estimatedQuality: 'High' | 'Medium' | 'Low';
+  estimatedDifficulty: 'Easy' | 'Moderate' | 'Hard';
+  estimatedTime: string | null;
+  analystSummary: string | null;
+  contractAddress: string | null;
+  knownAliases: string[];
   compare: string;
   comparisonType: DiscoveryComparisonType;
   confidenceScore: number;
@@ -1420,6 +1537,15 @@ function getOpportunityDiscoveryDetails(opportunity: CompetitorOpportunity): {
     listingUrl: opportunity.source_url,
     shortDescription: null,
     listingDate: null,
+    opportunityType: 'Verified Airdrop' as const,
+    riskLevel: 'Medium' as const,
+    officialSourcesFound: 0,
+    estimatedQuality: 'Medium' as const,
+    estimatedDifficulty: 'Moderate' as const,
+    estimatedTime: null,
+    analystSummary: null,
+    contractAddress: null,
+    knownAliases: [] as string[],
     compare: 'No existing AirdropGuard listing match found',
     comparisonType: 'new_project' as DiscoveryComparisonType,
     confidenceScore: 60,
@@ -1452,6 +1578,25 @@ function getOpportunityDiscoveryDetails(opportunity: CompetitorOpportunity): {
       listingUrl: typeof parsed.listing_url === 'string' && parsed.listing_url.trim() ? parsed.listing_url : fallback.listingUrl,
       shortDescription: typeof parsed.short_description === 'string' && parsed.short_description.trim() ? parsed.short_description : null,
       listingDate: typeof parsed.listing_date === 'string' && parsed.listing_date.trim() ? parsed.listing_date : null,
+      opportunityType: parsed.opportunity_type === 'Verified Airdrop' || parsed.opportunity_type === 'Testnet' || parsed.opportunity_type === 'Points Program' || parsed.opportunity_type === 'Speculative Token' || parsed.opportunity_type === 'Scam Alert'
+        ? parsed.opportunity_type
+        : fallback.opportunityType,
+      riskLevel: parsed.risk_level === 'Low' || parsed.risk_level === 'Medium' || parsed.risk_level === 'High'
+        ? parsed.risk_level
+        : fallback.riskLevel,
+      officialSourcesFound: typeof parsed.official_sources_found === 'number' ? parsed.official_sources_found : fallback.officialSourcesFound,
+      estimatedQuality: parsed.estimated_quality === 'High' || parsed.estimated_quality === 'Medium' || parsed.estimated_quality === 'Low'
+        ? parsed.estimated_quality
+        : fallback.estimatedQuality,
+      estimatedDifficulty: parsed.estimated_difficulty === 'Easy' || parsed.estimated_difficulty === 'Moderate' || parsed.estimated_difficulty === 'Hard'
+        ? parsed.estimated_difficulty
+        : fallback.estimatedDifficulty,
+      estimatedTime: typeof parsed.estimated_time === 'string' && parsed.estimated_time.trim() ? parsed.estimated_time : null,
+      analystSummary: typeof parsed.analyst_summary === 'string' && parsed.analyst_summary.trim() ? parsed.analyst_summary : null,
+      contractAddress: typeof parsed.contract_address === 'string' && parsed.contract_address.trim() ? parsed.contract_address : null,
+      knownAliases: Array.isArray(parsed.known_aliases)
+        ? parsed.known_aliases.filter((value): value is string => typeof value === 'string' && value.trim().length > 0).slice(0, 6)
+        : fallback.knownAliases,
       compare: typeof parsed.compare === 'string' && parsed.compare.trim() ? parsed.compare : fallback.compare,
       comparisonType: parsed.comparison_type === 'exact_match' || parsed.comparison_type === 'similar_project' || parsed.comparison_type === 'new_project'
         ? parsed.comparison_type
@@ -2568,6 +2713,14 @@ export default function AdminPage() {
   const [deletingAirdrop, setDeletingAirdrop] = useState<Airdrop | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [refreshingAll, setRefreshingAll] = useState(false);
+  const [airdropCategoryFilter, setAirdropCategoryFilter] = useState<'all' | 'Verified Airdrop' | 'Testnet' | 'Points Program' | 'Ecosystem Campaign' | 'Under Review'>('all');
+  const [airdropChainFilter, setAirdropChainFilter] = useState<string>('all');
+  const [airdropPublishedFilter, setAirdropPublishedFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [specRiskFilter, setSpecRiskFilter] = useState<'all' | 'Low' | 'Medium' | 'High'>('all');
+  const [specChainFilter, setSpecChainFilter] = useState<string>('all');
+  const [specPublishedFilter, setSpecPublishedFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [specSecurityFilter, setSpecSecurityFilter] = useState<'all' | 'high' | 'medium' | 'low' | 'missing'>('all');
+  const [specMissingContractFilter, setSpecMissingContractFilter] = useState<'all' | 'missing' | 'present'>('all');
 
   const [banners, setBanners] = useState<BannerAd[]>(() => {
     const today = new Date();
@@ -2955,9 +3108,61 @@ export default function AdminPage() {
     rejected: { label: 'Rejected', tone: 'text-amber-200 border-amber-500/25 bg-amber-500/10' },
   };
 
+  const getAdminOpportunityBucket = useCallback((airdrop: Airdrop): 'Verified Airdrop' | 'Testnet' | 'Points Program' | 'Ecosystem Campaign' | 'Under Review' | 'Speculative Token' | 'Scam Alert' => {
+    const opportunityType = getOpportunityType(airdrop);
+    if (opportunityType === 'Speculative Token') return 'Speculative Token';
+    if (opportunityType === 'Scam Alert') return 'Scam Alert';
+    if (airdrop.listing_state === 'under_review') return 'Under Review';
+    if (opportunityType === 'Verified Airdrop') return 'Verified Airdrop';
+    if (opportunityType === 'Testnet') return 'Testnet';
+    if (opportunityType === 'Points Program') return 'Points Program';
+    return 'Ecosystem Campaign';
+  }, []);
+
+  const getSpeculativeSecurityScore = useCallback((airdrop: Airdrop): number | null => {
+    const v16Security = airdrop.sub_scores?.v16_security_score;
+    if (typeof v16Security === 'number' && Number.isFinite(v16Security)) return Math.round(v16Security);
+    return airdrop.trust_score ?? null;
+  }, []);
+
+  const airdropListings = useMemo(() => airdrops.filter((airdrop) => {
+    const bucket = getAdminOpportunityBucket(airdrop);
+    return bucket !== 'Speculative Token' && bucket !== 'Scam Alert';
+  }), [airdrops, getAdminOpportunityBucket]);
+
+  const speculativeTokenListings = useMemo(
+    () => airdrops.filter((airdrop) => getAdminOpportunityBucket(airdrop) === 'Speculative Token'),
+    [airdrops, getAdminOpportunityBucket],
+  );
+
+  const filteredAirdropListings = useMemo(() => airdropListings.filter((airdrop) => {
+    const bucket = getAdminOpportunityBucket(airdrop);
+    if (airdropCategoryFilter !== 'all' && bucket !== airdropCategoryFilter) return false;
+    if (airdropChainFilter !== 'all' && !(airdrop.blockchain ?? []).includes(airdropChainFilter as Blockchain)) return false;
+    if (airdropPublishedFilter === 'published' && !airdrop.published) return false;
+    if (airdropPublishedFilter === 'draft' && airdrop.published) return false;
+    return true;
+  }), [airdropListings, getAdminOpportunityBucket, airdropCategoryFilter, airdropChainFilter, airdropPublishedFilter]);
+
+  const filteredSpeculativeTokenListings = useMemo(() => speculativeTokenListings.filter((airdrop) => {
+    const securityScore = getSpeculativeSecurityScore(airdrop);
+    if (specRiskFilter !== 'all' && airdrop.risk_level !== specRiskFilter) return false;
+    if (specChainFilter !== 'all' && !(airdrop.blockchain ?? []).includes(specChainFilter as Blockchain)) return false;
+    if (specPublishedFilter === 'published' && !airdrop.published) return false;
+    if (specPublishedFilter === 'draft' && airdrop.published) return false;
+    if (specSecurityFilter === 'high' && (securityScore === null || securityScore < 70)) return false;
+    if (specSecurityFilter === 'medium' && (securityScore === null || securityScore < 40 || securityScore >= 70)) return false;
+    if (specSecurityFilter === 'low' && (securityScore === null || securityScore >= 40)) return false;
+    if (specSecurityFilter === 'missing' && securityScore !== null) return false;
+    if (specMissingContractFilter === 'missing' && !!airdrop.contract_address) return false;
+    if (specMissingContractFilter === 'present' && !airdrop.contract_address) return false;
+    return true;
+  }), [speculativeTokenListings, getSpeculativeSecurityScore, specRiskFilter, specChainFilter, specPublishedFilter, specSecurityFilter, specMissingContractFilter]);
+
   const adminNavItems: Array<{ id: AdminView; label: string; blurb: string }> = useMemo(() => [
     { id: 'overview', label: 'Overview', blurb: 'Command centre summary and alerts' },
     { id: 'airdrops', label: 'Airdrops', blurb: 'Listings, publish, health, queue' },
+    { id: 'speculative-tokens', label: 'Speculative Tokens', blurb: 'High-risk token listings and security review' },
     { id: 'submissions', label: 'Submissions', blurb: 'Project and scam report triage' },
     { id: 'competitor-watch', label: 'Competitor Watch', blurb: 'Missing-opportunity monitoring' },
     { id: 'articles', label: 'Articles', blurb: 'Unified content editor, SEO and publishing workflow' },
@@ -3936,9 +4141,7 @@ export default function AdminPage() {
       const scanUpdates: Record<string, CompetitorSourceScanResult> = {};
       const debugUpdates: Record<string, CompetitorScanDebugResult> = {};
       const pendingAdds: PendingDiscoveryCandidate[] = [];
-      const existingKeys = new Set(
-        competitorOpportunities.map((item) => `${item.source_id}::${normalizeProjectName(item.project_name)}`)
-      );
+      const existingOpportunityIdentities = competitorOpportunities.map((item) => buildOpportunityIdentityKeys(item));
       const pendingKeys = new Set(
         pendingDiscoveryCandidates.map((item) => `${item.sourceId}::${normalizeProjectName(item.candidate.projectName)}::${item.candidate.listingUrl}`)
       );
@@ -4079,8 +4282,8 @@ export default function AdminPage() {
 
         for (const candidate of result.candidatesExtracted) {
           const normalizedName = normalizeProjectName(candidate.projectName);
-          const key = `${source.id}::${normalizedName}`;
-          if (existingKeys.has(key)) {
+          const candidateIdentity = buildCandidateIdentityKeys(candidate);
+          if (existingOpportunityIdentities.some((identity) => hasIdentityOverlap(identity, candidateIdentity))) {
             registerRejection(localRejections, 'already_tracked');
             continue;
           }
@@ -4125,14 +4328,23 @@ export default function AdminPage() {
             source_reliability: sourceReliability,
             project_url: candidate.projectUrl,
             listing_url: candidate.listingUrl,
+            opportunity_type: candidate.opportunityType,
             short_description: candidate.shortDescription,
             listing_date: candidate.listingDate,
             official_docs_url: candidate.officialDocsUrl,
             github_url: candidate.githubUrl,
             official_x_url: candidate.officialXUrl,
             official_discord_url: candidate.officialDiscordUrl,
+            contract_address: candidate.contractAddress,
+            known_aliases: candidate.knownAliases,
             funding_info: candidate.fundingInfo,
             team_info: candidate.teamInfo,
+            risk_level: candidate.riskLevel,
+            official_sources_found: candidate.officialSourcesFound,
+            estimated_quality: candidate.estimatedQuality,
+            estimated_difficulty: candidate.estimatedDifficulty,
+            estimated_time: candidate.estimatedTime,
+            analyst_summary: candidate.analystSummary,
             compare: compareMessage,
             comparison_type: comparison.comparison,
             confidence_score: confidenceScore,
@@ -4197,7 +4409,7 @@ export default function AdminPage() {
           if (error) throw error;
           if (!inserted) continue;
 
-          existingKeys.add(key);
+          existingOpportunityIdentities.push(candidateIdentity);
           setCompetitorOpportunities((prev) => [inserted as CompetitorOpportunity, ...prev]);
           foundForSource += 1;
 
@@ -4370,10 +4582,8 @@ export default function AdminPage() {
   }, [describeFunctionInvokeErrorDetailed, setCompetitorUiError, showToast]);
 
   const approvePendingDiscoveryCandidate = useCallback(async (pending: PendingDiscoveryCandidate) => {
-    const normalized = normalizeProjectName(pending.candidate.projectName);
-    const duplicateExisting = competitorOpportunities.some((item) => (
-      item.source_id === pending.sourceId && normalizeProjectName(item.project_name) === normalized
-    ));
+    const candidateIdentity = buildCandidateIdentityKeys(pending.candidate);
+    const duplicateExisting = competitorOpportunities.some((item) => hasIdentityOverlap(buildOpportunityIdentityKeys(item), candidateIdentity));
 
     if (duplicateExisting) {
       setPendingDiscoveryCandidates((prev) => prev.filter((item) => item.id !== pending.id));
@@ -4388,14 +4598,23 @@ export default function AdminPage() {
       source_reliability: pending.sourceReliability,
       project_url: pending.candidate.projectUrl,
       listing_url: pending.candidate.listingUrl,
+      opportunity_type: pending.candidate.opportunityType,
       short_description: pending.candidate.shortDescription,
       listing_date: pending.candidate.listingDate,
       official_docs_url: pending.candidate.officialDocsUrl,
       github_url: pending.candidate.githubUrl,
       official_x_url: pending.candidate.officialXUrl,
       official_discord_url: pending.candidate.officialDiscordUrl,
+      contract_address: pending.candidate.contractAddress,
+      known_aliases: pending.candidate.knownAliases,
       funding_info: pending.candidate.fundingInfo,
       team_info: pending.candidate.teamInfo,
+      risk_level: pending.candidate.riskLevel,
+      official_sources_found: pending.candidate.officialSourcesFound,
+      estimated_quality: pending.candidate.estimatedQuality,
+      estimated_difficulty: pending.candidate.estimatedDifficulty,
+      estimated_time: pending.candidate.estimatedTime,
+      analyst_summary: pending.candidate.analystSummary,
       compare: pending.compareMessage,
       comparison_type: pending.comparisonType,
       confidence_score: pending.confidenceScore,
@@ -4773,6 +4992,53 @@ export default function AdminPage() {
   }, [updateOpportunityStatus, describeError, setCompetitorUiError, showToast]);
 
   const openAdd = () => { setForm(BLANK_FORM); setEditingId(null); setModalMode('add'); };
+
+  const openAddSpeculative = () => {
+    setForm(normalizeSpeculativeForm({
+      ...BLANK_FORM,
+      category: [SPECULATIVE_TOKEN_CATEGORY],
+      risk_level: 'High',
+    }));
+    setEditingId(null);
+    setModalMode('add');
+  };
+
+  const openAddFromDiscovery = (opportunity: CompetitorOpportunity, asSpeculative = false) => {
+    const details = getOpportunityDiscoveryDetails(opportunity);
+    const mappedCategory = (() => {
+      if (asSpeculative || details.opportunityType === 'Speculative Token') return ['Speculative Token'] as Category[];
+      if (details.opportunityType === 'Testnet') return ['Testnet'] as Category[];
+      if (details.opportunityType === 'Points Program') return ['Points Program'] as Category[];
+      if (details.opportunityType === 'Scam Alert') return ['Scam Alert'] as Category[];
+      return ['Verified Airdrop'] as Category[];
+    })();
+
+    const nextForm = normalizeSpeculativeForm({
+      ...BLANK_FORM,
+      name: opportunity.project_name,
+      ticker: '',
+      ai_summary: details.analystSummary || details.shortDescription || '',
+      website_url: details.projectUrl || details.listingUrl,
+      twitter_url: details.officialXUrl || '',
+      discord_url: details.officialDiscordUrl || '',
+      github_url: details.githubUrl || '',
+      contract_address: details.contractAddress || '',
+      docs_url: details.officialDocsUrl || '',
+      funding_info: details.fundingInfo || '',
+      team_info: details.teamInfo || '',
+      time_required: details.estimatedTime || BLANK_FORM.time_required,
+      blockchain: opportunity.blockchain && BLOCKCHAIN_OPTIONS.includes(opportunity.blockchain as Blockchain) ? [opportunity.blockchain as Blockchain] : [],
+      category: mappedCategory,
+      difficulty: details.estimatedDifficulty,
+      risk_level: details.riskLevel,
+      reward_potential: asSpeculative ? 'Low' : details.estimatedQuality === 'High' ? 'High' : details.estimatedQuality === 'Medium' ? 'Medium' : 'Low',
+      tasks_text: details.detectedKeywords.length ? `Investigate discovery signals: ${details.detectedKeywords.join(', ')}` : '',
+    });
+
+    setForm(nextForm);
+    setEditingId(null);
+    setModalMode('add');
+  };
 
   const openAddBanner = () => {
     setBannerForm(BLANK_BANNER_FORM);
@@ -7439,8 +7705,8 @@ export default function AdminPage() {
       <section id="admin-competitor-watch" className={`rounded-2xl border border-fuchsia-500/20 bg-fuchsia-500/[0.05] p-4 space-y-3 ${canShowSection('competitor-watch') ? '' : 'hidden'}`}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
-            <h2 className="text-sm font-bold text-fuchsia-200 flex items-center gap-2"><Radar className="w-4 h-4" /> Competitor Watch</h2>
-            <p className="text-xs text-gray-400 mt-1">Track external sources and queue new projects found for human review only.</p>
+            <h2 className="text-sm font-bold text-fuchsia-200 flex items-center gap-2"><Radar className="w-4 h-4" /> Competitor Watch Discovery Queue</h2>
+            <p className="text-xs text-gray-400 mt-1">Modular source discovery for blogs, feeds, docs, GitHub, campaign hubs and news sites. New opportunities are queued here for admin review.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <label className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-2.5 py-1 text-xs text-gray-300">
@@ -7518,7 +7784,7 @@ export default function AdminPage() {
         </div>
 
         <div className="glass-card p-3 space-y-2">
-          <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">Competitor Sources</p>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">Discovery Sources</p>
           <div className="grid gap-2 md:grid-cols-3">
             <input value={newSourceName} onChange={(event) => setNewSourceName(event.target.value)} className="bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white" placeholder="Source name" />
             <input value={newSourceUrl} onChange={(event) => setNewSourceUrl(event.target.value)} className="bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-white md:col-span-2" placeholder="https://source-site.example" />
@@ -7574,7 +7840,7 @@ export default function AdminPage() {
 
         <div className="glass-card p-3 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">Preview Scan Results</p>
+            <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">Discovery Queue Preview</p>
             <span className="text-[11px] text-gray-400">Pending approvals: {prioritizedPendingDiscoveryCandidates.length}</span>
           </div>
           {prioritizedPendingDiscoveryCandidates.length === 0 ? (
@@ -7614,7 +7880,7 @@ export default function AdminPage() {
                         onClick={() => void approvePendingDiscoveryCandidate(pending)}
                         className="px-2.5 py-1 rounded border border-emerald-500/25 text-emerald-200 text-xs"
                       >
-                        Approve Candidate
+                        Review
                       </button>
                       <button
                         onClick={() => rejectPendingDiscoveryCandidate(pending)}
@@ -7632,7 +7898,7 @@ export default function AdminPage() {
 
         <div className="glass-card p-3 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">New Projects Found</p>
+            <p className="text-[11px] uppercase tracking-[0.12em] text-fuchsia-200">Discovery Queue</p>
             {genericCompetitorOpportunities.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] text-gray-500">Generic items: {genericCompetitorOpportunities.length}</span>
@@ -7700,11 +7966,18 @@ export default function AdminPage() {
                       <p>Why new: {details.whyNew}</p>
                       <p>Discovered: {new Date(opportunity.discovered_at).toLocaleString()}</p>
                     </div>
+                    <div className="mt-1 grid gap-1 text-[11px] text-gray-500 md:grid-cols-4">
+                      <p>Opportunity type: {details.opportunityType}</p>
+                      <p>Risk: {details.riskLevel}</p>
+                      <p>Official sources: {details.officialSourcesFound}</p>
+                      <p>Estimated quality: {details.estimatedQuality}</p>
+                    </div>
                     <div className="mt-1 grid gap-1 text-[11px] text-gray-500 md:grid-cols-3">
                       <p>Reason detected: {details.reasonDetected || 'Not provided'}</p>
                       <p>Duplicate status: {details.duplicateStatus || 'new'}</p>
                       <p>Detected keywords: {Array.isArray(details.detectedKeywords) && details.detectedKeywords.length ? details.detectedKeywords.join(', ') : 'None'}</p>
                     </div>
+                    {details.analystSummary && <p className="mt-1 text-xs text-gray-400">Analyst summary: {details.analystSummary}</p>}
                     {details.listingDate && <p className="mt-1 text-[11px] text-gray-400">Listing date: {details.listingDate}</p>}
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
                       <span>Docs: {details.officialDocsUrl ? 'Yes' : 'No'}</span>
@@ -7718,15 +7991,15 @@ export default function AdminPage() {
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {canQueue && (
                         <button
-                          onClick={() => void updateOpportunityStatus(opportunity, 'queued', 'Add competitor opportunity to review queue', 'Added to review queue')}
+                          onClick={() => void updateOpportunityStatus(opportunity, 'queued', 'Add discovery candidate to review queue', 'Added to review queue')}
                           className="px-2.5 py-1 rounded border border-cyan-500/25 text-cyan-200 text-xs"
                         >
-                          Add to Review Queue
+                          Review
                         </button>
                       )}
                       {canIgnore && (
                         <button
-                          onClick={() => void updateOpportunityStatus(opportunity, 'ignored', 'Ignore competitor opportunity', 'Opportunity ignored')}
+                          onClick={() => void updateOpportunityStatus(opportunity, 'ignored', 'Ignore discovery candidate', 'Discovery candidate ignored')}
                           className="px-2.5 py-1 rounded border border-white/20 text-gray-300 text-xs"
                         >
                           Ignore
@@ -7741,7 +8014,16 @@ export default function AdminPage() {
                         </button>
                       )}
                       {canCreateDraft && (
-                        <button onClick={() => void createDraftFromOpportunity(opportunity)} className="px-2.5 py-1 rounded border border-emerald-500/25 text-emerald-200 text-xs">Accept → Submissions</button>
+                        <button onClick={() => openAddFromDiscovery(opportunity, false)} className="px-2.5 py-1 rounded border border-emerald-500/25 text-emerald-200 text-xs">Create Listing</button>
+                      )}
+                      {canCreateDraft && (
+                        <button onClick={() => openAddFromDiscovery(opportunity, true)} className="px-2.5 py-1 rounded border border-rose-500/25 text-rose-200 text-xs">Create Speculative Token</button>
+                      )}
+                      {canCreateDraft && (
+                        <button onClick={() => void createDraftFromOpportunity(opportunity)} className="px-2.5 py-1 rounded border border-sky-500/25 text-sky-200 text-xs">Create Submission</button>
+                      )}
+                      {canIgnore && (
+                        <button onClick={() => void updateOpportunityStatus(opportunity, 'ignored', 'Blacklist discovery candidate', 'Discovery candidate blacklisted')} className="px-2.5 py-1 rounded border border-rose-500/25 text-rose-200 text-xs">Blacklist</button>
                       )}
                       {!canCreateDraft && (
                         <span className="text-[11px] text-gray-500">Submission already created from this opportunity.</span>
@@ -8310,6 +8592,12 @@ export default function AdminPage() {
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Airdrops</h2>
           <div className="flex items-center gap-2">
             <button
+              onClick={openAdd}
+              className="rounded-lg border border-neon-purple/25 bg-neon-purple/10 px-2.5 py-1 text-[11px] text-neon-purple hover:bg-neon-purple/20 transition-colors"
+            >
+              Add Airdrop
+            </button>
+            <button
               onClick={expandAllAirdropForms}
               className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[11px] text-sky-200 hover:bg-sky-500/20 transition-colors"
             >
@@ -8323,8 +8611,27 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+        <div className="mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <select value={airdropCategoryFilter} onChange={(e) => setAirdropCategoryFilter(e.target.value as typeof airdropCategoryFilter)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500/40">
+            <option value="all">All airdrops</option>
+            <option value="Verified Airdrop">Verified Airdrops</option>
+            <option value="Testnet">Testnets</option>
+            <option value="Points Program">Points Programs</option>
+            <option value="Ecosystem Campaign">Ecosystem Campaigns</option>
+            <option value="Under Review">Under Review</option>
+          </select>
+          <select value={airdropChainFilter} onChange={(e) => setAirdropChainFilter(e.target.value)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500/40">
+            <option value="all">All chains</option>
+            {BLOCKCHAIN_OPTIONS.map((chain) => <option key={`airdrop-chain-${chain}`} value={chain}>{chain}</option>)}
+          </select>
+          <select value={airdropPublishedFilter} onChange={(e) => setAirdropPublishedFilter(e.target.value as typeof airdropPublishedFilter)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500/40">
+            <option value="all">All publish states</option>
+            <option value="published">Published</option>
+            <option value="draft">Unpublished</option>
+          </select>
+        </div>
         <div className="space-y-3 md:hidden mb-3">
-          {airdrops.map((a) => {
+          {filteredAirdropListings.map((a) => {
             const isOpen = expandedAirdropIds.includes(a.id);
             const opportunityType = getOpportunityType(a);
             const riskCls = a.risk_level === 'Low' ? 'text-emerald-400' : a.risk_level === 'High' ? 'text-rose-400' : 'text-amber-400';
@@ -8410,7 +8717,7 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {airdrops.map(a => {
+              {filteredAirdropListings.map(a => {
                 const expiry = a.expiry_date
                   ? new Date(a.expiry_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
                   : null;
@@ -8562,6 +8869,173 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section id="admin-speculative-tokens" className={canShowSection('speculative-tokens') ? '' : 'hidden'}>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Speculative Tokens</h2>
+          <button
+            onClick={openAddSpeculative}
+            className="rounded-lg border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[11px] text-rose-200 hover:bg-rose-500/20 transition-colors"
+          >
+            Add Speculative Token
+          </button>
+        </div>
+
+        <div className="mb-3 rounded-2xl border border-rose-500/20 bg-rose-500/[0.05] p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-rose-300 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-bold text-white">Speculative Tokens are high-risk assets and are not verified airdrops.</h3>
+              <p className="text-xs text-gray-400 mt-1 leading-relaxed">Use this section to manage token-risk listings separately from verified, testnet and points-based opportunity workflows.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          <select value={specRiskFilter} onChange={(e) => setSpecRiskFilter(e.target.value as typeof specRiskFilter)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500/40">
+            <option value="all">All risk levels</option>
+            <option value="Low">Low risk</option>
+            <option value="Medium">Medium risk</option>
+            <option value="High">High risk</option>
+          </select>
+          <select value={specChainFilter} onChange={(e) => setSpecChainFilter(e.target.value)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500/40">
+            <option value="all">All chains</option>
+            {BLOCKCHAIN_OPTIONS.map((chain) => <option key={`spec-chain-${chain}`} value={chain}>{chain}</option>)}
+          </select>
+          <select value={specPublishedFilter} onChange={(e) => setSpecPublishedFilter(e.target.value as typeof specPublishedFilter)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500/40">
+            <option value="all">All publish states</option>
+            <option value="published">Published</option>
+            <option value="draft">Unpublished</option>
+          </select>
+          <select value={specSecurityFilter} onChange={(e) => setSpecSecurityFilter(e.target.value as typeof specSecurityFilter)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500/40">
+            <option value="all">All security scores</option>
+            <option value="high">70-100</option>
+            <option value="medium">40-69</option>
+            <option value="low">0-39</option>
+            <option value="missing">Missing score</option>
+          </select>
+          <select value={specMissingContractFilter} onChange={(e) => setSpecMissingContractFilter(e.target.value as typeof specMissingContractFilter)} className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500/40">
+            <option value="all">All contract states</option>
+            <option value="missing">Missing contract address</option>
+            <option value="present">Has contract address</option>
+          </select>
+        </div>
+
+        {filteredSpeculativeTokenListings.length === 0 ? (
+          <div className="glass-card p-8 text-center text-gray-500 text-sm">No speculative tokens match the current filters.</div>
+        ) : (
+          <>
+            <div className="space-y-3 md:hidden mb-3">
+              {filteredSpeculativeTokenListings.map((a) => {
+                const securityScore = getSpeculativeSecurityScore(a);
+                const scoreCls = securityScore == null ? 'text-gray-500' : securityScore >= 70 ? 'text-rose-300' : securityScore >= 40 ? 'text-amber-300' : 'text-emerald-300';
+                const riskCls = a.risk_level === 'Low' ? 'text-emerald-400' : a.risk_level === 'High' ? 'text-rose-400' : 'text-amber-400';
+                return (
+                  <article key={`spec-mobile-${a.id}`} className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{a.name}</p>
+                        <p className="text-[11px] text-gray-500 mt-1 font-mono">{a.ticker || '—'} · {(a.blockchain ?? []).join(', ') || 'Unassigned chain'}</p>
+                        <p className="text-[11px] text-gray-500 mt-1 break-all">{a.contract_address || 'Missing contract address'}</p>
+                      </div>
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getOpportunityTypeTone('Speculative Token')}`}>Speculative Token</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">Published: {a.published ? 'Yes' : 'No'}</div>
+                      <div className={`rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 ${riskCls}`}>Risk: {a.risk_level}</div>
+                      <div className={`rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 ${scoreCls}`}>Security: {securityScore ?? '—'}</div>
+                      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">Status: {a.published ? 'Published' : 'Draft'}</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => openEdit(a)} className="min-h-[42px] rounded-xl border border-sky-500/25 bg-sky-500/10 text-xs text-sky-200">Edit</button>
+                      <button
+                        onClick={async () => {
+                          const patch = { published: !a.published, human_verified: !a.published ? true : a.human_verified };
+                          const { error } = await supabase.from('airdrops').update(patch).eq('id', a.id);
+                          if (error) {
+                            showToast(`Unable to ${a.published ? 'unpublish' : 'publish'}: ${describeError(error)}`, 'error');
+                            return;
+                          }
+                          setAirdrops(prev => prev.map(x => x.id === a.id ? { ...x, ...patch } : x));
+                          fetchStats();
+                          showToast(a.published ? 'Speculative token unpublished' : 'Speculative token published');
+                        }}
+                        className="min-h-[42px] rounded-xl border border-white/20 bg-white/[0.04] text-xs text-gray-200"
+                      >
+                        {a.published ? 'Unpublish' : 'Publish'}
+                      </button>
+                      <button onClick={() => window.open(`/airdrop/${a.slug}`, '_blank', 'noopener,noreferrer')} className="min-h-[42px] rounded-xl border border-white/20 bg-white/[0.04] text-xs text-gray-200">Open Listing</button>
+                      <button onClick={() => setDeletingAirdrop(a)} className="min-h-[42px] rounded-xl border border-rose-500/25 bg-rose-500/10 text-xs text-rose-200">Delete</button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="glass-card overflow-x-auto hidden md:block">
+              <table className="w-full text-sm min-w-[920px]">
+                <thead>
+                  <tr className="border-b border-white/5">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Token</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Ticker</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Chain</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Contract Address</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Speculative Risk</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Security Score</th>
+                    <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredSpeculativeTokenListings.map((a) => {
+                    const securityScore = getSpeculativeSecurityScore(a);
+                    const scoreCls = securityScore == null ? 'text-gray-600' : securityScore >= 70 ? 'text-rose-300' : securityScore >= 40 ? 'text-amber-300' : 'text-emerald-300';
+                    const riskCls = a.risk_level === 'Low' ? 'text-emerald-400' : a.risk_level === 'High' ? 'text-rose-400' : 'text-amber-400';
+                    return (
+                      <tr key={`spec-desktop-${a.id}`} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3 text-white font-medium">{a.name}</td>
+                        <td className="px-4 py-3 text-[11px] text-gray-400 font-mono">{a.ticker || '—'}</td>
+                        <td className="px-4 py-3 text-xs text-gray-400">{(a.blockchain ?? []).join(', ') || '—'}</td>
+                        <td className="px-4 py-3 text-xs text-gray-400 max-w-[240px] truncate" title={a.contract_address || 'Missing contract address'}>{a.contract_address || 'Missing contract address'}</td>
+                        <td className="px-4 py-3"><span className={`text-xs font-medium ${riskCls}`}>{a.risk_level}</span></td>
+                        <td className="px-4 py-3 text-center"><span className={`text-xs font-bold tabular-nums ${scoreCls}`}>{securityScore ?? '—'}</span></td>
+                        <td className="px-4 py-3 text-center"><span className={`text-[10px] font-semibold border rounded-full px-2.5 py-1 ${a.published ? 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10' : 'text-gray-300 border-white/15 bg-white/[0.04]'}`}>{a.published ? 'Published' : 'Unpublished'}</span></td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={async () => {
+                                const patch = { published: !a.published, human_verified: !a.published ? true : a.human_verified };
+                                const { error: updateError } = await supabase.from('airdrops').update(patch).eq('id', a.id);
+                                if (updateError) {
+                                  showToast(`Unable to ${a.published ? 'unpublish' : 'publish'} speculative token: ${describeError(updateError)}`, 'error');
+                                  return;
+                                }
+                                setAirdrops(prev => prev.map(x => x.id === a.id ? { ...x, ...patch } : x));
+                                fetchStats();
+                                showToast(a.published ? 'Speculative token unpublished' : 'Speculative token published');
+                              }}
+                              title={a.published ? 'Unpublish' : 'Publish'}
+                              className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+                            >
+                              {a.published ? <Eye className="w-4 h-4 text-emerald-400" /> : <EyeOff className="w-4 h-4 text-gray-600" />}
+                            </button>
+                            <button onClick={() => runAnalysis(a, true)} disabled={analyzing === a.id} title="Run AI analysis" className="p-1.5 rounded-lg hover:bg-neon-purple/10 transition-colors disabled:opacity-50">
+                              {analyzing === a.id ? <Loader2 className="w-4 h-4 text-neon-purple animate-spin" /> : <Brain className="w-4 h-4 text-neon-purple" />}
+                            </button>
+                            <button onClick={() => openEdit(a)} title="Edit" className="p-1.5 rounded-lg hover:bg-sky-500/10 text-gray-500 hover:text-sky-400 transition-colors"><Pencil className="w-4 h-4" /></button>
+                            <button onClick={() => window.open(`/airdrop/${a.slug}`, '_blank', 'noopener,noreferrer')} title="Open listing" className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-colors"><ExternalLink className="w-4 h-4" /></button>
+                            <button onClick={() => setDeletingAirdrop(a)} title="Delete" className="p-1.5 rounded-lg hover:bg-rose-500/10 text-gray-500 hover:text-rose-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
 
       {/* ── Scam report review ─────────────────────────────────────────────── */}
