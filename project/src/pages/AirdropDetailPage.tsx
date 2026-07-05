@@ -1,9 +1,9 @@
 import SEO from '../components/SEO';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, ExternalLink, Twitter, MessageCircle, Send, Github,
+  ArrowLeft, ArrowRight, ExternalLink, Twitter, MessageCircle, Send, Github,
   Clock, Zap, ShieldAlert, Bookmark, BookmarkCheck, CheckSquare,
   Square, Globe, ChevronRight, Loader2, AlertCircle, UserCheck,
   BarChart3, FileText, ListChecks, ThumbsUp, AlertTriangle, Sparkles,
@@ -24,6 +24,14 @@ import CommunityResults from '../components/CommunityResults';
 import WalletSafetySnapshot from '../components/WalletSafetySnapshot';
 
 type Tab = 'overview' | 'tasks' | 'analysis';
+
+type AirdropNavigationItem = {
+  id: string;
+  slug: string;
+  name: string;
+  status: string;
+  created_at: string | null;
+};
 
 // ── CoinGecko market data ─────────────────────────────────────────────────────
 
@@ -1922,6 +1930,71 @@ function MobileAirdropActionBar({
   );
 }
 
+function MobileStickyAirdropNav({
+  previous,
+  next,
+  hidden,
+  onNavigate,
+}: {
+  previous: AirdropNavigationItem | null;
+  next: AirdropNavigationItem | null;
+  hidden: boolean;
+  onNavigate: (slug: string) => void;
+}) {
+  const [compactLabels, setCompactLabels] = useState(false);
+
+  useEffect(() => {
+    const updateCompactMode = () => {
+      if (typeof window === 'undefined') return;
+      setCompactLabels(window.innerWidth < 360);
+    };
+
+    updateCompactMode();
+    window.addEventListener('resize', updateCompactMode);
+    return () => window.removeEventListener('resize', updateCompactMode);
+  }, []);
+
+  const previousLabel = previous
+    ? `${compactLabels ? 'Prev' : 'Previous'}: ${previous.name}`
+    : 'No previous airdrop';
+  const nextLabel = next
+    ? `${compactLabels ? 'Next' : 'Next'}: ${next.name}`
+    : 'No next airdrop';
+
+  return (
+    <div
+      className={cn(
+        'fixed inset-x-0 bottom-[112px] z-40 px-3 transition-opacity duration-200 lg:hidden',
+        hidden ? 'pointer-events-none opacity-0' : 'opacity-100',
+      )}
+    >
+      <div className="mx-auto grid max-w-lg grid-cols-2 gap-2">
+        <button
+          type="button"
+          disabled={!previous}
+          onClick={() => previous && onNavigate(previous.slug)}
+          className="flex min-h-[50px] items-center gap-1.5 rounded-xl border border-white/10 bg-dark-900/95 px-3 py-2 text-left text-xs font-semibold text-white backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
+          aria-label={previous ? `Previous: ${previous.name}` : 'No previous airdrop'}
+        >
+          <ArrowLeft className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+          <span className="min-w-0 truncate">{previousLabel}</span>
+        </button>
+
+        <button
+          type="button"
+          disabled={!next}
+          onClick={() => next && onNavigate(next.slug)}
+          className="flex min-h-[50px] items-center justify-between gap-1.5 rounded-xl border border-neon-purple/30 bg-neon-purple/15 px-3 py-2 text-left text-xs font-semibold text-white backdrop-blur disabled:cursor-not-allowed disabled:opacity-45"
+          aria-label={next ? `Next: ${next.name}` : 'No next airdrop'}
+        >
+          <span className="min-w-0 truncate">{nextLabel}</span>
+          <ArrowRight className="h-3.5 w-3.5 shrink-0 text-gray-200" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SpeculativeTokenIntelligenceDashboard({
   airdrop,
   securityScore,
@@ -2405,14 +2478,79 @@ function SpeculativeTokenIntelligenceDashboard({
   );
 }
 
+function AirdropNavigationControls({
+  previous,
+  next,
+  loading,
+  onNavigate,
+}: {
+  previous: AirdropNavigationItem | null;
+  next: AirdropNavigationItem | null;
+  loading: boolean;
+  onNavigate: (slug: string) => void;
+}) {
+  const buttonClass = 'flex min-h-[64px] w-full flex-col items-start justify-center rounded-2xl border px-4 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+
+  const renderLabel = (direction: 'Previous' | 'Next', item: AirdropNavigationItem | null) => {
+    if (loading) return 'Loading...';
+    if (!item) return `No ${direction.toLowerCase()} airdrop`;
+    return `${direction}: ${item.name}`;
+  };
+
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <button
+        type="button"
+        disabled={loading || !previous}
+        onClick={() => previous && onNavigate(previous.slug)}
+        className={`${buttonClass} border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]`}
+        aria-label={renderLabel('Previous', previous)}
+      >
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+          Previous
+        </span>
+        <span className="mt-1 flex w-full items-center gap-2 text-sm font-semibold text-white">
+          <ArrowLeft className="h-4 w-4 shrink-0 text-gray-400" />
+          <span className="min-w-0 truncate">
+            {renderLabel('Previous', previous)}
+          </span>
+        </span>
+      </button>
+
+      <button
+        type="button"
+        disabled={loading || !next}
+        onClick={() => next && onNavigate(next.slug)}
+        className={`${buttonClass} border-neon-purple/20 bg-neon-purple/10 hover:border-neon-purple/35 hover:bg-neon-purple/15`}
+        aria-label={renderLabel('Next', next)}
+      >
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+          Next
+        </span>
+        <span className="mt-1 flex w-full items-center gap-2 text-sm font-semibold text-white">
+          <span className="min-w-0 truncate">
+            {renderLabel('Next', next)}
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-gray-300" />
+        </span>
+      </button>
+    </div>
+  );
+}
+
 export default function AirdropDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const [airdrop, setAirdrop] = useState<AirdropWithTasks | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bookmarked, setBookmarked] = useState(false);
   const [completions, setCompletions] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [navigationItems, setNavigationItems] = useState<AirdropNavigationItem[]>([]);
+  const [navigationLoading, setNavigationLoading] = useState(true);
+  const [hideStickyMobileNav, setHideStickyMobileNav] = useState(false);
+  const bottomNavigationRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -2448,6 +2586,38 @@ export default function AirdropDetailPage() {
   }, [slug]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadNavigation() {
+      setNavigationLoading(true);
+      const { data, error: navError } = await supabase
+        .from('airdrops')
+        .select('id, slug, name, status, created_at')
+        .eq('published', true)
+        .eq('review_status', 'approved')
+        .eq('is_demo', false)
+        .neq('listing_state', 'scam_alert')
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (cancelled) return;
+
+      if (navError) {
+        setNavigationItems([]);
+      } else {
+        setNavigationItems((data ?? []) as AirdropNavigationItem[]);
+      }
+      setNavigationLoading(false);
+    }
+
+    loadNavigation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!airdrop) return;
 
     const isSpeculative = isSpeculativeTokenProject(airdrop);
@@ -2472,6 +2642,33 @@ export default function AirdropDetailPage() {
     toggleCompletion(airdrop.id, taskId);
     setCompletions(getCompletions(airdrop.id));
   }
+
+  const navigationPair = useMemo(() => {
+    const currentIndex = navigationItems.findIndex((item) => item.slug === slug);
+    if (currentIndex < 0) return { previous: null, next: null };
+    return {
+      previous: currentIndex > 0 ? navigationItems[currentIndex - 1] ?? null : null,
+      next: currentIndex < navigationItems.length - 1 ? navigationItems[currentIndex + 1] ?? null : null,
+    };
+  }, [navigationItems, slug]);
+
+  useEffect(() => {
+    const target = bottomNavigationRef.current;
+    if (!target) {
+      setHideStickyMobileNav(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setHideStickyMobileNav(entry.isIntersecting);
+      },
+      { threshold: 0.2 },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [airdrop?.id, activeTab, navigationPair.previous?.slug, navigationPair.next?.slug]);
 
   if (loading) {
     return (
@@ -2606,6 +2803,15 @@ export default function AirdropDetailPage() {
         <ChevronRight className="w-3 h-3" />
         <span className="text-gray-500">{airdrop.name}</span>
       </nav>
+
+      <div className="mb-4 sm:mb-6">
+        <AirdropNavigationControls
+          previous={navigationPair.previous}
+          next={navigationPair.next}
+          loading={navigationLoading}
+          onNavigate={(targetSlug) => navigate(`/airdrop/${targetSlug}`)}
+        />
+      </div>
 
       {/* Hero card */}
       <div className="glass-card mb-6 overflow-hidden p-4 sm:mb-8 sm:p-8">
@@ -2987,6 +3193,15 @@ export default function AirdropDetailPage() {
           </div>
 
           <TrustProofPanel airdrop={airdrop} />
+
+          <div ref={bottomNavigationRef} className="pt-1 sm:pt-2">
+            <AirdropNavigationControls
+              previous={navigationPair.previous}
+              next={navigationPair.next}
+              loading={navigationLoading}
+              onNavigate={(targetSlug) => navigate(`/airdrop/${targetSlug}`)}
+            />
+          </div>
         </div>
         )
       )}
@@ -3081,6 +3296,13 @@ export default function AirdropDetailPage() {
         )
       )}
     </div>
+
+    <MobileStickyAirdropNav
+      previous={navigationPair.previous}
+      next={navigationPair.next}
+      hidden={hideStickyMobileNav}
+      onNavigate={(targetSlug) => navigate(`/airdrop/${targetSlug}`)}
+    />
 
     <MobileAirdropActionBar
       airdrop={airdrop}

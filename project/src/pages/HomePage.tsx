@@ -1506,7 +1506,8 @@ export default function HomePage() {
           .eq('review_status', 'approved')
           .eq('is_demo', false)
           .neq('listing_state', 'scam_alert')
-          .order('sort_order', { ascending: true }),
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true }),
         supabase.from('airdrop_results').select('*', { count: 'exact', head: true }),
         supabase.from('wallet_scan_history').select('*', { count: 'exact', head: true }),
       ]);
