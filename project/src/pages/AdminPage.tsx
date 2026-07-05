@@ -1911,7 +1911,7 @@ function BannerFormModal({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-white">{mode === 'add' ? 'Create Banner' : 'Edit Banner'}</h2>
-            <p className="text-xs text-gray-500 mt-1">Prepare enquiry workflow, upload artwork placeholders, and preview before going live.</p>
+            <p className="text-xs text-gray-500 mt-1">Prepare enquiry workflow, upload artwork assets, and preview before going live.</p>
           </div>
           <button onClick={onClose} aria-label="Close banner form" className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
             <X className="w-5 h-5" />
@@ -1982,7 +1982,7 @@ function BannerFormModal({
                 <p className="text-[10px] text-gray-600 mt-1">Where users go when they click the ad.</p>
               </div>
               <div>
-                <label className={labelClass}>Banner image placeholder</label>
+                <label className={labelClass}>Banner image</label>
                 <div className="flex items-center gap-2">
                   <label className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-neon-blue/25 bg-neon-blue/10 text-neon-blue text-sm font-medium cursor-pointer hover:bg-neon-blue/20 transition-colors">
                     <ImagePlus className="w-4 h-4" />
@@ -2081,7 +2081,7 @@ function BannerFormModal({
           </label>
 
           <div>
-            <label className={labelClass}>Future Paid Status Placeholder</label>
+            <label className={labelClass}>Payment status</label>
             <select
               value={form.paymentState}
               onChange={(e) => setForm((f) => ({ ...f, paymentState: e.target.value as BannerPaymentState }))}
@@ -2402,7 +2402,7 @@ export default function AdminPage() {
         status: 'Enquiry',
         enabled: true,
         exclusivePlacement: true,
-        notes: 'Placeholder banner to seed admin workflow.',
+        notes: 'Starter banner to seed admin workflow.',
         paymentState: 'Pending',
         archived: false,
         updatedAt: new Date().toISOString(),
@@ -3938,7 +3938,7 @@ export default function AdminPage() {
       await createAdminNotification({
         notification_type: 'admin_error',
         title: 'Competitor watch check failed',
-        message: 'Competitor watch check failed. Review admin debug details.',
+        message: 'Competitor watch check failed. Review admin diagnostics details.',
         severity: 'error',
         context: { area: 'competitor_watch', details: exact },
       });
@@ -4359,7 +4359,7 @@ export default function AdminPage() {
 
     fetchStats();
     showToast(`Airdrop ${decision}d successfully`);
-  }, [describeError, fetchStats, logAdminAudit, promptHumanVerificationNotes, showToast]);
+  }, [describeError, logAdminAudit, promptHumanVerificationNotes, showToast]);
 
   const saveTasksForAirdrop = async (airdropId: string, tasksText: string) => {
     console.info('[Admin][AirdropSave] Updating tasks', {
@@ -5128,7 +5128,21 @@ export default function AdminPage() {
   if (!isAdmin) return null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8 overflow-x-hidden pb-24 lg:pb-8">
+    <div className="relative min-h-screen overflow-x-hidden pb-28 lg:pb-8">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-dark-950/95 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.14em] text-cyan-200">Admin Control Centre</p>
+            <h1 className="truncate text-sm font-semibold text-white sm:text-base">{activeAdminNavItem.label}</h1>
+          </div>
+          <div className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs text-gray-300 sm:inline-flex">
+            <Bell className="h-3.5 w-3.5 text-cyan-300" />
+            {notificationsLoading ? 'Loading alerts...' : `${unreadNotificationsCount} unread`}
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24">
 
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -5183,9 +5197,9 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="hidden lg:block">
-          <div className="sticky top-20 rounded-2xl border border-white/10 bg-dark-900/70 p-3 backdrop-blur-sm">
+          <div className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-2xl border border-white/10 bg-dark-900/80 p-3 backdrop-blur-sm">
             <p className="text-[11px] uppercase tracking-[0.13em] text-cyan-200">Admin Navigation</p>
             <p className="mt-1 text-xs text-gray-400">Focused workspace sections with minimal scrolling.</p>
 
@@ -5211,7 +5225,7 @@ export default function AdminPage() {
           </div>
         </aside>
 
-        <div className="space-y-8 pb-24 lg:pb-0">
+        <main className="space-y-8 rounded-2xl border border-white/10 bg-dark-950/55 p-3 sm:p-4 lg:p-5 pb-24 lg:pb-6">
           <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-4 space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
@@ -5863,10 +5877,9 @@ export default function AdminPage() {
           <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
             <p className="font-semibold text-rose-200">{competitorError}</p>
             {competitorErrorDetails && (
-              <details className="mt-2 text-[11px]">
-                <summary className="cursor-pointer text-rose-200/90">Debug details</summary>
-                <pre className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-rose-500/20 bg-black/20 p-2 text-rose-100/90">{competitorErrorDetails}</pre>
-              </details>
+              <div className="mt-2 rounded-lg border border-rose-500/20 bg-black/20 p-2 text-[11px] text-rose-100/90 whitespace-pre-wrap break-words">
+                {competitorErrorDetails}
+              </div>
             )}
           </div>
         )}
@@ -5944,23 +5957,6 @@ export default function AdminPage() {
                     <p>Success rate: {Math.round(scan.successRate * 100)}%</p>
                     <p>Active: {source.is_active ? 'Yes' : 'No'}</p>
                   </div>
-                  {competitorScanDebugResults[source.id] && (
-                    <details className="mt-2 rounded-lg border border-white/10 bg-black/20 p-2 text-[11px] text-gray-300">
-                      <summary className="cursor-pointer text-fuchsia-200">Debug scan output</summary>
-                      <div className="mt-2 grid gap-1 md:grid-cols-2">
-                        <p>Adapter used: {competitorScanDebugResults[source.id].adapterUsed || 'None'}</p>
-                        <p>Page fetched: {competitorScanDebugResults[source.id].pageFetched}</p>
-                        <p>Cards found: {competitorScanDebugResults[source.id].cardsFound}</p>
-                        <p>Valid candidates extracted: {competitorScanDebugResults[source.id].validCandidatesExtracted}</p>
-                        <p>Candidates rejected: {competitorScanDebugResults[source.id].candidatesRejected}</p>
-                        <p>Outcome reason: {competitorScanDebugResults[source.id].outcomeReason || 'n/a'}</p>
-                      </div>
-                      <p className="mt-1 text-gray-400">Rejection reasons: {Object.entries(competitorScanDebugResults[source.id].rejectionReasons).map(([reason, count]) => `${reason} (${count})`).join(', ') || 'None'}</p>
-                      {competitorScanDebugResults[source.id].rejectionSamples.length > 0 && (
-                        <p className="mt-1 text-gray-500">Samples: {competitorScanDebugResults[source.id].rejectionSamples.join(' | ')}</p>
-                      )}
-                    </details>
-                  )}
                   <p className="mt-1 text-[11px] text-gray-500">Scan note: {scan.note}</p>
                 </div>
               );
@@ -6477,7 +6473,7 @@ export default function AdminPage() {
             Exclusive placement badge supported
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-gray-300">
-            Future paid status placeholder included
+            Payment status tracking included
           </span>
         </div>
 
@@ -6677,7 +6673,7 @@ export default function AdminPage() {
                     {banner.bannerImageUrl ? (
                       <img src={banner.bannerImageUrl} alt={banner.altText || 'Banner preview'} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-[10px] text-gray-500">Image placeholder</span>
+                      <span className="text-[10px] text-gray-500">No image</span>
                     )}
                   </div>
                   <div className="min-w-0">
@@ -7316,17 +7312,17 @@ export default function AdminPage() {
         )}
       </section>
 
-        </div>
+        </main>
       </div>
 
       <div className="lg:hidden fixed bottom-3 inset-x-3 z-40">
-        <div className="rounded-2xl border border-white/10 bg-dark-900/90 backdrop-blur-md p-2 shadow-xl">
-          <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-2xl border border-white/10 bg-dark-900/95 p-2 shadow-xl backdrop-blur-md">
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {adminNavItems.map((item) => (
               <button
                 key={`mobile-nav-${item.id}`}
                 onClick={() => setAdminView(item.id)}
-                className={`rounded-xl border px-3 py-2 text-[11px] font-semibold transition-colors min-h-[44px] ${adminView === item.id ? 'border-cyan-400/40 bg-cyan-500/12 text-cyan-100' : 'border-white/10 bg-dark-900/60 text-gray-300 hover:border-white/20 hover:text-white'}`}
+                className={`min-h-[42px] shrink-0 rounded-xl border px-3 py-2 text-[11px] font-semibold transition-colors ${adminView === item.id ? 'border-cyan-400/40 bg-cyan-500/12 text-cyan-100' : 'border-white/10 bg-dark-900/60 text-gray-300 hover:border-white/20 hover:text-white'}`}
               >
                 {item.label}
               </button>
@@ -7377,6 +7373,7 @@ export default function AdminPage() {
       />
 
       {toast && <ToastBar toast={toast} onDismiss={() => setToast(null)} />}
+      </div>
     </div>
   );
 }
