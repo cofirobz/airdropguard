@@ -8,11 +8,17 @@ const FUNCTION_NAME = 'airdrop-copilot';
 const FOOTER_NOTE = 'Educational analysis only. Never share your seed phrase.';
 const WELCOME_MESSAGE = 'Welcome to AirdropGuard Copilot. Ask about airdrop safety, compare projects, or get help prioritizing your next steps.';
 const QUICK_PROMPTS = [
-  'Show safest beginner airdrops',
-  'Which projects look risky and why?',
-  'What should I focus on today?',
-  "What's ending soon and what should I prioritize first?",
-];
+  { id: 'safe-beginner', label: 'Show safest beginner airdrops', question: 'Show safest beginner airdrops' },
+  { id: 'risky-projects', label: 'Which projects look risky and why?', question: 'Which projects look risky and why?' },
+  { id: 'focus-today', label: 'What should I focus on today?', question: 'What should I focus on today?' },
+  { id: 'ending-soon', label: "What's ending soon and what should I prioritize first?", question: "What's ending soon and what should I prioritize first?" },
+  { id: 'worth-time', label: 'Is this opportunity worth my time?', question: 'Is this opportunity worth my time?' },
+  { id: 'biggest-risks', label: 'What are the biggest risks?', question: 'What are the biggest risks?' },
+  { id: 'tasks-first', label: 'What tasks should I do first?', question: 'What tasks should I do first?' },
+  { id: 'qualify-difficulty', label: 'How hard is this to qualify for?', question: 'How hard is this to qualify for?' },
+  { id: 'what-to-avoid', label: 'What should I avoid?', question: 'What should I avoid?' },
+  { id: 'simple-explain', label: 'Explain this project simply.', question: 'Explain this project simply.' },
+] as const;
 const UNREADABLE_RESPONSE_MESSAGE = 'I received a response, but couldn\'t read the message. Please try again.';
 
 type ChatMessage = {
@@ -210,8 +216,49 @@ function extractAssistantText(payload: unknown): string | null {
   return extractTextFromObject(payload as Record<string, unknown>);
 }
 
+function resolveQuickPromptQuestion(input: string): string {
+  const trimmed = input.trim();
+  const match = QUICK_PROMPTS.find((prompt) => prompt.id === trimmed || prompt.label === trimmed || prompt.question === trimmed);
+  return match?.question ?? trimmed;
+}
+
+function looksLikeInternalToken(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed)) return true;
+  if (/^[0-9a-f]{24,}$/i.test(trimmed)) return true;
+  if (/^[a-z0-9_-]{28,}$/i.test(trimmed) && !/\s/.test(trimmed)) return true;
+  return false;
+}
+
+function sanitizeAssistantAnswer(raw: string): string {
+  let text = raw.trim();
+
+  if (text.startsWith('```')) {
+    text = text.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
+  }
+
+  const cleanedLines = text
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => !/^\s*(id|slug|hash|key)\s*[:=]/i.test(line));
+
+  const cleaned = cleanedLines.join('\n').trim();
+  if (!cleaned) return UNREADABLE_RESPONSE_MESSAGE;
+
+  if (looksLikeInternalToken(cleaned)) return UNREADABLE_RESPONSE_MESSAGE;
+
+  if ((cleaned.startsWith('{') && cleaned.endsWith('}')) || (cleaned.startsWith('[') && cleaned.endsWith(']'))) {
+    return UNREADABLE_RESPONSE_MESSAGE;
+  }
+
+  return cleaned;
+}
+
 function ensureAssistantMessage(payload: unknown): string {
-  return extractAssistantText(payload) ?? UNREADABLE_RESPONSE_MESSAGE;
+  const extracted = extractAssistantText(payload);
+  if (!extracted) return UNREADABLE_RESPONSE_MESSAGE;
+  return sanitizeAssistantAnswer(extracted);
 }
 
 async function extractInvokeError(error: unknown): Promise<string> {
@@ -388,7 +435,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
   }, [messages, loading]);
 
   const sendPrompt = async (input: string) => {
-    const content = input.trim();
+    const content = resolveQuickPromptQuestion(input);
     if (!content || loading) return;
 
     updateMemoryFromPrompt(content);
@@ -568,13 +615,13 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
                       <div className="mt-4 grid grid-cols-1 gap-2">
                         {QUICK_PROMPTS.map(prompt => (
                           <button
-                            key={prompt}
+                            key={prompt.id}
                             type="button"
-                            onClick={() => void sendPrompt(prompt)}
+                            onClick={() => void sendPrompt(prompt.id)}
                             disabled={loading}
                             className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-sm text-gray-100 transition-colors hover:bg-white/[0.08] disabled:opacity-60"
                           >
-                            {prompt}
+                            {prompt.label}
                           </button>
                         ))}
                       </div>

@@ -22,6 +22,7 @@ type UserPreferences = {
 
 type ChatRequest = {
   message?: string;
+  context?: string;
 };
 
 type CompactAirdrop = {
@@ -75,6 +76,73 @@ function buildFallbackAnswer(message: string, rows: CompactAirdrop[]): string {
     "",
     "AirdropGuard provides educational analysis only, not financial advice. Never share your seed phrase or connect your wallet to unknown sites.",
   ].join("\n");
+}
+
+const KNOWN_PROMPT_MAP: Record<string, string> = {
+  "safe-beginner": "Show safest beginner airdrops",
+  "risky-projects": "Which projects look risky and why?",
+  "focus-today": "What should I focus on today?",
+  "ending-soon": "What's ending soon and what should I prioritize first?",
+  "worth-time": "Is this opportunity worth my time?",
+  "biggest-risks": "What are the biggest risks?",
+  "tasks-first": "What tasks should I do first?",
+  "qualify-difficulty": "How hard is this to qualify for?",
+  "what-to-avoid": "What should I avoid?",
+  "simple-explain": "Explain this project simply.",
+};
+
+function normalizeQuestionInput(input: string): string {
+  const trimmed = safeString(input);
+  if (!trimmed) return "";
+  if (KNOWN_PROMPT_MAP[trimmed]) return KNOWN_PROMPT_MAP[trimmed];
+
+  const lower = trimmed.toLowerCase();
+  if (KNOWN_PROMPT_MAP[lower]) return KNOWN_PROMPT_MAP[lower];
+
+  const looksLikeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+  const looksLikeHash = /^[0-9a-f]{24,}$/i.test(trimmed);
+  const looksLikeOpaqueKey = /^[a-z0-9_-]{28,}$/i.test(trimmed) && !/\s/.test(trimmed);
+
+  if (looksLikeUuid || looksLikeHash || looksLikeOpaqueKey) {
+    return "Explain this project simply.";
+  }
+
+  return trimmed;
+}
+
+function detectFocusedAirdropsFromContext(context: string, airdrops: { name: string; slug: string }[]): Set<string> {
+  const lower = context.toLowerCase();
+  const hits = new Set<string>();
+
+  for (const airdrop of airdrops) {
+    const slug = airdrop.slug.toLowerCase();
+    const name = airdrop.name.toLowerCase();
+    if ((slug && lower.includes(slug)) || (name && lower.includes(name))) {
+      hits.add(airdrop.slug);
+    }
+  }
+
+  return hits;
+}
+
+function sanitizeModelAnswer(answer: string): string {
+  const trimmed = safeString(answer);
+  if (!trimmed) return "";
+
+  if (/^[0-9a-f]{8}-[0-9a-f-]{12,}$/i.test(trimmed) || /^[a-z0-9_-]{28,}$/i.test(trimmed)) {
+    return "I could not produce a clean readable answer. Please ask again using plain language.";
+  }
+
+  if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+    return "I could not produce a clean readable answer. Please ask again using plain language.";
+  }
+
+  const cleanedLines = trimmed
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter((line) => !/^\s*(id|slug|hash|key)\s*[:=]/i.test(line));
+
+  return cleanedLines.join("\n").trim();
 }
 
 async function fetchAirdropsForCopilot(supabase: ReturnType<typeof createClient>) {
@@ -240,7 +308,8 @@ Deno.serve(async (req: Request) => {
     if (!jwt) return json({ error: "Missing Authorization header" }, 401);
 
     const body = await req.json() as ChatRequest;
-    const message = safeString(body.message);
+    const message = normalizeQuestionInput(body.message ?? "");
+    const pageContext = compactText(safeString(body.context), 700);
     if (!message) return json({ error: "Message is required" }, 400);
     userMessageForFallback = message;
 
@@ -273,10 +342,22 @@ Deno.serve(async (req: Request) => {
       name: safeString(row.name),
       slug: safeString(row.slug),
     })));
+    const contextSlugs = detectFocusedAirdropsFromContext(pageContext, allAirdrops.map(row => ({
+      name: safeString(row.name),
+      slug: safeString(row.slug),
+    })));
 
     const selected = [...allAirdrops]
       .sort((a, b) => sortForCopilot(b) - sortForCopilot(a))
-      .filter((row, index) => index < MAX_AIRDROPS || relevantSlugs.has(safeString(row.slug)));
+      .filter((row, index) => index < MAX_AIRDROPS || relevantSlugs.has(safeString(row.slug)) || contextSlugs.has(safeString(row.slug)))
+      .sort((a, b) => {
+        const aSlug = safeString(a.slug);
+        const bSlug = safeString(b.slug);
+        const aFocused = contextSlugs.has(aSlug);
+        const bFocused = contextSlugs.has(bSlug);
+        if (aFocused !== bFocused) return aFocused ? -1 : 1;
+        return 0;
+      });
 
     const compactRows = selected.map(compactAirdrop);
     const preferences = preferencesRes.error
@@ -285,15 +366,22 @@ Deno.serve(async (req: Request) => {
 
     const prompt = [
       "You are AirdropGuard AI Copilot, a practical airdrop research assistant.",
+      "The user clicked or typed a question. Answer that exact question directly first, in plain English.",
       "Use ONLY the supplied AirdropGuard data. If something is missing or unsupported, say so clearly.",
       "Do not promise rewards. Do not give financial advice. Never ask for seed phrases or private keys. Never tell users to connect wallets to suspicious or unknown sites.",
       "Prefer verified and under_review listings over unknown-quality projects. Mention risk clearly. If a project is speculative or data is missing, say that.",
-      "For recommendation questions, use this structure when it fits: 1. Best picks 2. Why these 3. Risks to watch 4. Time required 5. What to do next.",
+      "Never output internal IDs, hashes, slugs, raw JSON, or database-looking values. Use human-readable project names and explanations.",
+      "For recommendation questions, use this structure when it fits: 1. Direct answer 2. Why 3. Risks to watch 4. Practical next steps.",
       "For comparison questions, use a clear side-by-side comparison based only on available fields.",
+      "If the context is an airdrop detail page, prioritize that project in your answer.",
+      "If the context is a speculative token page, explicitly mention token-risk uncertainty and safe verification steps.",
+      "If key fields are missing, say what is unknown and provide safe next actions without inventing facts.",
       "Always end with this exact safety wording:",
       "AirdropGuard provides educational analysis only, not financial advice. Never share your seed phrase or connect your wallet to unknown sites.",
       "",
       `USER QUESTION: ${message}`,
+      "",
+      `PAGE CONTEXT: ${pageContext || "None provided"}`,
       "",
       `USER PREFERENCES: ${JSON.stringify({
         experience_level: preferences?.experience_level ?? null,
@@ -311,7 +399,7 @@ Deno.serve(async (req: Request) => {
 
     try {
       const liveAnswer = await callOpenAI(prompt);
-      answer = liveAnswer || buildFallbackAnswer(message, compactRows);
+      answer = sanitizeModelAnswer(liveAnswer || "") || buildFallbackAnswer(message, compactRows);
       degraded = !liveAnswer;
     } catch (openAiError) {
       degraded = true;
