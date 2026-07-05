@@ -350,6 +350,66 @@ type AgieInsight = {
   confidenceText: string | null;
 };
 
+type OpportunityIntelligenceReport = {
+  overall_intelligence_score: number;
+  confidence: number;
+  opportunity_rating: string;
+  risk_rating: string;
+  difficulty: string;
+  time_required: string;
+  estimated_potential: string;
+  why_this_opportunity_matters: string;
+  positive_signals: string[];
+  warning_signals: string[];
+  who_this_is_suitable_for: string;
+  who_should_avoid_it: string;
+  estimated_time_commitment: string;
+  expected_skill_level: string;
+  likelihood_of_long_term_value: string;
+  explanation: string;
+};
+
+function parseOpportunityIntelligence(airdrop: AirdropWithTasks): OpportunityIntelligenceReport | null {
+  const raw = (airdrop as AnyAirdrop).opportunity_intelligence;
+  if (!raw || typeof raw !== 'object') return null;
+  const rec = raw as Record<string, unknown>;
+
+  const num = (value: unknown): number => {
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(100, Math.round(n)));
+  };
+
+  const txt = (value: unknown, fallback = 'Currently unavailable.'): string => {
+    const s = typeof value === 'string' ? value.trim() : '';
+    return s || fallback;
+  };
+
+  const arr = (value: unknown): string[] => {
+    if (!Array.isArray(value)) return [];
+    return value.map((v) => (typeof v === 'string' ? v.trim() : '')).filter(Boolean).slice(0, 8);
+  };
+
+  return {
+    overall_intelligence_score: num(rec.overall_intelligence_score),
+    confidence: num(rec.confidence),
+    opportunity_rating: txt(rec.opportunity_rating),
+    risk_rating: txt(rec.risk_rating),
+    difficulty: txt(rec.difficulty),
+    time_required: txt(rec.time_required),
+    estimated_potential: txt(rec.estimated_potential),
+    why_this_opportunity_matters: txt(rec.why_this_opportunity_matters),
+    positive_signals: arr(rec.positive_signals),
+    warning_signals: arr(rec.warning_signals),
+    who_this_is_suitable_for: txt(rec.who_this_is_suitable_for),
+    who_should_avoid_it: txt(rec.who_should_avoid_it),
+    estimated_time_commitment: txt(rec.estimated_time_commitment),
+    expected_skill_level: txt(rec.expected_skill_level),
+    likelihood_of_long_term_value: txt(rec.likelihood_of_long_term_value),
+    explanation: txt(rec.explanation),
+  };
+}
+
 function scoreFrom(airdrop: AirdropWithTasks, key: string): number | null {
   const value = (airdrop.sub_scores as Record<string, unknown> | null | undefined)?.[key];
   return typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : null;
@@ -1169,6 +1229,7 @@ function AnalysisTab({
     airdrop.ai_risk_analysis ||
     airdrop.ai_reward_estimate ||
     airdrop.trust_score !== null;
+  const opportunityIntel = parseOpportunityIntelligence(airdrop);
 
   // ── Section data derived from existing fields ────────────────────────────
 
@@ -1300,6 +1361,44 @@ function AnalysisTab({
       )}
 
       <AgieIntelligenceDashboard airdrop={airdrop} />
+
+      {opportunityIntel && (
+        <div className="glass-card p-6">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-base font-semibold text-white">Opportunity Intelligence</h2>
+            <div className="text-xs text-gray-500">Confidence {opportunityIntel.confidence}/100</div>
+          </div>
+          <p className="text-sm text-gray-300 leading-relaxed mb-4">{opportunityIntel.explanation}</p>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+            <div className="rounded-xl bg-dark-700/40 border border-white/5 px-3 py-2"><div className="text-[10px] text-gray-600 uppercase tracking-wider">Overall Intelligence</div><div className="text-sm font-bold text-white">{opportunityIntel.overall_intelligence_score}/100</div></div>
+            <div className="rounded-xl bg-dark-700/40 border border-white/5 px-3 py-2"><div className="text-[10px] text-gray-600 uppercase tracking-wider">Opportunity Rating</div><div className="text-sm font-bold text-white">{opportunityIntel.opportunity_rating}</div></div>
+            <div className="rounded-xl bg-dark-700/40 border border-white/5 px-3 py-2"><div className="text-[10px] text-gray-600 uppercase tracking-wider">Risk Rating</div><div className="text-sm font-bold text-white">{opportunityIntel.risk_rating}</div></div>
+            <div className="rounded-xl bg-dark-700/40 border border-white/5 px-3 py-2"><div className="text-[10px] text-gray-600 uppercase tracking-wider">Estimated Potential</div><div className="text-sm font-bold text-white">{opportunityIntel.estimated_potential}</div></div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Why this opportunity matters</p>
+              <p className="text-xs text-gray-400 leading-relaxed">{opportunityIntel.why_this_opportunity_matters}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-emerald-400 uppercase tracking-wider mb-1">Positive signals</p>
+              <p className="text-xs text-gray-400 leading-relaxed">{opportunityIntel.positive_signals.join(' • ') || 'Currently unavailable.'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-amber-400 uppercase tracking-wider mb-1">Warning signals</p>
+              <p className="text-xs text-gray-400 leading-relaxed">{opportunityIntel.warning_signals.join(' • ') || 'Currently unavailable.'}</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <p className="text-xs text-gray-400 leading-relaxed"><span className="text-gray-500">Suitable for:</span> {opportunityIntel.who_this_is_suitable_for}</p>
+              <p className="text-xs text-gray-400 leading-relaxed"><span className="text-gray-500">Should avoid:</span> {opportunityIntel.who_should_avoid_it}</p>
+              <p className="text-xs text-gray-400 leading-relaxed"><span className="text-gray-500">Estimated time:</span> {opportunityIntel.estimated_time_commitment}</p>
+              <p className="text-xs text-gray-400 leading-relaxed"><span className="text-gray-500">Skill / long-term value:</span> {opportunityIntel.expected_skill_level} / {opportunityIntel.likelihood_of_long_term_value}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <IntelligenceRadar airdrop={airdrop} />

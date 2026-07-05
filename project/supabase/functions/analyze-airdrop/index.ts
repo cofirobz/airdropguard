@@ -308,6 +308,118 @@ interface AiNarrative {
   ai_reward_estimate: string;
   overview: string;
   why_airdrop: string;
+  opportunity_intelligence?: OpportunityIntelligenceReport;
+}
+
+type OpportunityRating = "Strong" | "Promising" | "Speculative" | "Avoid";
+type RiskRating = "Low" | "Medium" | "High";
+type SkillLevel = "Beginner" | "Intermediate" | "Advanced";
+type LongTermValueLikelihood = "High" | "Medium" | "Low";
+
+interface OpportunityIntelligenceReport {
+  overall_intelligence_score: number;
+  confidence: number;
+  opportunity_rating: OpportunityRating;
+  risk_rating: RiskRating;
+  difficulty: "Easy" | "Moderate" | "Hard";
+  time_required: string;
+  estimated_potential: string;
+  why_this_opportunity_matters: string;
+  positive_signals: string[];
+  warning_signals: string[];
+  who_this_is_suitable_for: string;
+  who_should_avoid_it: string;
+  estimated_time_commitment: string;
+  expected_skill_level: SkillLevel;
+  likelihood_of_long_term_value: LongTermValueLikelihood;
+  explanation: string;
+  discovery_signals: {
+    project_age: string;
+    funding: string;
+    investors: string;
+    github_activity: string;
+    documentation: string;
+    website_quality: string;
+    community_size: string;
+    contract_analysis: string;
+    onchain_metrics: string;
+    wallet_intelligence: string;
+    previous_campaigns: string;
+    competitor_watch: string;
+  };
+}
+
+function normalizeOpportunityRating(value: string): OpportunityRating {
+  const lowered = safeString(value).toLowerCase();
+  if (lowered.includes("strong")) return "Strong";
+  if (lowered.includes("promis")) return "Promising";
+  if (lowered.includes("avoid")) return "Avoid";
+  return "Speculative";
+}
+
+function normalizeRiskRating(value: string): RiskRating {
+  const lowered = safeString(value).toLowerCase();
+  if (lowered.startsWith("h")) return "High";
+  if (lowered.startsWith("l")) return "Low";
+  return "Medium";
+}
+
+function normalizeSkillLevel(value: string): SkillLevel {
+  const lowered = safeString(value).toLowerCase();
+  if (lowered.startsWith("a")) return "Advanced";
+  if (lowered.startsWith("b")) return "Beginner";
+  return "Intermediate";
+}
+
+function normalizeLongTermValue(value: string): LongTermValueLikelihood {
+  const lowered = safeString(value).toLowerCase();
+  if (lowered.startsWith("h")) return "High";
+  if (lowered.startsWith("l")) return "Low";
+  return "Medium";
+}
+
+function normalizeSignalMap(value: unknown, fallback: OpportunityIntelligenceReport["discovery_signals"]): OpportunityIntelligenceReport["discovery_signals"] {
+  if (!value || typeof value !== "object") return fallback;
+  const rec = value as Record<string, unknown>;
+  return {
+    project_age: safeString(rec.project_age) || fallback.project_age,
+    funding: safeString(rec.funding) || fallback.funding,
+    investors: safeString(rec.investors) || fallback.investors,
+    github_activity: safeString(rec.github_activity) || fallback.github_activity,
+    documentation: safeString(rec.documentation) || fallback.documentation,
+    website_quality: safeString(rec.website_quality) || fallback.website_quality,
+    community_size: safeString(rec.community_size) || fallback.community_size,
+    contract_analysis: safeString(rec.contract_analysis) || fallback.contract_analysis,
+    onchain_metrics: safeString(rec.onchain_metrics) || fallback.onchain_metrics,
+    wallet_intelligence: safeString(rec.wallet_intelligence) || fallback.wallet_intelligence,
+    previous_campaigns: safeString(rec.previous_campaigns) || fallback.previous_campaigns,
+    competitor_watch: safeString(rec.competitor_watch) || fallback.competitor_watch,
+  };
+}
+
+function normalizeOpportunityIntelligenceReport(raw: unknown, fallback: OpportunityIntelligenceReport): OpportunityIntelligenceReport {
+  if (!raw || typeof raw !== "object") return fallback;
+  const rec = raw as Record<string, unknown>;
+
+  return {
+    overall_intelligence_score: clampOrFallback(rec.overall_intelligence_score, fallback.overall_intelligence_score),
+    confidence: clampOrFallback(rec.confidence, fallback.confidence),
+    opportunity_rating: normalizeOpportunityRating(safeString(rec.opportunity_rating) || fallback.opportunity_rating),
+    risk_rating: normalizeRiskRating(safeString(rec.risk_rating) || fallback.risk_rating),
+    difficulty: safeString(rec.difficulty) === "Hard" ? "Hard" : safeString(rec.difficulty) === "Easy" ? "Easy" : fallback.difficulty,
+    time_required: safeString(rec.time_required) || fallback.time_required,
+    estimated_potential: safeString(rec.estimated_potential) || fallback.estimated_potential,
+    why_this_opportunity_matters: safeString(rec.why_this_opportunity_matters) || fallback.why_this_opportunity_matters,
+    positive_signals: toStrArray(rec.positive_signals).length ? toStrArray(rec.positive_signals).slice(0, 8) : fallback.positive_signals,
+    warning_signals: toStrArray(rec.warning_signals).length ? toStrArray(rec.warning_signals).slice(0, 8) : fallback.warning_signals,
+    who_this_is_suitable_for: safeString(rec.who_this_is_suitable_for) || fallback.who_this_is_suitable_for,
+    who_should_avoid_it: safeString(rec.who_should_avoid_it) || fallback.who_should_avoid_it,
+    estimated_time_commitment: safeString(rec.estimated_time_commitment) || fallback.estimated_time_commitment,
+    expected_skill_level: normalizeSkillLevel(safeString(rec.expected_skill_level) || fallback.expected_skill_level),
+    likelihood_of_long_term_value: normalizeLongTermValue(safeString(rec.likelihood_of_long_term_value) || fallback.likelihood_of_long_term_value),
+    explanation: safeString(rec.explanation) || fallback.explanation,
+    discovery_signals: normalizeSignalMap(rec.discovery_signals, fallback.discovery_signals),
+  };
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -919,6 +1031,12 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function clamp(n: number, min = 0, max = 100): number {
   return Math.max(min, Math.min(max, Math.round(n)));
+}
+
+function clampOrFallback(value: unknown, fallback: number, min = 0, max = 100): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return clamp(fallback, min, max);
+  return clamp(n, min, max);
 }
 
 function safeString(value: unknown): string {
@@ -2730,6 +2848,100 @@ function computeIntelligenceScore(args: {
   };
 }
 
+function buildOpportunityIntelligenceFallback(args: {
+  airdrop: Record<string, unknown>;
+  score: IntelligenceScore;
+  web: WebEnrichmentData;
+  github: GitHubData;
+  cg: CoinGeckoData;
+  llama: DefiLlamaData;
+  evidence: SourceEvidence[];
+}): OpportunityIntelligenceReport {
+  const { airdrop, score, web, github, cg, llama, evidence } = args;
+  const categoryList = Array.isArray(airdrop.category) ? airdrop.category.map((c) => safeString(c)).filter(Boolean) : [];
+  const categoryText = categoryList.join(", ") || "General";
+
+  const opportunityRating: OpportunityRating =
+    score.opportunity_score >= 75 ? "Strong" :
+    score.opportunity_score >= 55 ? "Promising" :
+    score.opportunity_score >= 35 ? "Speculative" : "Avoid";
+
+  const skillLevel: SkillLevel =
+    score.difficulty === "Hard" ? "Advanced" : score.difficulty === "Moderate" ? "Intermediate" : "Beginner";
+
+  const longTermValue: LongTermValueLikelihood =
+    (score.breakdown.v16_reputation_score ?? 0) >= 75 && (score.breakdown.v16_evidence_depth_score ?? 0) >= 65
+      ? "High"
+      : (score.breakdown.v16_reputation_score ?? 0) >= 55
+      ? "Medium"
+      : "Low";
+
+  const positiveSignals = uniq([
+    score.breakdown.v16_reputation_score ? `Reputation score ${score.breakdown.v16_reputation_score}/100` : "",
+    web.docs_url ? "Official documentation available" : "",
+    github.found && (github.recentCommits30d ?? 0) > 0 ? `GitHub active with ${(github.recentCommits30d ?? 0)} commits in 30d` : "",
+    cg.found ? "Token market profile detected" : "",
+    llama.found ? `On-chain adoption evidence detected (${fmt(llama.tvl)} TVL)` : "",
+    (score.breakdown.opportunity_active_campaign_signals ?? 0) > 0 ? "Live campaign or quest signals detected" : "",
+    (score.breakdown.v17_timeline_event_count ?? 0) > 0 ? `Timeline evidence includes ${score.breakdown.v17_timeline_event_count} milestones` : "",
+  ].filter(Boolean)).slice(0, 6);
+
+  const warningSignals = uniq([
+    ...score.scam_warnings,
+    ...(score.missing_information ?? []).slice(0, 3),
+    score.breakdown.opportunity_negative_signals ? "Some opportunity signals are speculative or unconfirmed" : "",
+    score.breakdown.v14_official_link_mismatch ? "Official-link mismatch requires manual verification" : "",
+    score.breakdown.v14_action_safety_critical ? "Critical wallet-action safety risk identified" : "",
+  ].filter(Boolean)).slice(0, 6);
+
+  const potentialText = safeString(airdrop.estimated_reward)
+    ? `${score.reward_potential} (${safeString(airdrop.estimated_reward)})`
+    : score.reward_potential;
+
+  const explanation = `This opportunity scores ${score.trust_score}/100 overall because project quality, opportunity evidence, risk profile, execution effort and confidence were weighted together. Key positives include ${positiveSignals.slice(0, 3).join(", ") || "available public signals"}. Main constraints are ${warningSignals.slice(0, 3).join(", ") || "limited verification depth"}.`;
+
+  const trustedEvidenceCount = evidence.filter((e) => e.tier === "official" || e.tier === "primary" || e.tier === "trusted").length;
+
+  return {
+    overall_intelligence_score: clamp(score.breakdown.v16_overall_intelligence_score, score.trust_score),
+    confidence: score.confidence_score,
+    opportunity_rating: opportunityRating,
+    risk_rating: score.risk_level,
+    difficulty: score.difficulty,
+    time_required: safeString(airdrop.time_required) || "Currently unavailable.",
+    estimated_potential: potentialText,
+    why_this_opportunity_matters: `${safeString(airdrop.name) || "This project"} is categorized as ${categoryText} with ${score.opportunity_score}/100 opportunity strength and ${score.confidence_score}/100 confidence from available evidence.`,
+    positive_signals: positiveSignals.length ? positiveSignals : ["Currently unavailable."],
+    warning_signals: warningSignals.length ? warningSignals : ["Currently unavailable."],
+    who_this_is_suitable_for: score.difficulty === "Easy"
+      ? "Users seeking lower-friction opportunities with manageable execution risk."
+      : score.difficulty === "Moderate"
+      ? "Users comfortable with recurring tasks and medium due diligence."
+      : "Advanced users who can verify links/contracts and manage higher complexity.",
+    who_should_avoid_it: score.risk_level === "High"
+      ? "Users with low risk tolerance or limited verification experience should avoid this until signals improve."
+      : "Users unable to verify official sources, contracts and timelines independently.",
+    estimated_time_commitment: safeString(airdrop.time_required) || "Currently unavailable.",
+    expected_skill_level: skillLevel,
+    likelihood_of_long_term_value: longTermValue,
+    explanation,
+    discovery_signals: {
+      project_age: score.breakdown.v17_timeline_event_count ? `${score.breakdown.v17_timeline_event_count} timeline event(s) detected` : "Currently unavailable.",
+      funding: safeString(airdrop.funding_info) || "Currently unavailable.",
+      investors: safeString(airdrop.investors) || "Currently unavailable.",
+      github_activity: github.found ? `${github.recentCommits30d ?? 0} commits in last 30d` : "Currently unavailable.",
+      documentation: web.docs_url ? "Official docs found" : "Currently unavailable.",
+      website_quality: web.website_accessible ? "Official website accessible" : "Currently unavailable.",
+      community_size: cg.twitterFollowers ? `${cg.twitterFollowers.toLocaleString()} social followers` : "Currently unavailable.",
+      contract_analysis: score.breakdown.contract ? `Contract signal score ${score.breakdown.contract}/100` : "Currently unavailable.",
+      onchain_metrics: llama.found ? `TVL ${fmt(llama.tvl)}` : "Currently unavailable.",
+      wallet_intelligence: score.breakdown.risk_level_score ? `Risk model ${score.breakdown.risk_level_score}/100` : "Currently unavailable.",
+      previous_campaigns: (score.breakdown.opportunity_active_campaign_signals ?? 0) > 0 ? "Prior/active campaign signals detected" : "Currently unavailable.",
+      competitor_watch: trustedEvidenceCount > 0 ? `${trustedEvidenceCount} trusted/official discovery source(s) checked` : "Currently unavailable.",
+    },
+  };
+}
+
 function buildNarrativePrompt(args: {
   project: Record<string, unknown>;
   taskCount: number;
@@ -2790,12 +3002,44 @@ function buildNarrativePrompt(args: {
     '  "ai_risk_analysis": "Max 80 words. Specific risks, scam signals, missing evidence, or contract/community concerns.",',
     '  "ai_reward_estimate": "Max 35 words. Reward potential and effort, with no guarantee language.",',
     '  "overview": "Max 70 words. Project use case, ecosystem and maturity.",',
-    '  "why_airdrop": "Max 55 words. Why this may or may not be worth farming, based on evidence."',
+    '  "why_airdrop": "Max 55 words. Why this may or may not be worth farming, based on evidence.",',
+    '  "opportunity_intelligence": {',
+    '    "overall_intelligence_score": 0,',
+    '    "confidence": 0,',
+    '    "opportunity_rating": "Strong|Promising|Speculative|Avoid",',
+    '    "risk_rating": "Low|Medium|High",',
+    '    "difficulty": "Easy|Moderate|Hard",',
+    '    "time_required": "Short phrase",',
+    '    "estimated_potential": "Short phrase with evidence context",',
+    '    "why_this_opportunity_matters": "Analyst-grade explanation.",',
+    '    "positive_signals": ["signal 1", "signal 2"],',
+    '    "warning_signals": ["risk 1", "risk 2"],',
+    '    "who_this_is_suitable_for": "Specific user profile.",',
+    '    "who_should_avoid_it": "Specific user profile.",',
+    '    "estimated_time_commitment": "Realistic estimate.",',
+    '    "expected_skill_level": "Beginner|Intermediate|Advanced",',
+    '    "likelihood_of_long_term_value": "High|Medium|Low",',
+    '    "explanation": "Never only a score. Explain why with concrete evidence and caveats.",',
+    '    "discovery_signals": {',
+    '      "project_age": "text",',
+    '      "funding": "text",',
+    '      "investors": "text",',
+    '      "github_activity": "text",',
+    '      "documentation": "text",',
+    '      "website_quality": "text",',
+    '      "community_size": "text",',
+    '      "contract_analysis": "text",',
+    '      "onchain_metrics": "text",',
+    '      "wallet_intelligence": "text",',
+    '      "previous_campaigns": "text",',
+    '      "competitor_watch": "text"',
+    '    }',
+    '  }',
     "}",
   ].join("\n");
 }
 
-async function callOpenAIJson(prompt: string, maxTokens = 700, temperature = 0.2): Promise<Record<string, unknown>> {
+async function callOpenAIJson(prompt: string, maxTokens = 1200, temperature = 0.2): Promise<Record<string, unknown>> {
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) throw new Error("OPENAI_API_KEY is not set");
   const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -2942,6 +3186,7 @@ async function safeUpdateAirdrop(supabase: ReturnType<typeof createClient>, id: 
     "ai_summary", "ai_risk_analysis", "ai_reward_estimate", "overview", "why_airdrop",
     "trust_score", "trust_label", "score_reasons", "sub_scores", "risk_level", "reward_potential",
     "difficulty", "last_analyzed_at", "updated_at", "github_url", "docs_url", "twitter_url", "discord_url", "telegram_url", "funding_info", "investors", "team_info", "source", "listing_state", "blacklist_reason",
+    "opportunity_intelligence", "ai_reasoning", "final_published_score",
   ];
   const fallback: Record<string, unknown> = {};
   for (const key of basicKeys) if (key in fullPayload) fallback[key] = fullPayload[key];
@@ -3042,6 +3287,16 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
     score.sources_checked = uniq([...score.sources_checked, `AirdropGuard: ${suggestedTasksInserted} starter task(s) suggested`]);
   }
 
+  const fallbackOpportunityIntelligence = buildOpportunityIntelligenceFallback({
+    airdrop: airdrop as Record<string, unknown>,
+    score,
+    web: webData,
+    github: githubData,
+    cg: cgData,
+    llama: llamaData,
+    evidence,
+  });
+
   const narrativeRaw = await callOpenAIJson(buildNarrativePrompt({
     project: airdrop as Record<string, unknown>,
     taskCount: taskCount ?? 0,
@@ -3068,6 +3323,10 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
     ai_reward_estimate: safeString(narrativeRaw.ai_reward_estimate),
     overview: safeString(narrativeRaw.overview),
     why_airdrop: safeString(narrativeRaw.why_airdrop),
+    opportunity_intelligence: normalizeOpportunityIntelligenceReport(
+      narrativeRaw.opportunity_intelligence,
+      fallbackOpportunityIntelligence,
+    ),
   };
 
   const now = new Date().toISOString();
@@ -3082,6 +3341,18 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
   if (!webData.found) enrichmentProfile.failures.push("Official website fetch failed or unavailable");
   if (!githubData.found) enrichmentProfile.failures.push("GitHub repository not detected");
   if (!searchResults.length) enrichmentProfile.failures.push("Search results unavailable");
+
+  const recommendationOverride = safeString(airdrop.ai_recommendation_override);
+  const effectiveRecommendation: Recommendation =
+    recommendationOverride === "verify" || recommendationOverride === "review_further" || recommendationOverride === "blacklist"
+      ? recommendationOverride
+      : score.ai_recommendation;
+
+  const humanOverrideScore = typeof airdrop.human_override_score === "number"
+    ? clampOrFallback(airdrop.human_override_score, score.trust_score)
+    : null;
+
+  const finalPublishedScore = humanOverrideScore ?? score.trust_score;
 
   const updatePayload: Record<string, unknown> = {
     ai_summary: narrative.ai_summary,
@@ -3103,6 +3374,14 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
     scam_warnings: score.scam_warnings,
     missing_information: score.missing_information,
     sources_checked: score.sources_checked,
+    opportunity_intelligence: narrative.opportunity_intelligence,
+    ai_reasoning: {
+      reasons: score.reasons,
+      confidence_explanation: score.confidence_explanation,
+      recommended_admin_action: score.recommended_admin_action,
+      explanation: narrative.opportunity_intelligence?.explanation ?? fallbackOpportunityIntelligence.explanation,
+    },
+    final_published_score: finalPublishedScore,
     sub_scores: score.breakdown,
     enrichment_profile: enrichmentProfile,
     last_analyzed_at: now,
@@ -3110,10 +3389,10 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
   };
 
   // Safety: AI can recommend but should not publish automatically.
-  if (score.ai_recommendation === "blacklist") {
+  if (effectiveRecommendation === "blacklist") {
     updatePayload.listing_state = "under_review";
     updatePayload.blacklist_reason = score.scam_warnings.join(" | ") || "High-risk intelligence signals detected. Manual review required.";
-  } else if (score.ai_recommendation === "review_further") {
+  } else if (effectiveRecommendation === "review_further") {
     updatePayload.listing_state = "under_review";
   }
 
@@ -3126,12 +3405,14 @@ async function handleAirdropAnalysis(airdrop_id: string, force: boolean, supabas
     success: true,
     cached: false,
     enrichment_cached: canUseCachedEnrichment,
-    ai_recommendation: score.ai_recommendation,
+    ai_recommendation: effectiveRecommendation,
     trust_score: score.trust_score,
     opportunity_score: score.opportunity_score,
     risk_level: score.risk_level,
     confidence_score: score.confidence_score,
     confidence_level: score.confidence_level,
+    opportunity_intelligence: narrative.opportunity_intelligence,
+    final_published_score: finalPublishedScore,
     scam_warnings: score.scam_warnings,
     missing_information: score.missing_information,
     sources_checked: score.sources_checked,

@@ -224,6 +224,9 @@ type AirdropFormData = {
   blockchain: Blockchain[]; category: Category[];
   status: Airdrop['status']; risk_level: Airdrop['risk_level'];
   reward_potential: Airdrop['reward_potential']; difficulty: Airdrop['difficulty'];
+  ai_recommendation_override: '' | 'verify' | 'review_further' | 'blacklist';
+  human_override_score: string;
+  human_decision: string;
   published: boolean; is_featured: boolean; is_trending: boolean; is_sponsored: boolean;
   tasks_text: string;
 };
@@ -236,6 +239,9 @@ const BLANK_FORM: AirdropFormData = {
   estimated_reward: '', expiry_date: '', time_required: 'Varies',
   blockchain: [], category: [],
   status: 'Active', risk_level: 'Medium', reward_potential: 'Medium', difficulty: 'Moderate',
+  ai_recommendation_override: '',
+  human_override_score: '',
+  human_decision: '',
   published: false, is_featured: false, is_trending: false, is_sponsored: false,
   tasks_text: '',
 };
@@ -1881,6 +1887,45 @@ function AirdropFormModal({
           <textarea value={form.ai_summary} onChange={e => setForm(f => ({ ...f, ai_summary: e.target.value }))}
             placeholder="Brief description of this airdrop opportunity..." rows={3}
             className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40 resize-none" />
+        </div>
+
+        <div className="pt-3 border-t border-white/5 space-y-3">
+          <p className="text-[10px] text-gray-600 uppercase tracking-wider font-semibold">AI Intelligence Controls</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>AI Recommendation Override</label>
+              <select
+                value={form.ai_recommendation_override}
+                onChange={e => setForm(f => ({ ...f, ai_recommendation_override: e.target.value as AirdropFormData['ai_recommendation_override'] }))}
+                className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40 cursor-pointer"
+              >
+                <option value="" className="bg-dark-900">None (use AI)</option>
+                <option value="verify" className="bg-dark-900">Verify</option>
+                <option value="review_further" className="bg-dark-900">Review Further</option>
+                <option value="blacklist" className="bg-dark-900">Blacklist</option>
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Final Published Score Override (0-100)</label>
+              <input
+                value={form.human_override_score}
+                onChange={e => setForm(f => ({ ...f, human_override_score: e.target.value.replace(/[^0-9]/g, '').slice(0, 3) }))}
+                placeholder="Leave blank to use AI score"
+                className={`${inp} font-mono`}
+                inputMode="numeric"
+              />
+            </div>
+          </div>
+          <div>
+            <label className={lbl}>Human Decision Notes</label>
+            <textarea
+              value={form.human_decision}
+              onChange={e => setForm(f => ({ ...f, human_decision: e.target.value }))}
+              placeholder="Why this score/recommendation was accepted or overridden"
+              rows={2}
+              className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40 resize-none"
+            />
+          </div>
         </div>
 
         <div className="pt-3 border-t border-white/5">
@@ -4883,6 +4928,9 @@ export default function AdminPage() {
       risk_level: a.risk_level,
       reward_potential: a.reward_potential,
       difficulty: a.difficulty,
+      ai_recommendation_override: a.ai_recommendation_override ?? '',
+      human_override_score: typeof a.human_override_score === 'number' ? String(a.human_override_score) : '',
+      human_decision: a.human_decision ?? '',
       published: a.published,
       is_featured: a.is_featured,
       is_trending: a.is_trending,
@@ -5046,6 +5094,13 @@ export default function AdminPage() {
         setForm(normalizedForm);
       }
 
+      const parsedOverrideScore = normalizedForm.human_override_score.trim() === ''
+        ? null
+        : Math.max(0, Math.min(100, Number.parseInt(normalizedForm.human_override_score, 10)));
+
+      const fallbackScore = existing?.trust_score ?? null;
+      const finalPublishedScore = parsedOverrideScore ?? fallbackScore;
+
       currentStep = 'prepare_payload';
       const payload = {
         name: normalizedForm.name.trim(),
@@ -5071,6 +5126,10 @@ export default function AdminPage() {
         risk_level: normalizedForm.risk_level,
         reward_potential: normalizedForm.reward_potential,
         difficulty: normalizedForm.difficulty,
+        ai_recommendation_override: normalizedForm.ai_recommendation_override || null,
+        human_override_score: Number.isFinite(parsedOverrideScore as number) ? parsedOverrideScore : null,
+        human_decision: normalizedForm.human_decision.trim() || null,
+        final_published_score: finalPublishedScore,
         published: normalizedForm.published,
         human_verified: normalizedForm.published,
         is_featured: normalizedForm.is_featured,
@@ -8292,6 +8351,11 @@ export default function AdminPage() {
                 {isOpen && (
                   <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
                     <p className="text-xs text-gray-400 leading-relaxed">{a.ai_summary || 'No AI summary yet. Run AI analysis to populate.'}</p>
+                    {typeof (a.opportunity_intelligence as Record<string, unknown> | null | undefined)?.explanation === 'string' && (
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        Why score: {((a.opportunity_intelligence as Record<string, unknown>).explanation as string).slice(0, 220)}
+                      </p>
+                    )}
                     <div className="grid grid-cols-2 gap-2 text-[11px]">
                       <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">AI analysis: {a.last_analyzed_at ? 'Available' : 'Not run'}</div>
                       <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">Reviewer notes: {a.blacklist_reason ? 'Available' : 'None'}</div>
