@@ -2356,9 +2356,30 @@ export default function AdminPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [subLoading, setSubLoading] = useState(true);
   const [expandedSub, setExpandedSub] = useState<string | null>(null);
-  const [expandedAirdrop, setExpandedAirdrop] = useState<string | null>(null);
+  const [expandedAirdropIds, setExpandedAirdropIds] = useState<string[]>([]);
   const [subNotes, setSubNotes] = useState<Record<string, string>>({});
   const [analyzingSub, setAnalyzingSub] = useState<string | null>(null);
+
+  useEffect(() => {
+    setExpandedAirdropIds((prev) => {
+      const valid = new Set(airdrops.map((row) => row.id));
+      return prev.filter((id) => valid.has(id));
+    });
+  }, [airdrops]);
+
+  const toggleAirdropForm = useCallback((id: string) => {
+    setExpandedAirdropIds((prev) => (
+      prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id]
+    ));
+  }, []);
+
+  const expandAllAirdropForms = useCallback(() => {
+    setExpandedAirdropIds(airdrops.map((row) => row.id));
+  }, [airdrops]);
+
+  const collapseAllAirdropForms = useCallback(() => {
+    setExpandedAirdropIds([]);
+  }, []);
 
   useEffect(() => {
     if (!expandedSub) return;
@@ -7160,10 +7181,26 @@ export default function AdminPage() {
       </section>
 
       <section id="admin-airdrops" className={canShowSection('airdrops') ? '' : 'hidden'}>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Airdrops</h2>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Airdrops</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={expandAllAirdropForms}
+              className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[11px] text-sky-200 hover:bg-sky-500/20 transition-colors"
+            >
+              Open all forms
+            </button>
+            <button
+              onClick={collapseAllAirdropForms}
+              className="rounded-lg border border-white/15 bg-white/[0.04] px-2.5 py-1 text-[11px] text-gray-200 hover:bg-white/[0.08] transition-colors"
+            >
+              Collapse all
+            </button>
+          </div>
+        </div>
         <div className="space-y-3 md:hidden mb-3">
           {airdrops.map((a) => {
-            const isOpen = expandedAirdrop === a.id;
+            const isOpen = expandedAirdropIds.includes(a.id);
             const riskCls = a.risk_level === 'Low' ? 'text-emerald-400' : a.risk_level === 'High' ? 'text-rose-400' : 'text-amber-400';
             const scoreCls = a.trust_score == null ? 'text-gray-500' : a.trust_score >= 75 ? 'text-emerald-400' : a.trust_score >= 50 ? 'text-amber-400' : 'text-rose-400';
             return (
@@ -7177,7 +7214,7 @@ export default function AdminPage() {
                       <span className={riskCls}>Risk {a.risk_level}</span>
                     </div>
                   </div>
-                  <button onClick={() => setExpandedAirdrop(isOpen ? null : a.id)} className="min-h-[40px] px-3 rounded-lg border border-white/10 text-xs text-gray-300">
+                  <button onClick={() => toggleAirdropForm(a.id)} className="min-h-[40px] px-3 rounded-lg border border-white/10 text-xs text-gray-300">
                     {isOpen ? 'Hide' : 'Open'}
                   </button>
                 </div>
