@@ -2825,6 +2825,8 @@ export default function AdminPage() {
 
   const [adminNotifications, setAdminNotifications] = useState<AdminNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<Set<string>>(new Set());
+  const [expandedAdminPanels, setExpandedAdminPanels] = useState<Record<string, boolean>>({});
   const [lastEnrichmentStats, setLastEnrichmentStats] = useState<{
     websites_analyzed: number; docs_found: number; funding_found: number;
     github_found: number; token_detected: number; investors_found: number;
@@ -3093,6 +3095,32 @@ export default function AdminPage() {
     () => adminNotifications.filter((item) => !item.is_read).length,
     [adminNotifications]
   );
+
+  const visibleAdminNotifications = useMemo(
+    () => adminNotifications.filter((item) => !dismissedNotificationIds.has(item.id)),
+    [adminNotifications, dismissedNotificationIds],
+  );
+
+  const dismissNotification = useCallback((id: string) => {
+    setDismissedNotificationIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearAllNotifications = useCallback(() => {
+    setDismissedNotificationIds(new Set(adminNotifications.map((item) => item.id)));
+  }, [adminNotifications]);
+
+  const isAdminPanelOpen = useCallback((panelKey: string) => Boolean(expandedAdminPanels[panelKey]), [expandedAdminPanels]);
+
+  const toggleAdminPanel = useCallback((panelKey: string) => {
+    setExpandedAdminPanels((prev) => ({
+      ...prev,
+      [panelKey]: !prev[panelKey],
+    }));
+  }, []);
 
   const discordQueueCount = useMemo(
     () => discordSocialUpdates.filter((item) => item.status === 'draft' || item.status === 'failed').length,
@@ -6596,7 +6624,7 @@ export default function AdminPage() {
               : <Brain className="w-4 h-4" />}
             {refreshingAll ? 'Analyzing…' : 'Refresh All AI'}
           </button>
-          <button onClick={() => { fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); fetchDiscordSocialOps(); }}
+          <button onClick={() => { setExpandedAdminPanels({}); fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); fetchDiscordSocialOps(); }}
             aria-label="Refresh admin data"
             className="min-h-[44px] px-3 py-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
@@ -6666,12 +6694,20 @@ export default function AdminPage() {
             </div>
 
             <div className="rounded-xl border border-white/10 bg-dark-900/40 p-3">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-cyan-200">In-App Admin Notifications</p>
-              {adminNotifications.length === 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] uppercase tracking-[0.12em] text-cyan-200">In-App Admin Notifications</p>
+                <button
+                  onClick={clearAllNotifications}
+                  className="rounded-lg border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[11px] text-rose-200 hover:bg-rose-500/20"
+                >
+                  Clear All
+                </button>
+              </div>
+              {visibleAdminNotifications.length === 0 ? (
                 <p className="mt-2 text-xs text-gray-500">No admin notifications yet.</p>
               ) : (
                 <div className="mt-2 space-y-2">
-                  {adminNotifications.slice(0, 6).map((item) => {
+                  {visibleAdminNotifications.slice(0, 6).map((item) => {
                     const action = resolveNotificationAction(item);
                     const severityTone = item.severity === 'error'
                       ? 'text-rose-200 border-rose-500/25 bg-rose-500/10'
@@ -6689,6 +6725,13 @@ export default function AdminPage() {
                           <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${severityTone}`}>
                             {item.severity}
                           </span>
+                          <button
+                            onClick={() => dismissNotification(item.id)}
+                            aria-label="Dismiss notification"
+                            className="shrink-0 rounded-lg border border-white/15 bg-white/[0.03] p-1 text-gray-300 hover:text-white hover:bg-white/[0.08]"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
                         </div>
                         <div className="mt-2 flex items-center justify-between gap-2">
                           <p className="text-[10px] text-gray-500">{new Date(item.created_at).toLocaleString()}</p>
@@ -7929,6 +7972,9 @@ export default function AdminPage() {
           ) : (
             <div className="space-y-2">
               {prioritizedCompetitorOpportunities.slice(0, 50).map(({ opportunity, details, dynamicScore, dynamicPriority, dynamicMentions }) => {
+                const duplicatePanelKey = `duplicate:${opportunity.id}`;
+                const reasoningPanelKey = `reasoning:${opportunity.id}`;
+                const enrichmentPanelKey = `enrichment:${opportunity.id}`;
                 const opportunityStatusMetaMap = COMPETITOR_STATUS_META as Record<string, { label: string; tone: string }>;
                 const comparisonMetaMap = DISCOVERY_COMPARISON_META as Record<string, { label: string; tone: string }>;
                 const priorityMetaMap = DISCOVERY_PRIORITY_META as Record<string, { label: string; tone: string }>;
@@ -7961,33 +8007,71 @@ export default function AdminPage() {
                       <p>Discovery score: {dynamicScore}</p>
                       <p>Sources mentioning: {dynamicMentions}</p>
                     </div>
-                    <div className="mt-1 grid gap-1 text-[11px] text-gray-500 md:grid-cols-3">
-                      <p>Comparison: {details.compare}</p>
-                      <p>Why new: {details.whyNew}</p>
-                      <p>Discovered: {new Date(opportunity.discovered_at).toLocaleString()}</p>
+                    <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.02] px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleAdminPanel(duplicatePanelKey)}
+                        className="w-full flex items-center justify-between text-left text-[11px] text-gray-300"
+                      >
+                        <span>Duplicate debug details</span>
+                        <span>{isAdminPanelOpen(duplicatePanelKey) ? 'Hide' : 'Show'}</span>
+                      </button>
+                      {isAdminPanelOpen(duplicatePanelKey) && (
+                        <div className="mt-2 grid gap-1 text-[11px] text-gray-500 md:grid-cols-3">
+                          <p>Comparison: {details.compare}</p>
+                          <p>Why new: {details.whyNew}</p>
+                          <p>Discovered: {new Date(opportunity.discovered_at).toLocaleString()}</p>
+                          <p>Reason detected: {details.reasonDetected || 'Not provided'}</p>
+                          <p>Duplicate status: {details.duplicateStatus || 'new'}</p>
+                          <p>Detected keywords: {Array.isArray(details.detectedKeywords) && details.detectedKeywords.length ? details.detectedKeywords.join(', ') : 'None'}</p>
+                        </div>
+                      )}
                     </div>
-                    <div className="mt-1 grid gap-1 text-[11px] text-gray-500 md:grid-cols-4">
-                      <p>Opportunity type: {details.opportunityType}</p>
-                      <p>Risk: {details.riskLevel}</p>
-                      <p>Official sources: {details.officialSourcesFound}</p>
-                      <p>Estimated quality: {details.estimatedQuality}</p>
+
+                    <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.02] px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleAdminPanel(reasoningPanelKey)}
+                        className="w-full flex items-center justify-between text-left text-[11px] text-gray-300"
+                      >
+                        <span>AI reasoning</span>
+                        <span>{isAdminPanelOpen(reasoningPanelKey) ? 'Hide' : 'Show'}</span>
+                      </button>
+                      {isAdminPanelOpen(reasoningPanelKey) && (
+                        <div className="mt-2 grid gap-1 text-[11px] text-gray-500 md:grid-cols-4">
+                          <p>Opportunity type: {details.opportunityType}</p>
+                          <p>Risk: {details.riskLevel}</p>
+                          <p>Official sources: {details.officialSourcesFound}</p>
+                          <p>Estimated quality: {details.estimatedQuality}</p>
+                          {details.analystSummary && <p className="md:col-span-4 text-xs text-gray-400">Analyst summary: {details.analystSummary}</p>}
+                        </div>
+                      )}
                     </div>
-                    <div className="mt-1 grid gap-1 text-[11px] text-gray-500 md:grid-cols-3">
-                      <p>Reason detected: {details.reasonDetected || 'Not provided'}</p>
-                      <p>Duplicate status: {details.duplicateStatus || 'new'}</p>
-                      <p>Detected keywords: {Array.isArray(details.detectedKeywords) && details.detectedKeywords.length ? details.detectedKeywords.join(', ') : 'None'}</p>
+
+                    <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.02] px-2 py-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleAdminPanel(enrichmentPanelKey)}
+                        className="w-full flex items-center justify-between text-left text-[11px] text-gray-300"
+                      >
+                        <span>Auto-enrichment details</span>
+                        <span>{isAdminPanelOpen(enrichmentPanelKey) ? 'Hide' : 'Show'}</span>
+                      </button>
+                      {isAdminPanelOpen(enrichmentPanelKey) && (
+                        <div className="mt-2">
+                          {details.listingDate && <p className="text-[11px] text-gray-400">Listing date: {details.listingDate}</p>}
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                            <span>Docs: {details.officialDocsUrl ? 'Yes' : 'No'}</span>
+                            <span>GitHub: {details.githubUrl ? 'Yes' : 'No'}</span>
+                            <span>X: {details.officialXUrl ? 'Yes' : 'No'}</span>
+                            <span>Discord: {details.officialDiscordUrl ? 'Yes' : 'No'}</span>
+                            <span>Blockchain: {opportunity.blockchain || 'Unknown'}</span>
+                          </div>
+                          {details.shortDescription && <p className="mt-1 text-xs text-gray-400">{details.shortDescription}</p>}
+                          <p className="mt-1 text-xs text-gray-400">Why matched: {opportunity.why_matched}</p>
+                        </div>
+                      )}
                     </div>
-                    {details.analystSummary && <p className="mt-1 text-xs text-gray-400">Analyst summary: {details.analystSummary}</p>}
-                    {details.listingDate && <p className="mt-1 text-[11px] text-gray-400">Listing date: {details.listingDate}</p>}
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                      <span>Docs: {details.officialDocsUrl ? 'Yes' : 'No'}</span>
-                      <span>GitHub: {details.githubUrl ? 'Yes' : 'No'}</span>
-                      <span>X: {details.officialXUrl ? 'Yes' : 'No'}</span>
-                      <span>Discord: {details.officialDiscordUrl ? 'Yes' : 'No'}</span>
-                      <span>Blockchain: {opportunity.blockchain || 'Unknown'}</span>
-                    </div>
-                    {details.shortDescription && <p className="mt-1 text-xs text-gray-400">{details.shortDescription}</p>}
-                    <p className="mt-1 text-xs text-gray-400">Why matched: {opportunity.why_matched}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {canQueue && (
                         <button
