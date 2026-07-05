@@ -18,6 +18,11 @@ export const createPublishCommand = (services: BotServices): BotCommand => ({
     await interaction.deferReply({ ephemeral: true });
     const messageId = interaction.options.getString("messageid", true);
     const channelId = interaction.options.getString("channelid") ?? services.channels.alerts;
+    if (!channelId) {
+      await interaction.editReply("Target announcement channel is not configured.");
+      return;
+    }
+
     const channel = await services.client.channels.fetch(channelId).catch(() => null);
 
     if (!channel || channel.type !== ChannelType.GuildAnnouncement) {

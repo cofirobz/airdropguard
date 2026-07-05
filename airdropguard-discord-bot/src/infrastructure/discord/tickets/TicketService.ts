@@ -15,11 +15,15 @@ import { CUSTOM_IDS } from "../constants";
 export class TicketService {
   public constructor(
     private readonly client: Client,
-    private readonly supportRoleId: string,
+    private readonly supportRoleId: string | undefined,
     private readonly categoryId?: string
   ) {}
 
   public async postPanel(channel: GuildTextBasedChannel): Promise<void> {
+    if (!this.supportRoleId) {
+      return;
+    }
+
     const embed = new EmbedBuilder()
       .setColor(0x1f8b4c)
       .setTitle("AirdropGuard Support")
@@ -34,6 +38,10 @@ export class TicketService {
   }
 
   public async openTicket(guild: Guild, userId: string): Promise<string> {
+    if (!this.supportRoleId) {
+      throw new Error("Ticket support is disabled because TICKET_SUPPORT_ROLE_ID is not configured.");
+    }
+
     const existing = guild.channels.cache.find(
       (channel) =>
         channel.type === ChannelType.GuildText &&

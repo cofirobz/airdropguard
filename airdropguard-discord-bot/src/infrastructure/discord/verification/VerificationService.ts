@@ -14,12 +14,16 @@ import { logger } from "../../../core/logger/logger";
 export class VerificationService {
   public constructor(
     private readonly client: Client,
-    private readonly welcomeChannelId: string,
-    private readonly verifiedRoleId: string,
+    private readonly welcomeChannelId: string | undefined,
+    private readonly verifiedRoleId: string | undefined,
     private readonly autoAssignRoles: string[]
   ) {}
 
   public async onMemberJoined(member: GuildMember): Promise<void> {
+    if (!this.welcomeChannelId) {
+      return;
+    }
+
     for (const roleId of this.autoAssignRoles) {
       if (member.guild.roles.cache.has(roleId)) {
         await member.roles.add(roleId).catch(() => undefined);
@@ -47,6 +51,10 @@ export class VerificationService {
   }
 
   public async verifyMember(member: GuildMember): Promise<boolean> {
+    if (!this.verifiedRoleId) {
+      return false;
+    }
+
     if (member.roles.cache.has(this.verifiedRoleId)) {
       return false;
     }

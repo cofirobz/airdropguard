@@ -12,7 +12,15 @@ const defaultBreakdown: TrustScoreBreakdown = {
 
 const normalizeTasks = (value: unknown): string[] => {
   if (Array.isArray(value)) {
-    return value.map((v) => String(v));
+    return value.map((v) => {
+      if (typeof v === "string") {
+        return v;
+      }
+      if (typeof v === "object" && v !== null && "title" in v && typeof (v as { title?: unknown }).title === "string") {
+        return String((v as { title: string }).title);
+      }
+      return String(v);
+    });
   }
   if (typeof value === "string") {
     return value
@@ -36,11 +44,21 @@ const normalizeReasons = (value: unknown): string[] => {
 const toProject = (raw: any): AirdropProject => ({
   id: String(raw.id ?? raw.slug ?? raw.name ?? crypto.randomUUID()),
   name: String(raw.name ?? "Unknown"),
-  category: raw.category ? String(raw.category) : undefined,
-  website: raw.website ? String(raw.website) : undefined,
-  summary: raw.summary ? String(raw.summary) : undefined,
-  verified: Boolean(raw.verified ?? true),
-  flaggedScam: Boolean(raw.flaggedScam ?? raw.is_scam ?? false),
+  category: raw.category ? String(raw.category) : Array.isArray(raw.category) && raw.category.length > 0 ? String(raw.category[0]) : undefined,
+  website: raw.website ? String(raw.website) : raw.website_url ? String(raw.website_url) : undefined,
+  summary: raw.summary ? String(raw.summary) : raw.ai_summary ? String(raw.ai_summary) : raw.overview ? String(raw.overview) : undefined,
+  verified: Boolean(
+    raw.verified ??
+      raw.human_verified ??
+      (typeof raw.listing_state === "string" && raw.listing_state.toLowerCase() === "verified") ??
+      (typeof raw.review_status === "string" && raw.review_status.toLowerCase() === "approved")
+  ),
+  flaggedScam: Boolean(
+    raw.flaggedScam ??
+      raw.is_scam ??
+      (typeof raw.listing_state === "string" && raw.listing_state.toLowerCase() === "scam_alert") ??
+      (typeof raw.review_status === "string" && raw.review_status.toLowerCase().includes("scam"))
+  ),
   scamReasons: normalizeReasons(raw.scamReasons ?? raw.scam_reasons),
   trustScore: Number(raw.trustScore ?? raw.trust_score ?? 0),
   trustScoreBreakdown: {
@@ -52,9 +70,23 @@ const toProject = (raw: any): AirdropProject => ({
       raw.trustScoreBreakdown?.transparency ?? raw.transparency_score ?? defaultBreakdown.transparency
     )
   },
-  estimatedReward: raw.estimatedReward ? String(raw.estimatedReward) : raw.estimated_reward ? String(raw.estimated_reward) : undefined,
-  tasks: normalizeTasks(raw.tasks),
-  publishedAt: raw.publishedAt ? String(raw.publishedAt) : raw.published_at ? String(raw.published_at) : undefined
+  estimatedReward: raw.estimatedReward
+    ? String(raw.estimatedReward)
+    : raw.estimated_reward
+      ? String(raw.estimated_reward)
+      : raw.ai_reward_estimate
+        ? String(raw.ai_reward_estimate)
+        : undefined,
+  tasks: normalizeTasks(raw.tasks ?? raw.airdrop_tasks),
+  publishedAt: raw.publishedAt
+    ? String(raw.publishedAt)
+    : raw.published_at
+      ? String(raw.published_at)
+      : raw.updated_at
+        ? String(raw.updated_at)
+        : raw.created_at
+          ? String(raw.created_at)
+          : undefined
 });
 
 export class AirdropGuardApiClient implements AirdropApiPort {

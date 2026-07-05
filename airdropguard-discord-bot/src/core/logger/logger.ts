@@ -1,11 +1,50 @@
 type LogLevel = "debug" | "info" | "warn" | "error";
 
+const safeJsonStringify = (value: unknown, replacer?: (string | number)[]): string => {
+  try {
+    return JSON.stringify(value, replacer);
+  } catch {
+    return JSON.stringify({ unserializable: true });
+  }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+export const serializeError = (error: unknown): Record<string, unknown> => {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      json: safeJsonStringify(error, Object.getOwnPropertyNames(error))
+    };
+  }
+
+  if (isRecord(error)) {
+    const ownPropertyNames = Object.getOwnPropertyNames(error);
+    return {
+      name: typeof error.name === "string" ? error.name : undefined,
+      message: typeof error.message === "string" ? error.message : undefined,
+      stack: typeof error.stack === "string" ? error.stack : undefined,
+      json: safeJsonStringify(error, ownPropertyNames)
+    };
+  }
+
+  return {
+    name: undefined,
+    message: typeof error === "string" ? error : String(error),
+    stack: undefined,
+    json: safeJsonStringify(error)
+  };
+};
+
 const format = (level: LogLevel, message: string, meta?: unknown): string => {
   const base = `[${new Date().toISOString()}] [${level.toUpperCase()}] ${message}`;
   if (meta === undefined) {
     return base;
   }
-  return `${base} ${JSON.stringify(meta)}`;
+  return `${base} ${safeJsonStringify(meta)}`;
 };
 
 export const logger = {

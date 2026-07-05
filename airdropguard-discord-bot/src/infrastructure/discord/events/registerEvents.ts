@@ -6,6 +6,10 @@ import { toCommandMap } from "../commandRegistry";
 import { BotServices } from "../BotServices";
 
 const sendLog = async (services: BotServices, content: string): Promise<void> => {
+  if (!services.channels.logs) {
+    return;
+  }
+
   const channel = await services.client.channels.fetch(services.channels.logs).catch(() => null);
   if (!channel || channel.type !== ChannelType.GuildText) {
     return;
@@ -17,33 +21,25 @@ export const registerEvents = (services: BotServices): void => {
   const commands = toCommandMap(createCommands(services));
 
   services.client.on(Events.ClientReady, (client) => {
-    logger.info("AirdropGuard AI connected", { tag: client.user.tag });
+    logger.info("Discord client ready", {
+      tag: client.user.tag,
+      guildCount: client.guilds.cache.size
+    });
     void sendLog(services, `AirdropGuard AI online as ${client.user.tag}`);
     services.automation.start();
-  });
-
-  services.client.on(Events.GuildMemberAdd, (member: GuildMember) => {
-    void services.verification.onMemberJoined(member).catch((error) => logger.error("guildMemberAdd failed", error));
-  });
-
-  services.client.on(Events.MessageCreate, (message) => {
-    void services.autoModeration.moderateMessage(message).catch((error) => {
-      logger.error("message moderation failed", error);
-    });
   });
 
   services.client.on(Events.InteractionCreate, (interaction) => {
     void (async () => {
       if (interaction.isButton()) {
-        if (!interaction.inGuild() || !(interaction.member instanceof GuildMember)) {
+        if (!interaction.inGuild()) {
           await interaction.reply({ content: "This action only works in a server.", ephemeral: true });
           return;
         }
 
         if (interaction.customId === CUSTOM_IDS.verifyMember) {
-          const verifiedNow = await services.verification.verifyMember(interaction.member);
           await interaction.reply({
-            content: verifiedNow ? "You are now verified." : "You are already verified.",
+            content: "Verification is temporarily disabled while the bot runs in slash-command-only mode.",
             ephemeral: true
           });
           return;

@@ -3,6 +3,11 @@ import { z } from "zod";
 
 dotenvConfig();
 
+const optionalString = z.preprocess(
+  (value) => (typeof value === "string" && value.trim().length === 0 ? undefined : value),
+  z.string().min(1).optional()
+);
+
 const splitCsv = (value: string | undefined): string[] =>
   (value ?? "")
     .split(",")
@@ -13,25 +18,25 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("production"),
   DISCORD_TOKEN: z.string().min(1),
   DISCORD_CLIENT_ID: z.string().min(1),
-  DISCORD_GUILD_ID: z.string().optional(),
+  DISCORD_GUILD_ID: z.string().min(1),
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_MODEL: z.string().default("gpt-4.1-mini"),
   AIRDROPGUARD_API_BASE_URL: z.string().url(),
-  AIRDROPGUARD_API_KEY: z.string().optional(),
-  BOT_OWNER_USER_ID: z.string().optional(),
-  VERIFIED_ROLE_ID: z.string().min(1),
-  PREMIUM_ROLE_ID: z.string().optional(),
-  ADMIN_ROLE_ID: z.string().min(1),
-  MODERATOR_ROLE_ID: z.string().min(1),
-  FOUNDER_ROLE_ID: z.string().min(1),
-  WELCOME_CHANNEL_ID: z.string().min(1),
-  LOG_CHANNEL_ID: z.string().min(1),
-  ALERTS_CHANNEL_ID: z.string().min(1),
-  AIRDROPS_CHANNEL_ID: z.string().min(1),
-  UPDATES_CHANNEL_ID: z.string().min(1),
-  TICKET_CATEGORY_ID: z.string().optional(),
-  TICKET_SUPPORT_ROLE_ID: z.string().min(1),
-  AUTO_ASSIGN_ROLE_IDS: z.string().optional(),
+  AIRDROPGUARD_API_KEY: z.string().min(1),
+  BOT_OWNER_USER_ID: optionalString,
+  VERIFIED_ROLE_ID: optionalString,
+  PREMIUM_ROLE_ID: optionalString,
+  ADMIN_ROLE_ID: optionalString,
+  MODERATOR_ROLE_ID: optionalString,
+  FOUNDER_ROLE_ID: optionalString,
+  WELCOME_CHANNEL_ID: optionalString,
+  LOG_CHANNEL_ID: optionalString,
+  ALERTS_CHANNEL_ID: optionalString,
+  AIRDROPS_CHANNEL_ID: optionalString,
+  UPDATES_CHANNEL_ID: optionalString,
+  TICKET_CATEGORY_ID: optionalString,
+  TICKET_SUPPORT_ROLE_ID: optionalString,
+  AUTO_ASSIGN_ROLE_IDS: optionalString,
   ENABLE_GUILD_COMMANDS: z.coerce.boolean().default(true),
   ANTI_SPAM_WINDOW_MS: z.coerce.number().int().positive().default(12000),
   ANTI_SPAM_MAX_MESSAGES: z.coerce.number().int().positive().default(6),

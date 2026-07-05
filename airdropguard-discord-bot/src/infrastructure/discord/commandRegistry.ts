@@ -1,11 +1,14 @@
 import { REST, Routes, SlashCommandBuilder, SlashCommandOptionsOnlyBuilder } from "discord.js";
+import { logger, serializeError } from "../../core/logger/logger";
 import { BotCommand } from "../../types/command";
 import { BotServices } from "./BotServices";
 import { createAddAirdropCommand } from "./commands/admin/addairdrop";
 import { createAnnounceCommand } from "./commands/admin/announce";
 import { createPostCommand } from "./commands/admin/post";
+import { createPostBrandWelcomeCommand } from "./commands/admin/postbrandwelcome";
 import { createPublishCommand } from "./commands/admin/publish";
 import { createRemoveAirdropCommand } from "./commands/admin/removeairdrop";
+import { createSetupServerCommand } from "./commands/admin/setupserver";
 import { createModerateCommand } from "./commands/moderation/moderate";
 import { createAskCommand } from "./commands/public/ask";
 import { createHelpCommand } from "./commands/public/help";
@@ -29,7 +32,9 @@ export const createCommands = (services: BotServices): BotCommand[] => [
   createTicketCommand(services),
   createAnnounceCommand(services),
   createPostCommand(services),
+  createPostBrandWelcomeCommand(),
   createPublishCommand(services),
+  createSetupServerCommand(),
   createAddAirdropCommand(services),
   createRemoveAirdropCommand(services),
   createModerateCommand()
@@ -47,10 +52,28 @@ export const registerCommands = async (args: {
   const rest = new REST({ version: "10" }).setToken(args.token);
   const body = args.commands.map((command) => command.toJSON());
 
-  if (args.guildId) {
-    await rest.put(Routes.applicationGuildCommands(args.clientId, args.guildId), { body });
-    return;
-  }
+  try {
+    if (args.guildId) {
+      await rest.put(Routes.applicationGuildCommands(args.clientId, args.guildId), { body });
+      return;
+    }
 
-  await rest.put(Routes.applicationCommands(args.clientId), { body });
+    await rest.put(Routes.applicationCommands(args.clientId), { body });
+  } catch (error) {
+    const details = serializeError(error);
+    const restError = typeof error === "object" && error !== null ? error as Record<string, unknown> : undefined;
+
+    logger.error("Discord command registration failed", {
+      ...details,
+      status: typeof restError?.status === "number" ? restError.status : undefined,
+      code: typeof restError?.code === "number" || typeof restError?.code === "string" ? restError.code : undefined,
+      method: typeof restError?.method === "string" ? restError.method : undefined,
+      url: typeof restError?.url === "string" ? restError.url : undefined,
+      routeType: args.guildId ? "guild" : "global",
+      clientId: args.clientId,
+      guildId: args.guildId
+    });
+
+    throw error;
+  }
 };

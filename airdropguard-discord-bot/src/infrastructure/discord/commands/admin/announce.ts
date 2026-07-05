@@ -10,6 +10,11 @@ export const createAnnounceCommand = (services: BotServices): BotCommand => ({
   adminOnly: true,
   async execute({ interaction }) {
     const message = interaction.options.getString("message", true);
+    if (!services.channels.alerts) {
+      await interaction.reply({ content: "Alerts channel is not configured.", ephemeral: true });
+      return;
+    }
+
     const channel = await services.client.channels.fetch(services.channels.alerts).catch(() => null);
 
     if (!channel || channel.type !== ChannelType.GuildText) {

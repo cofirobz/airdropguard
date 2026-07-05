@@ -21,9 +21,9 @@ export interface BotServices {
   automation: AutomationPublisher;
   interactionLimiter: SlidingWindowLimiter;
   channels: {
-    airdrops: string;
-    alerts: string;
-    updates: string;
-    logs: string;
+    airdrops?: string;
+    alerts?: string;
+    updates?: string;
+    logs?: string;
   };
 }

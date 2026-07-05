@@ -13,9 +13,28 @@ import { AutoModerationService } from "./infrastructure/discord/moderation/AutoM
 import { TicketService } from "./infrastructure/discord/tickets/TicketService";
 import { VerificationService } from "./infrastructure/discord/verification/VerificationService";
 
+const warnIfMissing = (name: string, feature: string, value: string | undefined): void => {
+  if (!value) {
+    logger.warn(`${feature} disabled because ${name} is not configured.`);
+  }
+};
+
 export const bootstrap = async (): Promise<void> => {
   const client = createDiscordClient();
   const api = new AirdropGuardApiClient(env.AIRDROPGUARD_API_BASE_URL, env.AIRDROPGUARD_API_KEY);
+
+  warnIfMissing("VERIFIED_ROLE_ID", "Verification role assignment", env.VERIFIED_ROLE_ID);
+  warnIfMissing("WELCOME_CHANNEL_ID", "Welcome messages", env.WELCOME_CHANNEL_ID);
+  warnIfMissing("ADMIN_ROLE_ID", "Admin role checks", env.ADMIN_ROLE_ID);
+  warnIfMissing("MODERATOR_ROLE_ID", "Moderator role checks", env.MODERATOR_ROLE_ID);
+  warnIfMissing("FOUNDER_ROLE_ID", "Founder role checks", env.FOUNDER_ROLE_ID);
+  warnIfMissing("LOG_CHANNEL_ID", "Discord log channel output", env.LOG_CHANNEL_ID);
+  warnIfMissing("ALERTS_CHANNEL_ID", "Alert publishing", env.ALERTS_CHANNEL_ID);
+  warnIfMissing("AIRDROPS_CHANNEL_ID", "Airdrop publishing", env.AIRDROPS_CHANNEL_ID);
+  warnIfMissing("UPDATES_CHANNEL_ID", "Website update publishing", env.UPDATES_CHANNEL_ID);
+  warnIfMissing("TICKET_SUPPORT_ROLE_ID", "Ticket support", env.TICKET_SUPPORT_ROLE_ID);
+  logger.warn("Member join verification disabled while running in slash-command-only mode.");
+  logger.warn("Message content anti-spam and scam scanning disabled while running in slash-command-only mode.");
 
   const services = {
     client,
@@ -58,6 +77,12 @@ export const bootstrap = async (): Promise<void> => {
 
   registerEvents(services);
 
+  logger.info("Registering slash commands", {
+    routeType: env.ENABLE_GUILD_COMMANDS ? "guild" : "global",
+    clientId: env.DISCORD_CLIENT_ID,
+    guildId: env.ENABLE_GUILD_COMMANDS ? env.DISCORD_GUILD_ID : undefined
+  });
+
   await registerCommands({
     token: env.DISCORD_TOKEN,
     clientId: env.DISCORD_CLIENT_ID,
@@ -65,6 +90,11 @@ export const bootstrap = async (): Promise<void> => {
     commands: createCommands(services).map((command) => command.data)
   });
 
+  logger.info("Slash commands registered successfully", {
+    routeType: env.ENABLE_GUILD_COMMANDS ? "guild" : "global"
+  });
+
+  logger.info("Logging into Discord client");
   await client.login(env.DISCORD_TOKEN);
   logger.info("AirdropGuard AI bootstrapped");
 };

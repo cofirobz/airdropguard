@@ -1,18 +1,21 @@
 import { ChannelType, Client, EmbedBuilder, TextChannel } from "discord.js";
 import cron from "node-cron";
 import { AirdropApiPort } from "../../../application/ports/AirdropApiPort";
-import { logger } from "../../../core/logger/logger";
+import { logger, serializeError } from "../../../core/logger/logger";
 
 interface AutomationChannels {
-  airdropsChannelId: string;
-  alertsChannelId: string;
-  updatesChannelId: string;
+  airdropsChannelId?: string;
+  alertsChannelId?: string;
+  updatesChannelId?: string;
 }
 
 export class AutomationPublisher {
   private latestAirdropPoll?: string;
   private latestAlertPoll?: string;
   private latestUpdatePoll?: string;
+  private airdropsEnabled = true;
+  private alertsEnabled = true;
+  private updatesEnabled = true;
 
   public constructor(
     private readonly client: Client,
@@ -32,9 +35,9 @@ export class AutomationPublisher {
   public async runOnce(): Promise<void> {
     try {
       const [airdrops, alerts, updates] = await Promise.all([
-        this.api.getLatestVerified(3),
-        this.api.getScamAlertsSince(this.latestAlertPoll),
-        this.api.getWebsiteUpdatesSince(this.latestUpdatePoll)
+        this.fetchAirdrops(),
+        this.fetchAlerts(),
+        this.fetchUpdates()
       ]);
 
       if (airdrops.length > 0) {
@@ -79,11 +82,100 @@ export class AutomationPublisher {
           .setTimestamp(new Date(update.publishedAt)));
       }
     } catch (error) {
-      logger.error("Automation run failed", error);
+      logger.error("Automation run failed", serializeError(error));
     }
   }
 
-  private async postEmbed(channelId: string, embed: EmbedBuilder): Promise<void> {
+  private async fetchAirdrops() {
+    return this.fetchAutomationFeed({
+      enabled: this.airdropsEnabled,
+      endpointPath: "/airdrops/latest",
+      automationName: "verified airdrops",
+      disable: () => {
+        this.airdropsEnabled = false;
+      },
+      run: () => this.api.getLatestVerified(3)
+    });
+  }
+
+  private async fetchAlerts() {
+    return this.fetchAutomationFeed({
+      enabled: this.alertsEnabled,
+      endpointPath: "/alerts/scams",
+      automationName: "scam alerts",
+      disable: () => {
+        this.alertsEnabled = false;
+      },
+      run: () => this.api.getScamAlertsSince(this.latestAlertPoll)
+    });
+  }
+
+  private async fetchUpdates() {
+    return this.fetchAutomationFeed({
+      enabled: this.updatesEnabled,
+      endpointPath: "/updates",
+      automationName: "website updates",
+      disable: () => {
+        this.updatesEnabled = false;
+      },
+      run: () => this.api.getWebsiteUpdatesSince(this.latestUpdatePoll)
+    });
+  }
+
+  private async fetchAutomationFeed<T>(args: {
+    enabled: boolean;
+    endpointPath: string;
+    automationName: string;
+    disable: () => void;
+    run: () => Promise<T[]>;
+  }): Promise<T[]> {
+    if (!args.enabled) {
+      return [];
+    }
+
+    try {
+      return await args.run();
+    } catch (error) {
+      const status = this.getStatusCode(error);
+
+      if (status === 404) {
+        args.disable();
+        logger.warn("Automation endpoint unavailable; disabling automation", {
+          automation: args.automationName,
+          endpointPath: args.endpointPath,
+          status
+        });
+        return [];
+      }
+
+      logger.warn("Automation endpoint request failed", {
+        automation: args.automationName,
+        endpointPath: args.endpointPath,
+        status,
+        ...serializeError(error)
+      });
+      return [];
+    }
+  }
+
+  private getStatusCode(error: unknown): number | undefined {
+    if (typeof error !== "object" || error === null) {
+      return undefined;
+    }
+
+    const response = "response" in error ? error.response : undefined;
+    if (typeof response !== "object" || response === null) {
+      return undefined;
+    }
+
+    return "status" in response && typeof response.status === "number" ? response.status : undefined;
+  }
+
+  private async postEmbed(channelId: string | undefined, embed: EmbedBuilder): Promise<void> {
+    if (!channelId) {
+      return;
+    }
+
     const channel = await this.client.channels.fetch(channelId).catch(() => null);
     if (!channel || channel.type !== ChannelType.GuildText) {
       return;

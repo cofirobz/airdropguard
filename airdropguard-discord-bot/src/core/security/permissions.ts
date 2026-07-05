@@ -1,12 +1,12 @@
-import { ChatInputCommandInteraction, GuildMember } from "discord.js";
+import { ChatInputCommandInteraction, GuildMember, PermissionFlagsBits } from "discord.js";
 
 export type AccessRole = "founder" | "admin" | "moderator" | "verified" | "premium";
 
 export interface PermissionConfig {
-  founderRoleId: string;
-  adminRoleId: string;
-  moderatorRoleId: string;
-  verifiedRoleId: string;
+  founderRoleId?: string;
+  adminRoleId?: string;
+  moderatorRoleId?: string;
+  verifiedRoleId?: string;
   premiumRoleId?: string;
   ownerUserId?: string;
 }
@@ -49,6 +49,16 @@ export class PermissionGuard {
     if (!interaction.inGuild() || !interaction.member || !(interaction.member instanceof GuildMember)) {
       await interaction.reply({ content: "This command only works in a server.", ephemeral: true });
       return false;
+    }
+
+    // Temporary bypass while custom admin role wiring is incomplete:
+    // allow server owner and native Discord administrators.
+    if (interaction.guild?.ownerId === interaction.user.id) {
+      return true;
+    }
+
+    if (interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      return true;
     }
 
     if (!this.isAdminOrAbove(interaction.member)) {

@@ -7,7 +7,7 @@ export const createHelpCommand = (): BotCommand => ({
     const embed = new EmbedBuilder()
       .setColor(0x2ecc71)
       .setTitle("AirdropGuard AI Commands")
-      .setDescription("Check Before You Connect.")
+      .setDescription("Website-aligned intelligence for verified listings, trust scoring and scam checks.")
       .addFields(
         {
           name: "Public",
@@ -21,6 +21,10 @@ export const createHelpCommand = (): BotCommand => ({
         {
           name: "Admin",
           value: "`/announce` `/post` `/publish` `/addairdrop` `/removeairdrop` `/moderate`"
+        },
+        {
+          name: "Website",
+          value: "https://airdropguard.com"
         }
       )
       .setFooter({ text: "AirdropGuard AI Security Assistant" });

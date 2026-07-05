@@ -19,6 +19,11 @@ export const createPostCommand = (services: BotServices): BotCommand => ({
       return;
     }
 
+    if (!services.channels.airdrops) {
+      await interaction.editReply("Airdrops channel is not configured.");
+      return;
+    }
+
     const channel = await services.client.channels.fetch(services.channels.airdrops).catch(() => null);
     if (!channel || channel.type !== ChannelType.GuildText) {
       await interaction.editReply("Airdrops channel is not configured correctly.");
