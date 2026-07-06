@@ -36,7 +36,6 @@ import FilterBar, { type Filters } from '../components/FilterBar';
 import NewsletterSection from '../components/NewsletterSection';
 import SEO from '../components/SEO';
 import SocialLinksStrip from '../components/SocialLinksStrip';
-import TrustStrip from '../components/TrustStrip';
 import { openCopilotWithPrompt } from '../lib/copilot';
 import { daysUntil, isMainAirdropListing, isSpeculativeTokenListing } from '../lib/utils';
 

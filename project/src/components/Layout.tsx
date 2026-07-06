@@ -257,18 +257,15 @@ function Footer() {
               className="inline-flex items-center gap-3"
               aria-label="AirdropGuard home"
             >
-              <picture>
-                <source srcSet="/airdrop_guards.webp" type="image/webp" />
-                <img
-                  src="/airdrop_guards.png"
-                  alt="AirdropGuard"
-                  width={44}
-                  height={44}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-11 w-11 rounded-2xl object-cover shadow-sm shadow-neon-purple/15"
-                />
-              </picture>
+              <img
+                src="/favicon.svg"
+                alt="AirdropGuard"
+                width={44}
+                height={44}
+                loading="lazy"
+                decoding="async"
+                className="h-11 w-11 rounded-2xl object-cover shadow-sm shadow-neon-purple/15"
+              />
 
               <div>
                 <div className="text-lg font-black gradient-text">
@@ -409,6 +406,7 @@ export default function Layout() {
     }
   });
   const lastScrollYRef = useRef(0);
+  const scrollTickingRef = useRef(false);
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
   const { user, signOut } = useAuth();
@@ -441,18 +439,26 @@ export default function Layout() {
     }
 
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      const delta = currentScrollY - lastScrollYRef.current;
+      if (scrollTickingRef.current) return;
+      scrollTickingRef.current = true;
 
-      if (currentScrollY <= 24) {
-        setNavHidden(false);
-      } else if (delta > 8 && currentScrollY > 96) {
-        setNavHidden(true);
-      } else if (delta < -8) {
-        setNavHidden(false);
-      }
+      window.requestAnimationFrame(() => {
+        const currentScrollY = window.scrollY;
+        const delta = currentScrollY - lastScrollYRef.current;
+        let nextHidden = false;
 
-      lastScrollYRef.current = currentScrollY;
+        if (currentScrollY <= 24) {
+          nextHidden = false;
+        } else if (delta > 8 && currentScrollY > 96) {
+          nextHidden = true;
+        } else if (delta < -8) {
+          nextHidden = false;
+        }
+
+        setNavHidden((prev) => (prev === nextHidden ? prev : nextHidden));
+        lastScrollYRef.current = currentScrollY;
+        scrollTickingRef.current = false;
+      });
     };
 
     lastScrollYRef.current = window.scrollY;
@@ -545,18 +551,15 @@ export default function Layout() {
               className="group flex min-w-0 items-center gap-2.5"
               aria-label="AirdropGuard home"
             >
-              <picture>
-                <source srcSet="/airdrop_guards.webp" type="image/webp" />
-                <img
-                  src="/airdrop_guards.png"
-                  alt="AirdropGuard"
-                  width={44}
-                  height={44}
-                  loading="eager"
-                  decoding="async"
-                  className="h-11 w-11 shrink-0 rounded-2xl object-cover shadow-sm shadow-neon-purple/20 transition-transform transition-shadow duration-300 group-hover:scale-[1.03] group-hover:shadow-neon-purple/45"
-                />
-              </picture>
+              <img
+                src="/favicon.svg"
+                alt="AirdropGuard"
+                width={44}
+                height={44}
+                loading="eager"
+                decoding="async"
+                className="h-11 w-11 shrink-0 rounded-2xl object-cover shadow-sm shadow-neon-purple/20 transition-transform transition-shadow duration-300 group-hover:scale-[1.03] group-hover:shadow-neon-purple/45"
+              />
 
               <div className="min-w-0 leading-tight">
                 <span className="block truncate text-lg font-black gradient-text xl:text-xl">

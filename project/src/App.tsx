@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
@@ -35,6 +36,16 @@ function PageLoader() {
 }
 
 function App() {
+  const [showRiskBanner, setShowRiskBanner] = useState(false);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setShowRiskBanner(true);
+    }, 1200);
+
+    return () => window.clearTimeout(id);
+  }, []);
+
   return (
     <ErrorBoundary>
       <AuthProvider>
@@ -70,7 +81,7 @@ function App() {
           </Suspense>
         </BrowserRouter>
 
-        <FcaRiskBanner />
+        {showRiskBanner && <FcaRiskBanner />}
       </AuthProvider>
     </ErrorBoundary>
   );
