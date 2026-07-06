@@ -327,7 +327,7 @@ interface BannerAd {
 type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt'>;
 
 type ContentView = 'airdrops' | 'articles' | 'hero' | 'featured' | 'trending' | 'learn' | 'sections';
-type AdminView = 'overview' | 'airdrops' | 'speculative-tokens' | 'submissions' | 'competitor-watch' | 'articles' | 'social-admin' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
+type AdminView = 'overview' | 'airdrops' | 'speculative-tokens' | 'submissions' | 'competitor-watch' | 'ignored-deleted-projects' | 'articles' | 'social-admin' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
 
 interface ControlArticle {
   id: string;
@@ -582,7 +582,38 @@ type AdminNotification = {
   severity: 'info' | 'success' | 'warning' | 'error';
   is_read: boolean;
   context: Record<string, unknown> | null;
+  dedupe_key: string;
+  occurrence_count: number;
+  last_seen_at: string;
   created_at: string;
+};
+
+type DeletedEntityType = 'airdrop' | 'submission' | 'competitor_opportunity';
+type SuppressionFingerprintType = 'project_name' | 'website_url' | 'source_url' | 'slug' | 'token_symbol' | 'contract_address';
+
+type SuppressionFingerprint = {
+  fingerprint_type: SuppressionFingerprintType;
+  fingerprint_value: string;
+};
+
+type DeletedSuppressionRow = {
+  id: string;
+  entity_type: DeletedEntityType;
+  fingerprint_type: SuppressionFingerprintType;
+  fingerprint_value: string;
+  reason: string | null;
+  context: Record<string, unknown> | null;
+  created_at: string;
+};
+
+type SuppressedProjectGroup = {
+  key: string;
+  projectName: string;
+  source: string;
+  entityType: DeletedEntityType;
+  reason: string;
+  deletedAt: string;
+  rowIds: string[];
 };
 
 type AuditTargetType = 'airdrop' | 'article' | 'banner' | 'submission' | 'scam_report' | 'homepage' | 'unknown';
@@ -846,6 +877,63 @@ function normalizeContract(value: string | null | undefined): string | null {
   const trimmed = String(value ?? '').trim().toLowerCase();
   if (!trimmed) return null;
   return /^0x[a-f0-9]{40}$/.test(trimmed) ? trimmed : null;
+}
+
+function normalizeTokenSymbol(value: string | null | undefined): string | null {
+  const trimmed = String(value ?? '').trim().replace(/^\$/g, '').toLowerCase();
+  if (!trimmed) return null;
+  return trimmed;
+}
+
+function collectSuppressionFingerprints(input: {
+  projectName?: string | null;
+  websiteUrl?: string | null;
+  sourceUrl?: string | null;
+  slug?: string | null;
+  tokenSymbol?: string | null;
+  contractAddress?: string | null;
+}): SuppressionFingerprint[] {
+  const fingerprints = new Map<string, SuppressionFingerprint>();
+
+  const add = (fingerprintType: SuppressionFingerprintType, rawValue: string | null) => {
+    if (!rawValue) return;
+    const key = `${fingerprintType}:${rawValue}`;
+    if (!fingerprints.has(key)) {
+      fingerprints.set(key, {
+        fingerprint_type: fingerprintType,
+        fingerprint_value: rawValue,
+      });
+    }
+  };
+
+  add('project_name', normalizeProjectName(input.projectName ?? ''));
+  add('website_url', normalizeComparableUrl(input.websiteUrl));
+  add('source_url', normalizeComparableUrl(input.sourceUrl));
+  add('slug', String(input.slug ?? '').trim().toLowerCase() || null);
+  add('token_symbol', normalizeTokenSymbol(input.tokenSymbol));
+  add('contract_address', normalizeContract(input.contractAddress));
+
+  return Array.from(fingerprints.values());
+}
+
+function stableSerializeForDedupe(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableSerializeForDedupe(item)).join(',')}]`;
+  }
+
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableSerializeForDedupe(item)}`);
+    return `{${entries.join(',')}}`;
+  }
+
+  return JSON.stringify(value ?? null);
+}
+
+function buildNotificationDedupeKey(notification: Omit<AdminNotification, 'id' | 'is_read' | 'created_at' | 'last_seen_at' | 'occurrence_count' | 'dedupe_key'>): string {
+  const contextSerialized = stableSerializeForDedupe(notification.context ?? {});
+  return `${notification.notification_type}::${notification.title.trim().toLowerCase()}::${notification.message.trim().toLowerCase()}::${contextSerialized}`;
 }
 
 function buildCandidateIdentityKeys(candidate: DiscoveryCandidate): Set<string> {
@@ -2945,7 +3033,10 @@ export default function AdminPage() {
 
   const [adminNotifications, setAdminNotifications] = useState<AdminNotification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
-  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<Set<string>>(new Set());
+  const [deletedSuppressions, setDeletedSuppressions] = useState<DeletedSuppressionRow[]>([]);
+  const [deletedSuppressionsLoading, setDeletedSuppressionsLoading] = useState(false);
+  const [deletedSuppressionsError, setDeletedSuppressionsError] = useState<string | null>(null);
+  const [restoringSuppressionKey, setRestoringSuppressionKey] = useState<string | null>(null);
   const [expandedAdminPanels, setExpandedAdminPanels] = useState<Record<string, boolean>>({});
   const [lastEnrichmentStats, setLastEnrichmentStats] = useState<{
     websites_analyzed: number; docs_found: number; funding_found: number;
@@ -3217,21 +3308,44 @@ export default function AdminPage() {
   );
 
   const visibleAdminNotifications = useMemo(
-    () => adminNotifications.filter((item) => !dismissedNotificationIds.has(item.id)),
-    [adminNotifications, dismissedNotificationIds],
+    () => adminNotifications.filter((item) => !item.is_read),
+    [adminNotifications],
   );
 
-  const dismissNotification = useCallback((id: string) => {
-    setDismissedNotificationIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-  }, []);
+  const dismissNotification = useCallback(async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('admin_notifications')
+        .update({ is_read: true })
+        .eq('id', id);
+      if (error) throw error;
 
-  const clearAllNotifications = useCallback(() => {
-    setDismissedNotificationIds(new Set(adminNotifications.map((item) => item.id)));
-  }, [adminNotifications]);
+      setAdminNotifications((prev) => prev.map((item) => (
+        item.id === id ? { ...item, is_read: true } : item
+      )));
+    } catch (error) {
+      showToast(`Unable to dismiss notification: ${describeError(error)}`, 'error');
+    }
+  }, [describeError, showToast]);
+
+  const clearAllNotifications = useCallback(async () => {
+    const unreadIds = adminNotifications.filter((item) => !item.is_read).map((item) => item.id);
+    if (unreadIds.length === 0) return;
+
+    try {
+      const { error } = await supabase
+        .from('admin_notifications')
+        .update({ is_read: true })
+        .in('id', unreadIds);
+      if (error) throw error;
+
+      setAdminNotifications((prev) => prev.map((item) => (
+        unreadIds.includes(item.id) ? { ...item, is_read: true } : item
+      )));
+    } catch (error) {
+      showToast(`Unable to clear notifications: ${describeError(error)}`, 'error');
+    }
+  }, [adminNotifications, describeError, showToast]);
 
   const isAdminPanelOpen = useCallback((panelKey: string) => Boolean(expandedAdminPanels[panelKey]), [expandedAdminPanels]);
 
@@ -3309,12 +3423,65 @@ export default function AdminPage() {
     return true;
   }), [speculativeTokenListings, getSpeculativeSecurityScore, specRiskFilter, specChainFilter, specPublishedFilter, specSecurityFilter, specMissingContractFilter]);
 
+  const suppressedProjects = useMemo(() => {
+    const grouped = new Map<string, SuppressedProjectGroup>();
+
+    deletedSuppressions.forEach((row) => {
+      const context = (row.context && typeof row.context === 'object' ? row.context : {}) as Record<string, unknown>;
+      const projectFromContext = typeof context.projectName === 'string' && context.projectName.trim()
+        ? context.projectName.trim()
+        : null;
+      const projectName = projectFromContext
+        || (row.fingerprint_type === 'project_name' ? row.fingerprint_value : null)
+        || 'Unknown project';
+
+      const source = typeof context.source === 'string' && context.source.trim()
+        ? context.source.trim()
+        : typeof context.sourceUrl === 'string' && context.sourceUrl.trim()
+        ? context.sourceUrl.trim()
+        : typeof context.sourceId === 'string' && context.sourceId.trim()
+        ? `source:${context.sourceId.trim()}`
+        : 'Unknown source';
+
+      const key = `${row.entity_type}::${normalizeProjectName(projectName)}`;
+      const existing = grouped.get(key);
+
+      if (!existing) {
+        grouped.set(key, {
+          key,
+          projectName,
+          source,
+          entityType: row.entity_type,
+          reason: row.reason || 'Admin deleted entity',
+          deletedAt: row.created_at,
+          rowIds: [row.id],
+        });
+        return;
+      }
+
+      existing.rowIds.push(row.id);
+      if (new Date(row.created_at).getTime() > new Date(existing.deletedAt).getTime()) {
+        existing.deletedAt = row.created_at;
+      }
+      if (!existing.reason && row.reason) {
+        existing.reason = row.reason;
+      }
+      if (existing.source === 'Unknown source' && source !== 'Unknown source') {
+        existing.source = source;
+      }
+    });
+
+    return Array.from(grouped.values())
+      .sort((a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime());
+  }, [deletedSuppressions]);
+
   const adminNavItems: Array<{ id: AdminView; label: string; blurb: string }> = useMemo(() => [
     { id: 'overview', label: 'Overview', blurb: 'Command centre summary and alerts' },
     { id: 'airdrops', label: 'Airdrops', blurb: 'Listings, publish, health, queue' },
     { id: 'speculative-tokens', label: 'Speculative Tokens', blurb: 'High-risk token listings and security review' },
     { id: 'submissions', label: 'Submissions', blurb: 'Project and scam report triage' },
     { id: 'competitor-watch', label: 'Competitor Watch', blurb: 'Missing-opportunity monitoring' },
+    { id: 'ignored-deleted-projects', label: 'Ignored / Deleted Projects', blurb: 'Suppression fingerprints and restore controls' },
     { id: 'articles', label: 'Articles', blurb: 'Unified content editor, SEO and publishing workflow' },
     { id: 'social-admin', label: 'Social Admin', blurb: 'Discord update queue, approvals and scheduling' },
     { id: 'advertise-admin', label: 'Advertise Admin', blurb: 'Paid visibility, API and campaign operations' },
@@ -3446,20 +3613,173 @@ export default function AdminPage() {
     }
   }, [submissions]);
 
-  const createAdminNotification = useCallback(async (
-    notification: Omit<AdminNotification, 'id' | 'is_read' | 'created_at'>
+  const registerDeletionSuppression = useCallback(async (
+    entityType: DeletedEntityType,
+    fingerprints: SuppressionFingerprint[],
+    reason: string,
+    context?: Record<string, unknown>
   ) => {
+    if (fingerprints.length === 0) return;
+
+    const rows = fingerprints.map((fingerprint) => ({
+      entity_type: entityType,
+      fingerprint_type: fingerprint.fingerprint_type,
+      fingerprint_value: fingerprint.fingerprint_value,
+      reason,
+      context: context ?? {},
+      created_by: user?.id ?? null,
+    }));
+
+    const { error } = await supabase
+      .from('deleted_entity_suppressions')
+      .upsert(rows, { onConflict: 'entity_type,fingerprint_type,fingerprint_value' });
+
+    if (error) {
+      const details = describeError(error).toLowerCase();
+      const missingTable = details.includes('deleted_entity_suppressions')
+        && (details.includes('does not exist') || details.includes('relation') || details.includes('schema cache'));
+      if (missingTable) {
+        console.warn('[Admin][Suppression] Table unavailable, skipping suppression registration');
+        return;
+      }
+      throw error;
+    }
+  }, [describeError, user?.id]);
+
+  const isEntitySuppressed = useCallback(async (
+    entityType: DeletedEntityType,
+    fingerprints: SuppressionFingerprint[]
+  ) => {
+    if (fingerprints.length === 0) return false;
+
+    const fingerprintValues = Array.from(new Set(fingerprints.map((item) => item.fingerprint_value).filter(Boolean)));
+    if (fingerprintValues.length === 0) return false;
+
     const { data, error } = await supabase
+      .from('deleted_entity_suppressions')
+      .select('fingerprint_type, fingerprint_value')
+      .eq('entity_type', entityType)
+      .in('fingerprint_value', fingerprintValues);
+
+    if (error) {
+      const details = describeError(error).toLowerCase();
+      const missingTable = details.includes('deleted_entity_suppressions')
+        && (details.includes('does not exist') || details.includes('relation') || details.includes('schema cache'));
+      if (missingTable) {
+        return false;
+      }
+      throw error;
+    }
+
+    const matches = new Set(
+      ((data ?? []) as Array<{ fingerprint_type: string; fingerprint_value: string }>).map(
+        (item) => `${item.fingerprint_type}:${item.fingerprint_value}`
+      )
+    );
+
+    return fingerprints.some((item) => matches.has(`${item.fingerprint_type}:${item.fingerprint_value}`));
+  }, [describeError]);
+
+  const createAdminNotification = useCallback(async (
+    notification: Omit<AdminNotification, 'id' | 'is_read' | 'created_at' | 'last_seen_at' | 'occurrence_count' | 'dedupe_key'>
+  ) => {
+    const dedupeKey = buildNotificationDedupeKey(notification);
+    const nowIso = new Date().toISOString();
+
+    const existingResult = await supabase
       .from('admin_notifications')
-      .insert({
-        notification_type: notification.notification_type,
-        title: notification.title,
-        message: notification.message,
-        severity: notification.severity,
-        context: notification.context ?? {},
-      })
-      .select('id, notification_type, title, message, severity, is_read, context, created_at')
-      .single();
+      .select('id, occurrence_count')
+      .eq('dedupe_key', dedupeKey)
+      .maybeSingle();
+
+    if (existingResult.error) {
+      const details = describeError(existingResult.error).toLowerCase();
+      const missingSchema = details.includes('dedupe_key') || details.includes('occurrence_count') || details.includes('last_seen_at');
+      if (!missingSchema) {
+        console.warn('[Admin][Notifications] Failed to inspect existing notification', {
+          error: describeError(existingResult.error),
+          notification,
+        });
+        return;
+      }
+
+      const legacyInsert = await supabase
+        .from('admin_notifications')
+        .insert({
+          notification_type: notification.notification_type,
+          title: notification.title,
+          message: notification.message,
+          severity: notification.severity,
+          context: notification.context ?? {},
+          is_read: false,
+        })
+        .select('id, notification_type, title, message, severity, is_read, context, created_at')
+        .single();
+
+      if (legacyInsert.error) {
+        console.warn('[Admin][Notifications] Failed to create legacy notification', {
+          error: describeError(legacyInsert.error),
+          notification,
+        });
+        return;
+      }
+
+      if (!legacyInsert.data) return;
+
+      const legacyNotification: AdminNotification = {
+        ...(legacyInsert.data as AdminNotification),
+        dedupe_key: dedupeKey,
+        occurrence_count: 1,
+        last_seen_at: nowIso,
+      };
+
+      setAdminNotifications((prev) => [legacyNotification, ...prev]);
+      return;
+    }
+
+    const existing = existingResult.data as { id: string; occurrence_count: number } | null;
+
+    let data: AdminNotification | null = null;
+    let error: unknown = null;
+
+    if (existing?.id) {
+      const updateResult = await supabase
+        .from('admin_notifications')
+        .update({
+          title: notification.title,
+          message: notification.message,
+          severity: notification.severity,
+          context: notification.context ?? {},
+          is_read: false,
+          last_seen_at: nowIso,
+          occurrence_count: (existing.occurrence_count ?? 1) + 1,
+        })
+        .eq('id', existing.id)
+        .select('id, notification_type, title, message, severity, is_read, context, dedupe_key, occurrence_count, last_seen_at, created_at')
+        .single();
+
+      data = (updateResult.data ?? null) as AdminNotification | null;
+      error = updateResult.error;
+    } else {
+      const insertResult = await supabase
+        .from('admin_notifications')
+        .insert({
+          notification_type: notification.notification_type,
+          title: notification.title,
+          message: notification.message,
+          severity: notification.severity,
+          context: notification.context ?? {},
+          dedupe_key: dedupeKey,
+          is_read: false,
+          last_seen_at: nowIso,
+          occurrence_count: 1,
+        })
+        .select('id, notification_type, title, message, severity, is_read, context, dedupe_key, occurrence_count, last_seen_at, created_at')
+        .single();
+
+      data = (insertResult.data ?? null) as AdminNotification | null;
+      error = insertResult.error;
+    }
 
     if (error) {
       console.warn('[Admin][Notifications] Failed to create notification', {
@@ -3469,9 +3789,19 @@ export default function AdminPage() {
       return;
     }
 
-    if (data) {
-      setAdminNotifications((prev) => [data as AdminNotification, ...prev]);
-    }
+    if (!data) return;
+
+    const nextNotification: AdminNotification = {
+      ...(data as AdminNotification),
+      last_seen_at: nowIso,
+      is_read: false,
+    };
+
+    setAdminNotifications((prev) => {
+      const withoutExisting = prev.filter((item) => item.id !== nextNotification.id);
+      return [nextNotification, ...withoutExisting]
+        .sort((left, right) => new Date(right.last_seen_at).getTime() - new Date(left.last_seen_at).getTime());
+    });
   }, [describeError]);
 
   const fetchAdminNotifications = useCallback(async () => {
@@ -3479,11 +3809,34 @@ export default function AdminPage() {
     try {
       const { data, error } = await supabase
         .from('admin_notifications')
-        .select('id, notification_type, title, message, severity, is_read, context, created_at')
-        .order('created_at', { ascending: false })
+        .select('id, notification_type, title, message, severity, is_read, context, dedupe_key, occurrence_count, last_seen_at, created_at')
+        .order('last_seen_at', { ascending: false })
         .limit(30);
 
-      if (error) throw error;
+      if (error) {
+        const details = describeError(error).toLowerCase();
+        const missingSchema = details.includes('dedupe_key') || details.includes('occurrence_count') || details.includes('last_seen_at');
+        if (!missingSchema) throw error;
+
+        const legacyResult = await supabase
+          .from('admin_notifications')
+          .select('id, notification_type, title, message, severity, is_read, context, created_at')
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        if (legacyResult.error) throw legacyResult.error;
+
+        const normalized = ((legacyResult.data ?? []) as Array<Omit<AdminNotification, 'dedupe_key' | 'occurrence_count' | 'last_seen_at'>>).map((row) => ({
+          ...row,
+          dedupe_key: `${row.notification_type}:${row.id}`,
+          occurrence_count: 1,
+          last_seen_at: row.created_at,
+        }));
+
+        setAdminNotifications(normalized as AdminNotification[]);
+        return;
+      }
+
       setAdminNotifications((data ?? []) as AdminNotification[]);
     } catch (error) {
       console.warn('[Admin][Notifications] Unable to load notifications', describeError(error));
@@ -3492,6 +3845,73 @@ export default function AdminPage() {
       setNotificationsLoading(false);
     }
   }, [describeError]);
+
+  const fetchDeletedSuppressions = useCallback(async () => {
+    setDeletedSuppressionsLoading(true);
+    setDeletedSuppressionsError(null);
+
+    try {
+      const { data, error } = await supabase
+        .from('deleted_entity_suppressions')
+        .select('id, entity_type, fingerprint_type, fingerprint_value, reason, context, created_at')
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (error) {
+        const details = describeError(error).toLowerCase();
+        const missingTable = details.includes('deleted_entity_suppressions')
+          && (details.includes('does not exist') || details.includes('relation') || details.includes('schema cache'));
+
+        if (missingTable) {
+          setDeletedSuppressions([]);
+          setDeletedSuppressionsError('Suppression table not available yet. Apply the latest migration to enable this view.');
+          return;
+        }
+
+        throw error;
+      }
+
+      setDeletedSuppressions((data ?? []) as DeletedSuppressionRow[]);
+    } catch (error) {
+      setDeletedSuppressions([]);
+      setDeletedSuppressionsError(`Unable to load suppression records: ${describeError(error)}`);
+    } finally {
+      setDeletedSuppressionsLoading(false);
+    }
+  }, [describeError]);
+
+  const restoreSuppressedProject = useCallback(async (project: SuppressedProjectGroup) => {
+    if (project.rowIds.length === 0) return;
+    setRestoringSuppressionKey(project.key);
+
+    try {
+      const { error } = await supabase
+        .from('deleted_entity_suppressions')
+        .delete()
+        .in('id', project.rowIds);
+
+      if (error) throw error;
+
+      setDeletedSuppressions((prev) => prev.filter((row) => !project.rowIds.includes(row.id)));
+      showToast(`${project.projectName} restored for discovery`);
+
+      await logAdminAudit({
+        actionTaken: 'Restore suppressed project fingerprints',
+        aiRecommendation: 'Manual admin restore requested',
+        finalDecision: 'Suppression removed',
+        context: {
+          projectName: project.projectName,
+          entityType: project.entityType,
+          source: project.source,
+          removedFingerprintCount: project.rowIds.length,
+        },
+      }, { source: 'suppression_restore' });
+    } catch (error) {
+      showToast(`Unable to restore project suppression: ${describeError(error)}`, 'error');
+    } finally {
+      setRestoringSuppressionKey(null);
+    }
+  }, [describeError, logAdminAudit, showToast]);
 
   const fetchAIDrafts = useCallback(async () => {
     setAIDraftsLoading(true);
@@ -4298,13 +4718,36 @@ export default function AdminPage() {
   }, [genericCompetitorOpportunities, logAdminAudit, setCompetitorUiError, showToast]);
 
   const bulkDeleteGenericCompetitorOpportunities = useCallback(async () => {
-    const ids = genericCompetitorOpportunities.map((item) => item.id);
+    const targets = [...genericCompetitorOpportunities];
+    const ids = targets.map((item) => item.id);
     if (ids.length === 0) {
       showToast('No generic opportunities to delete');
       return;
     }
 
     try {
+      for (const opportunity of targets) {
+        const details = getOpportunityDiscoveryDetails(opportunity);
+        const fingerprints = collectSuppressionFingerprints({
+          projectName: opportunity.project_name,
+          websiteUrl: details.projectUrl,
+          sourceUrl: opportunity.source_url,
+          contractAddress: details.contractAddress,
+        });
+
+        await registerDeletionSuppression(
+          'competitor_opportunity',
+          fingerprints,
+          'Admin deleted competitor opportunity',
+          {
+            opportunityId: opportunity.id,
+            projectName: opportunity.project_name,
+            sourceId: opportunity.source_id,
+            sourceUrl: opportunity.source_url,
+          }
+        );
+      }
+
       const { error } = await supabase
         .from('competitor_opportunities')
         .delete()
@@ -4326,7 +4769,7 @@ export default function AdminPage() {
       setCompetitorUiError('Unable to bulk-delete generic opportunities right now.', error);
       showToast('Unable to bulk-delete generic opportunities right now.', 'error');
     }
-  }, [genericCompetitorOpportunities, logAdminAudit, setCompetitorUiError, showToast]);
+  }, [genericCompetitorOpportunities, logAdminAudit, registerDeletionSuppression, setCompetitorUiError, showToast]);
 
   const checkCompetitorSourcesNow = useCallback(async () => {
     setCheckingCompetitors(true);
@@ -4501,6 +4944,18 @@ export default function AdminPage() {
         for (const candidate of result.candidatesExtracted) {
           const normalizedName = normalizeProjectName(candidate.projectName);
           const candidateIdentity = buildCandidateIdentityKeys(candidate);
+          const suppressionFingerprints = collectSuppressionFingerprints({
+            projectName: candidate.projectName,
+            websiteUrl: candidate.projectUrl,
+            sourceUrl: candidate.listingUrl,
+            contractAddress: candidate.contractAddress,
+          });
+
+          if (await isEntitySuppressed('competitor_opportunity', suppressionFingerprints)) {
+            registerRejection(localRejections, 'suppressed_deleted');
+            continue;
+          }
+
           if (existingOpportunityIdentities.some((identity) => hasIdentityOverlap(identity, candidateIdentity))) {
             registerRejection(localRejections, 'already_tracked');
             continue;
@@ -4658,7 +5113,10 @@ export default function AdminPage() {
 
         if (foundForSource === 0) {
           noOpportunityScans += 1;
-          const mergedRejected = result.candidatesRejected + (localRejections.already_tracked || 0) + (localRejections.already_in_preview || 0);
+          const mergedRejected = result.candidatesRejected
+            + (localRejections.already_tracked || 0)
+            + (localRejections.already_in_preview || 0)
+            + (localRejections.suppressed_deleted || 0);
           scanUpdates[source.id] = {
             status: 'none_found',
             lastCheckedAt: result.checkedAt,
@@ -4775,7 +5233,7 @@ export default function AdminPage() {
     } finally {
       setCheckingCompetitors(false);
     }
-  }, [competitorSources, competitorOpportunities, competitorSourceScanResults, pendingDiscoveryCandidates, previewScanModeEnabled, airdrops, showToast, describeError, describeFunctionInvokeErrorDetailed, logAdminAudit, createAdminNotification, setCompetitorUiError]);
+  }, [competitorSources, competitorOpportunities, competitorSourceScanResults, pendingDiscoveryCandidates, previewScanModeEnabled, airdrops, showToast, describeError, describeFunctionInvokeErrorDetailed, logAdminAudit, createAdminNotification, isEntitySuppressed, setCompetitorUiError]);
 
   const testCompetitorWatchEdgeFunction = useCallback(async () => {
     setCompetitorError(null);
@@ -4817,6 +5275,19 @@ export default function AdminPage() {
     if (duplicateExisting) {
       setPendingDiscoveryCandidates((prev) => prev.filter((item) => item.id !== pending.id));
       showToast('Candidate already exists in queue. Removed from preview.', 'error');
+      return;
+    }
+
+    const suppressionFingerprints = collectSuppressionFingerprints({
+      projectName: pending.candidate.projectName,
+      websiteUrl: pending.candidate.projectUrl,
+      sourceUrl: pending.candidate.listingUrl,
+      contractAddress: pending.candidate.contractAddress,
+    });
+
+    if (await isEntitySuppressed('competitor_opportunity', suppressionFingerprints)) {
+      setPendingDiscoveryCandidates((prev) => prev.filter((item) => item.id !== pending.id));
+      showToast('Candidate is permanently suppressed from re-creation.', 'error');
       return;
     }
 
@@ -4909,7 +5380,7 @@ export default function AdminPage() {
       setCompetitorUiError('Unable to approve preview candidate right now.', error);
       showToast('Unable to approve preview candidate right now.', 'error');
     }
-  }, [competitorOpportunities, logAdminAudit, setCompetitorUiError, showToast]);
+  }, [competitorOpportunities, isEntitySuppressed, logAdminAudit, setCompetitorUiError, showToast]);
 
   const rejectPendingDiscoveryCandidate = useCallback((pending: PendingDiscoveryCandidate) => {
     setPendingDiscoveryCandidates((prev) => prev.filter((item) => item.id !== pending.id));
@@ -4991,6 +5462,18 @@ export default function AdminPage() {
         confidenceScore: details.confidenceScore,
         sourceStatus: opportunity.status,
       });
+
+      const submissionSuppressionFingerprints = collectSuppressionFingerprints({
+        projectName: opportunity.project_name,
+        websiteUrl: details.projectUrl,
+        sourceUrl: details.listingUrl,
+        contractAddress: details.contractAddress,
+      });
+
+      if (await isEntitySuppressed('submission', submissionSuppressionFingerprints)) {
+        showToast('This discovery item was permanently deleted from the queue and cannot be recreated.', 'error');
+        return;
+      }
 
       const { data: existing, error: existingError } = await supabase
         .from('airdrop_submissions')
@@ -5226,7 +5709,7 @@ export default function AdminPage() {
       setCompetitorUiError('Unable to create submission from Competitor Watch.', error);
       showToast(`Create submission failed: ${exact}`, 'error');
     }
-  }, [updateOpportunityStatus, describeError, setCompetitorUiError, showToast]);
+  }, [updateOpportunityStatus, describeError, isEntitySuppressed, setCompetitorUiError, showToast]);
 
   const openAdd = () => { setForm(BLANK_FORM); setEditingId(null); setModalMode('add'); };
 
@@ -5671,6 +6154,19 @@ export default function AdminPage() {
         const base = normalizedForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
         const slug = `${base}-${Date.now().toString(36)}`;
 
+        const suppressionFingerprints = collectSuppressionFingerprints({
+          projectName: normalizedForm.name,
+          websiteUrl: normalizedForm.website_url,
+          sourceUrl: normalizedForm.website_url,
+          slug,
+          tokenSymbol: normalizedForm.ticker,
+          contractAddress: normalizedForm.contract_address,
+        });
+
+        if (await isEntitySuppressed('airdrop', suppressionFingerprints)) {
+          throw new Error('This project was permanently deleted and cannot be recreated.');
+        }
+
         console.info('[Admin][AirdropSave] Inserting new airdrop', { slug });
 
         const baseInsertPayload = {
@@ -5850,6 +6346,27 @@ export default function AdminPage() {
     if (!deletingAirdrop) return;
     setDeleting(true);
     try {
+      const deletingAirdropWithSource = deletingAirdrop as Airdrop & { source_url?: string | null; source?: string | null };
+      const fingerprints = collectSuppressionFingerprints({
+        projectName: deletingAirdrop.name,
+        websiteUrl: deletingAirdrop.website_url,
+        sourceUrl: deletingAirdropWithSource.source_url,
+        slug: deletingAirdrop.slug,
+        tokenSymbol: deletingAirdrop.ticker,
+        contractAddress: deletingAirdrop.contract_address,
+      });
+
+      await registerDeletionSuppression(
+        'airdrop',
+        fingerprints,
+        'Admin deleted airdrop',
+        {
+          airdropId: deletingAirdrop.id,
+          projectName: deletingAirdrop.name,
+          source: deletingAirdropWithSource.source,
+        }
+      );
+
       await supabase.from('airdrop_tasks').delete().eq('airdrop_id', deletingAirdrop.id);
       const { error } = await supabase.from('airdrops').delete().eq('id', deletingAirdrop.id);
       if (error) throw error;
@@ -6319,9 +6836,10 @@ export default function AdminPage() {
       fetchAIDrafts();
       fetchCompetitorWatchData();
       fetchAdminNotifications();
+      fetchDeletedSuppressions();
       fetchDiscordSocialOps();
     }
-  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications, fetchDiscordSocialOps]);
+  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications, fetchDeletedSuppressions, fetchDiscordSocialOps]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -6348,6 +6866,17 @@ export default function AdminPage() {
 
     const websiteUrl = (submission.website_url ?? '').trim();
     const source = isCompetitorWatchSubmission(submission) ? 'competitor_watch' : 'submission_review';
+    const suppressionFingerprints = collectSuppressionFingerprints({
+      projectName,
+      websiteUrl,
+      sourceUrl: websiteUrl || null,
+      tokenSymbol: submission.token_symbol ?? null,
+      contractAddress: submission.contract_address ?? null,
+    });
+
+    if (await isEntitySuppressed('airdrop', suppressionFingerprints)) {
+      throw new Error('This project was permanently deleted and cannot be recreated.');
+    }
 
     let existing: { id: string; name: string } | null = null;
 
@@ -6461,7 +6990,7 @@ export default function AdminPage() {
 
     if (error) throw error;
     return { airdropId: data.id as string, created: true as const };
-  }, [airdrops.length, isCompetitorWatchSubmission]);
+  }, [airdrops.length, isCompetitorWatchSubmission, isEntitySuppressed]);
 
   const updateSubmissionStatus = useCallback(async (id: string, status: string) => {
     try {
@@ -6522,6 +7051,25 @@ export default function AdminPage() {
     if (!confirmed) return;
 
     try {
+      const fingerprints = collectSuppressionFingerprints({
+        projectName: submission.project_name,
+        websiteUrl: submission.website_url,
+        sourceUrl: submission.website_url,
+        tokenSymbol: submission.token_symbol,
+        contractAddress: submission.contract_address,
+      });
+
+      await registerDeletionSuppression(
+        'submission',
+        fingerprints,
+        'Admin deleted submission',
+        {
+          submissionId: submission.id,
+          projectName: submission.project_name,
+          source: submission.airdrop_type,
+        }
+      );
+
       const { error } = await supabase
         .from('airdrop_submissions')
         .delete()
@@ -6552,7 +7100,7 @@ export default function AdminPage() {
     } catch (error) {
       showToast(`Delete submission failed: ${describeError(error)}`, 'error');
     }
-  }, [describeError, expandedSub, logAdminAudit, showToast, fetchStats]);
+  }, [describeError, expandedSub, fetchStats, logAdminAudit, registerDeletionSuppression, showToast]);
 
 
   const updateScamReportStatus = async (report: ScamReport, status: 'approved' | 'rejected' | 'pending') => {
@@ -6897,7 +7445,7 @@ export default function AdminPage() {
               : <Brain className="w-4 h-4" />}
             {refreshingAll ? 'Analyzing…' : 'Refresh All AI'}
           </button>
-          <button onClick={() => { setExpandedAdminPanels({}); fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); fetchDiscordSocialOps(); }}
+          <button onClick={() => { setExpandedAdminPanels({}); fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); fetchDeletedSuppressions(); fetchDiscordSocialOps(); }}
             aria-label="Refresh admin data"
             className="min-h-[44px] px-3 py-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
@@ -6994,6 +7542,9 @@ export default function AdminPage() {
                           <div className="min-w-0">
                             <p className="text-xs font-medium text-white truncate">{item.title}</p>
                             <p className="mt-1 text-xs text-gray-400">{item.message}</p>
+                            {item.occurrence_count > 1 ? (
+                              <p className="mt-1 text-[10px] text-cyan-300">Seen {item.occurrence_count} times</p>
+                            ) : null}
                           </div>
                           <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] ${severityTone}`}>
                             {item.severity}
@@ -7007,7 +7558,7 @@ export default function AdminPage() {
                           </button>
                         </div>
                         <div className="mt-2 flex items-center justify-between gap-2">
-                          <p className="text-[10px] text-gray-500">{new Date(item.created_at).toLocaleString()}</p>
+                          <p className="text-[10px] text-gray-500">{new Date(item.last_seen_at || item.created_at).toLocaleString()}</p>
                           <button
                             onClick={action.onClick}
                             className="rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-100 hover:bg-cyan-500/20 transition-colors"
@@ -8447,6 +8998,64 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+      </section>
+
+      <section id="admin-ignored-deleted-projects" className={`rounded-2xl border border-amber-500/20 bg-amber-500/[0.05] p-4 space-y-3 ${canShowSection('ignored-deleted-projects') ? '' : 'hidden'}`}>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-amber-200">Ignored / Deleted Projects</h2>
+            <p className="text-xs text-gray-400 mt-1">Suppression fingerprints created by admin deletions. Restore removes suppression so projects can be discovered again.</p>
+          </div>
+          <button
+            onClick={() => void fetchDeletedSuppressions()}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-amber-400/30 bg-amber-500/10 text-xs text-amber-100 hover:bg-amber-500/20"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>
+
+        {deletedSuppressionsError && (
+          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+            {deletedSuppressionsError}
+          </div>
+        )}
+
+        {deletedSuppressionsLoading ? (
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-gray-400">
+            Loading suppressed projects...
+          </div>
+        ) : suppressedProjects.length === 0 ? (
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-xs text-gray-400">
+            No suppressed projects found.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {suppressedProjects.map((project) => (
+              <div key={project.key} className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-white">{project.projectName}</p>
+                    <div className="mt-1 grid gap-1 text-[11px] text-gray-400 md:grid-cols-2 xl:grid-cols-4">
+                      <p>Source: {project.source}</p>
+                      <p>Type: {project.entityType.replace(/_/g, ' ')}</p>
+                      <p>Reason: {project.reason}</p>
+                      <p>Date deleted: {new Date(project.deletedAt).toLocaleString()}</p>
+                    </div>
+                    <p className="mt-1 text-[11px] text-gray-500">Fingerprints stored: {project.rowIds.length}</p>
+                  </div>
+                  <button
+                    onClick={() => void restoreSuppressedProject(project)}
+                    disabled={restoringSuppressionKey === project.key}
+                    className="shrink-0 px-2.5 py-1 rounded border border-emerald-500/25 text-emerald-200 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {restoringSuppressionKey === project.key ? 'Restoring...' : 'Restore'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section id="admin-ai-control" className={`rounded-2xl border border-violet-500/20 bg-violet-500/[0.05] p-4 space-y-3 ${canShowSection('system-tools') ? '' : 'hidden'}`}>

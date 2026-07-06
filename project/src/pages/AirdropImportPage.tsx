@@ -155,6 +155,13 @@ interface ManualForm {
   estimated_reward: string;
 }
 
+type SuppressionFingerprintType = 'project_name' | 'website_url' | 'source_url' | 'slug' | 'token_symbol' | 'contract_address';
+
+type SuppressionFingerprint = {
+  fingerprint_type: SuppressionFingerprintType;
+  fingerprint_value: string;
+};
+
 const EMPTY_MANUAL: ManualForm = {
   name: '', ticker: '', description: '', website_url: '',
   twitter_url: '', discord_url: '', source_url: '', chain: '',
@@ -249,6 +256,51 @@ function mapManualToInsert(f: ManualForm) {
     cryptorank_id: null,
     source_url: f.source_url.trim() || null,
   };
+}
+
+function normalizeComparableUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value.trim());
+    const normalizedPath = url.pathname.replace(/\/$/, '').toLowerCase() || '/';
+    return `${url.hostname.replace(/^www\./, '').toLowerCase()}${normalizedPath}`;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTokenSymbol(value: string | null | undefined): string | null {
+  const trimmed = String(value ?? '').trim().replace(/^\$/, '').toLowerCase();
+  return trimmed || null;
+}
+
+function collectSuppressionFingerprints(input: {
+  projectName?: string | null;
+  websiteUrl?: string | null;
+  sourceUrl?: string | null;
+  slug?: string | null;
+  tokenSymbol?: string | null;
+}): SuppressionFingerprint[] {
+  const map = new Map<string, SuppressionFingerprint>();
+  const add = (fingerprintType: SuppressionFingerprintType, value: string | null) => {
+    if (!value) return;
+    const key = `${fingerprintType}:${value}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        fingerprint_type: fingerprintType,
+        fingerprint_value: value,
+      });
+    }
+  };
+
+  const normalizedName = normalizeDiscoveryName(input.projectName ?? '');
+  add('project_name', normalizedName || null);
+  add('website_url', normalizeComparableUrl(input.websiteUrl));
+  add('source_url', normalizeComparableUrl(input.sourceUrl));
+  add('slug', String(input.slug ?? '').trim().toLowerCase() || null);
+  add('token_symbol', normalizeTokenSymbol(input.tokenSymbol));
+
+  return Array.from(map.values());
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -354,6 +406,34 @@ export default function AirdropImportPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
+  }, []);
+
+  const isAirdropSuppressed = useCallback(async (fingerprints: SuppressionFingerprint[]) => {
+    if (fingerprints.length === 0) return false;
+
+    const values = Array.from(new Set(fingerprints.map((item) => item.fingerprint_value).filter(Boolean)));
+    if (values.length === 0) return false;
+
+    const { data, error } = await supabase
+      .from('deleted_entity_suppressions')
+      .select('fingerprint_type, fingerprint_value')
+      .eq('entity_type', 'airdrop')
+      .in('fingerprint_value', values);
+
+    if (error) {
+      const details = error.message.toLowerCase();
+      const missingTable = details.includes('deleted_entity_suppressions')
+        && (details.includes('does not exist') || details.includes('relation') || details.includes('schema cache'));
+      if (missingTable) return false;
+      throw error;
+    }
+
+    const matches = new Set(
+      ((data ?? []) as Array<{ fingerprint_type: string; fingerprint_value: string }>).map(
+        (item) => `${item.fingerprint_type}:${item.fingerprint_value}`
+      )
+    );
+    return fingerprints.some((item) => matches.has(`${item.fingerprint_type}:${item.fingerprint_value}`));
   }, []);
 
   // ── Admin auth ────────────────────────────────────────────────────────────
@@ -508,6 +588,19 @@ export default function AirdropImportPage() {
       }
 
       const record = mapScrapedToInsert(item);
+      const suppressionFingerprints = collectSuppressionFingerprints({
+        projectName: record.name,
+        websiteUrl: record.website_url,
+        sourceUrl: record.source_url,
+        slug: record.slug,
+        tokenSymbol: record.ticker,
+      });
+
+      if (await isAirdropSuppressed(suppressionFingerprints)) {
+        showToast(`${item.name} was permanently deleted and cannot be re-imported`, 'error');
+        return;
+      }
+
       const { error } = await supabase.from('airdrops').insert(record);
       if (error) throw new Error(error.message);
       setImportedUrls(prev => new Set([...prev, item.source_url]));
@@ -530,6 +623,19 @@ export default function AirdropImportPage() {
     setManualSaving(true);
     try {
       const record = mapManualToInsert(manual);
+      const suppressionFingerprints = collectSuppressionFingerprints({
+        projectName: record.name,
+        websiteUrl: record.website_url,
+        sourceUrl: record.source_url,
+        slug: record.slug,
+        tokenSymbol: record.ticker,
+      });
+
+      if (await isAirdropSuppressed(suppressionFingerprints)) {
+        showToast(`${manual.name} was permanently deleted and cannot be re-imported`, 'error');
+        return;
+      }
+
       const { error } = await supabase.from('airdrops').insert(record);
       if (error) throw new Error(error.message);
       showToast(`${manual.name} added to review queue`);
