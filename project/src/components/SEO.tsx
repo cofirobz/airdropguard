@@ -1,4 +1,5 @@
 import { Helmet } from "react-helmet-async";
+import { SEO_SITE_NAME, SEO_SITE_URL } from "../lib/seo";
 
 type SEOProps = {
   title: string;
@@ -10,8 +11,8 @@ type SEOProps = {
   noindex?: boolean;
 };
 
-const SITE_NAME = "AirdropGuard";
-const SITE_URL = "https://airdropguard.com";
+const SITE_NAME = SEO_SITE_NAME;
+const SITE_URL = SEO_SITE_URL;
 const DEFAULT_IMAGE = `${SITE_URL}/airdrop_guards.png`;
 
 export default function SEO({

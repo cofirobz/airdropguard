@@ -277,8 +277,8 @@ export default function ApiDocsPage() {
           <h2 className="text-lg font-bold text-white">Getting Started</h2>
         </div>
         <ol className="space-y-2 text-sm text-gray-300">
-          <li>1. Create your account at <Link to="/auth" className="text-cyan-200 hover:text-cyan-100">/auth</Link>.</li>
-          <li>2. Choose a plan at <Link to="/pricing" className="text-cyan-200 hover:text-cyan-100">/pricing</Link> and get your API key.</li>
+          <li>1. Create your account on the <Link to="/auth" className="text-cyan-200 hover:text-cyan-100">account access page</Link>.</li>
+          <li>2. Choose a plan on the <Link to="/pricing" className="text-cyan-200 hover:text-cyan-100">API pricing page</Link> and get your API key.</li>
           <li>3. Use your key in the Authorization header: <span className="font-mono text-cyan-100">Bearer YOUR_API_KEY</span>.</li>
           <li>4. Start with <span className="font-mono text-cyan-100">GET /api-v1/airdrops</span>, then fetch details with <span className="font-mono text-cyan-100">/api-v1/airdrops/:slug</span>.</li>
         </ol>

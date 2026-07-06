@@ -136,7 +136,7 @@ export default function AuthPage() {
 
         <p className="text-xs text-gray-600 text-center mt-6">
           Looking for API pricing?{' '}
-          <Link to="/pricing" className="text-neon-purple hover:underline">View plans</Link>
+          <Link to="/pricing" className="text-neon-purple hover:underline">View API pricing plans</Link>
         </p>
       </div>
     </div>

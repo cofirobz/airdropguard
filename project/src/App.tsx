@@ -23,6 +23,9 @@ const TermsPage = lazy(() => import('./pages/TermsPage'));
 const WalletCheckerPage = lazy(() => import('./pages/WalletCheckerPage'));
 const ArticlesPage = lazy(() => import('./pages/ArticlesPage'));
 const Layer2page = lazy(() => import('./pages/Layer2page'));
+const VerifyCryptoAirdropsSafely2026Page = lazy(() => import('./pages/VerifyCryptoAirdropsSafely2026Page'));
+const BestAiAirdropScannerToolsPage = lazy(() => import('./pages/BestAiAirdropScannerToolsPage'));
+const CryptoAirdropScamDetectionGuidePage = lazy(() => import('./pages/CryptoAirdropScamDetectionGuidePage'));
 const RiskDisclosure = lazy(() => import('./pages/RiskDisclosure'));
 const Whitepaper = lazy(() => import('./pages/Whitepaper'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
@@ -73,6 +76,9 @@ function App() {
                 <Route path="wallet-checker" element={<WalletCheckerPage />} />
                 <Route path="articles" element={<ArticlesPage />} />
                 <Route path="articles/layer-2-airdrops-2026" element={<Layer2page />} />
+                <Route path="articles/how-to-verify-crypto-airdrops-safely-2026" element={<VerifyCryptoAirdropsSafely2026Page />} />
+                <Route path="articles/best-ai-airdrop-scanner-tools" element={<BestAiAirdropScannerToolsPage />} />
+                <Route path="articles/crypto-airdrop-scam-detection-guide" element={<CryptoAirdropScamDetectionGuidePage />} />
                 <Route path="risk-disclosure" element={<RiskDisclosure />} />
                 <Route path="whitepaper" element={<Whitepaper />} />
                 <Route path="*" element={<NotFoundPage />} />

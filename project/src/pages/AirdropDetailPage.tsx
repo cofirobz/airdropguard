@@ -22,6 +22,7 @@ import {
 import { TrustScoreBadge } from '../components/TrustScoreSection';
 import CommunityResults from '../components/CommunityResults';
 import WalletSafetySnapshot from '../components/WalletSafetySnapshot';
+import { airdropSeoTitle, scamAlertSeoTitle, speculativeSeoTitle } from '../lib/seo';
 
 type Tab = 'overview' | 'tasks' | 'analysis';
 
@@ -2801,10 +2802,15 @@ export default function AirdropDetailPage() {
       },
     ],
   };
+  const seoTitle = opportunityType === 'Scam Alert'
+    ? scamAlertSeoTitle(airdrop.name)
+    : isSpeculativeToken
+      ? speculativeSeoTitle(airdrop.name)
+      : airdropSeoTitle(airdrop.name);
   return (
   <>
     <SEO
-      title={`${airdrop.name} ${isSpeculativeToken ? 'Token Risk Guide' : 'Airdrop Guide'} | AirdropGuard`}
+      title={seoTitle}
       description={pageDescription}
       canonical={pageUrl}
       image={airdrop.logo_url || "https://airdropguard.com/airdrop_guards.png"}

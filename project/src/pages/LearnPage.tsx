@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BookOpen, ChevronDown, ArrowRight,
   Gift, Wallet, ShieldCheck, AlertTriangle, CheckSquare, Zap, Layers,
   Code2, Globe, BarChart3, Bot, LayoutDashboard, Key, TrendingUp,
 } from 'lucide-react';
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
 
 // ── Visual flow for AirdropGuard API article ──────────────────────────────────
 function ApiFlow() {
@@ -121,6 +123,66 @@ const GUIDES: Guide[] = [
       'Check the contract address on Etherscan before signing anything.',
       'Rug pulls launch tokens, generate hype, then the team abandons the project and sells everything.',
     ],
+  },
+  {
+    id: 'verify-airdrops-2026',
+    category: 'Crypto Basics',
+    icon: ShieldCheck,
+    iconBg: 'bg-emerald-500/10 border-emerald-500/20',
+    iconColor: 'text-emerald-400',
+    title: 'How to Verify Crypto Airdrops Safely in 2026',
+    summary: 'A practical 7-step verification framework for beginners.',
+    paras: [
+      'This guide shows you how to verify campaign legitimacy before you connect, sign, or claim. It covers identity checks, contract and domain validation, wallet approval review, and risk monitoring in a simple flow.',
+      'It also explains how to reduce damage when something goes wrong: use read-only checks first, keep a separate wallet for higher-risk tasks, and never rely on hype or urgency as proof.',
+      'Most importantly, remember this rule: AirdropGuard never asks for seed phrases or private keys, and no legitimate airdrop should ask either.',
+    ],
+    bullets: [
+      'Includes wallet safety checklist for first-time claimers.',
+      'Explains how to detect mixed or conflicting trust signals.',
+      'Links to Scam Alerts, methodology, and API resources for deeper validation.',
+    ],
+    link: { label: 'Read full guide: Verify crypto airdrops safely', to: '/articles/how-to-verify-crypto-airdrops-safely-2026' },
+  },
+  {
+    id: 'best-ai-scanner-tools',
+    category: 'Crypto Basics',
+    icon: Bot,
+    iconBg: 'bg-neon-purple/10 border-neon-purple/20',
+    iconColor: 'text-neon-purple',
+    title: 'Best AI Airdrop Scanner Tools',
+    summary: 'How to compare tools by safety and signal quality, not hype.',
+    paras: [
+      'Many scanner tools look similar at first glance. This guide helps you evaluate what actually matters: explainable scoring, scam visibility, actionable workflows, and transparent methodology.',
+      'Instead of chasing vanity metrics, you will learn how to judge whether a tool helps you make safer and faster decisions in real-world farming conditions.',
+      'The guide also covers when API and pricing become relevant for advanced users who want repeatable automation.',
+    ],
+    bullets: [
+      'Beginner-friendly framework for comparing scanner quality.',
+      'Clear warning signs for tools that hide risk context.',
+      'Includes seed phrase safety rules and wallet-protection habits.',
+    ],
+    link: { label: 'Read full guide: Best AI airdrop scanner tools', to: '/articles/best-ai-airdrop-scanner-tools' },
+  },
+  {
+    id: 'scam-detection-guide',
+    category: 'Crypto Basics',
+    icon: AlertTriangle,
+    iconBg: 'bg-amber-500/10 border-amber-500/20',
+    iconColor: 'text-amber-400',
+    title: 'Crypto Airdrop Scam Detection Guide',
+    summary: 'Spot scam patterns early with a repeatable defense workflow.',
+    paras: [
+      'This guide breaks down the most common scam patterns in 2026, including phishing claim pages, impersonation support DMs, fake urgency tactics, and malicious token approval traps.',
+      'You get a step-by-step detection workflow that starts with link and contract verification, then moves into transaction-prompt checks and live risk confirmation before any claim action.',
+      'The guide reinforces non-negotiable wallet protection rules, including never sharing seed phrases. AirdropGuard never asks for seed phrases or private keys.',
+    ],
+    bullets: [
+      'Designed for beginners who want practical anti-scam checks.',
+      'Shows how to pause decisions when signals conflict.',
+      'Includes direct links to Airdrops, Scam Alerts, and methodology resources.',
+    ],
+    link: { label: 'Read full guide: Airdrop scam detection', to: '/articles/crypto-airdrop-scam-detection-guide' },
   },
   {
     id: 'how-to-qualify',
@@ -406,9 +468,40 @@ export default function LearnPage() {
   const visible = tab === 'all' ? GUIDES : GUIDES.filter(g => g.category === tab);
   const cryptoGuides  = visible.filter(g => g.category === 'Crypto Basics');
   const devGuides     = visible.filter(g => g.category === 'Developer & API');
+  const learnSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CreativeWork',
+        '@id': 'https://airdropguard.com/learn#creativework',
+        name: 'AirdropGuard Learn & Guides',
+        url: 'https://airdropguard.com/learn',
+        description: 'Beginner-friendly guides to crypto airdrops, wallet safety, DeFi basics, and building with the AirdropGuard API.',
+        inLanguage: 'en',
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': 'https://airdropguard.com/learn#faq',
+        mainEntity: GUIDES.slice(0, 10).map((guide) => ({
+          '@type': 'Question',
+          name: guide.title,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: guide.paras[0] ?? guide.summary,
+          },
+        })),
+      },
+    ],
+  }), []);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <SEO
+        title="Learn Crypto Airdrops, Wallet Safety & API Guides | AirdropGuard"
+        description="Read practical guides on crypto airdrops, wallet safety, DeFi basics, scams, and API workflows with trust-first educational content."
+        canonical={canonicalFromPath('/learn')}
+        schema={learnSchema}
+      />
 
       {/* Header */}
       <div className="mb-10">
@@ -483,6 +576,17 @@ export default function LearnPage() {
           </div>
         </section>
       )}
+
+      <section className="mt-10 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <h2 className="text-base font-bold text-white">Related resources</h2>
+        <p className="mt-1 text-sm text-gray-400">Explore connected pages for deeper research and safer execution.</p>
+        <div className="mt-4 flex flex-wrap gap-2 text-sm">
+          <Link to="/" className="rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5 text-gray-200 hover:bg-white/[0.08]">Browse verified airdrops</Link>
+          <Link to="/scam-alerts" className="rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5 text-gray-200 hover:bg-white/[0.08]">Review scam alerts</Link>
+          <Link to="/whitepaper" className="rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5 text-gray-200 hover:bg-white/[0.08]">Read methodology</Link>
+          <Link to="/pricing" className="rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5 text-gray-200 hover:bg-white/[0.08]">API pricing and access</Link>
+        </div>
+      </section>
     </div>
   );
 }

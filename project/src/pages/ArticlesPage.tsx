@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import {
   DEFAULT_ARTICLE_TRUST_PROFILES,
   formatCompactDate,
+  mergeArticleProfiles,
   type ArticleTrustProfile,
   type VerificationStatus,
   verificationStatusLabel,
@@ -51,7 +52,7 @@ export default function ArticlesPage() {
         },
       })) as ArticleTrustProfile[];
 
-      setProfiles(mapped.length > 0 ? mapped : DEFAULT_ARTICLE_TRUST_PROFILES);
+      setProfiles(mergeArticleProfiles(DEFAULT_ARTICLE_TRUST_PROFILES, mapped));
     };
 
     void loadProfiles();

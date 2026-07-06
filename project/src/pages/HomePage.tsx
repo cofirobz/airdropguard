@@ -37,6 +37,7 @@ import NewsletterSection from '../components/NewsletterSection';
 import SEO from '../components/SEO';
 import SocialLinksStrip from '../components/SocialLinksStrip';
 import { openCopilotWithPrompt } from '../lib/copilot';
+import { canonicalFromPath, homeSeoTitle } from '../lib/seo';
 import { daysUntil, isMainAirdropListing, isSpeculativeTokenListing } from '../lib/utils';
 
 const DEFAULT_FILTERS: Filters = {
@@ -586,9 +587,9 @@ function HomepageFinalCtaSection() {
             <Link to="/auth" className="inline-flex min-h-[50px] items-center justify-center rounded-2xl bg-cyan-500 px-6 py-3 text-sm font-black text-white transition-colors hover:bg-cyan-400">
               Create Free Account
             </Link>
-            <Link to="/" className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white/[0.08]">
-              Explore Airdrops
-            </Link>
+            <a href="#airdrops" className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-6 py-3 text-sm font-black text-white transition-colors hover:bg-white/[0.08]">
+              Browse Verified Airdrops
+            </a>
           </div>
         </div>
       </div>
@@ -1479,7 +1480,7 @@ function FinalCtaSection() {
               href="#airdrops"
               className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]"
             >
-              Explore Airdrops
+              Browse Verified Airdrops
             </a>
           </div>
         </div>
@@ -1657,11 +1658,57 @@ export default function HomePage() {
         '@id': 'https://airdropguard.com/#website',
         name: 'AirdropGuard',
         url: 'https://airdropguard.com',
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: 'https://airdropguard.com/?search={search_term_string}',
+          'query-input': 'required name=search_term_string',
+        },
         publisher: {
           '@id': 'https://airdropguard.com/#organization',
         },
         description:
           'Discover verified crypto airdrops, avoid scams, check your wallet safely and use Copilot to focus on the opportunities that deserve your time.',
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': 'https://airdropguard.com/#faq',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'How does AirdropGuard reduce scam risk?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'AirdropGuard combines AI analysis, human verification, wallet safety intelligence, and scam alerts so users can evaluate trust and risk before connecting wallets.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Can I start using AirdropGuard for free?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. You can start with free verified listings and core trust insights, then upgrade when you need deeper AI mission control and advanced workflow support.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Does AirdropGuard require my seed phrase?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'No. AirdropGuard does not require your seed phrase or private keys, and wallet intelligence tooling is read-only.',
+            },
+          },
+        ],
+      },
+      {
+        '@type': 'ItemList',
+        '@id': 'https://airdropguard.com/#visible-airdrops',
+        name: 'Visible Airdrop Listings',
+        itemListElement: visibleAirdrops.map((airdrop, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          url: `https://airdropguard.com/airdrop/${airdrop.slug}`,
+          name: airdrop.name,
+        })),
       },
     ],
   };
@@ -1713,9 +1760,9 @@ export default function HomePage() {
   return (
     <>
       <SEO
-        title="AirdropGuard | The AI-Powered Platform for Smarter Crypto Airdrops"
+        title={homeSeoTitle()}
         description="Stop wasting time on scam airdrops. Find high-quality crypto opportunities in seconds with AI analysis, human verification and wallet safety intelligence."
-        canonical="https://airdropguard.com/"
+        canonical={canonicalFromPath('/')}
         schema={homepageSchema}
       />
 
@@ -1815,7 +1862,7 @@ export default function HomePage() {
               Open Dashboard
             </Link>
             <Link to="/pricing" className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/[0.08]">
-              View Pricing
+              View API Pricing Plans
             </Link>
           </div>
         </div>

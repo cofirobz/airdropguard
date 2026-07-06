@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ShieldX, ExternalLink, Loader2, AlertCircle, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
 import { supabase } from '../lib/supabase';
 import type { Airdrop } from '../lib/types';
 import { getOpportunityType } from '../lib/utils';
@@ -105,6 +107,51 @@ export default function ScamAlertsPage() {
   const [scams, setScams] = useState<Airdrop[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const scamSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        '@id': 'https://airdropguard.com/scam-alerts#collection',
+        name: 'Scam Alerts & Risk Reports',
+        url: 'https://airdropguard.com/scam-alerts',
+        description: 'Known scams and blacklisted projects identified by AirdropGuard risk systems.',
+      },
+      {
+        '@type': 'ItemList',
+        '@id': 'https://airdropguard.com/scam-alerts#list',
+        name: 'Known scam alerts',
+        itemListElement: scams.slice(0, 30).map((airdrop, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          url: `https://airdropguard.com/airdrop/${airdrop.slug || airdrop.id}`,
+          name: airdrop.name,
+        })),
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': 'https://airdropguard.com/scam-alerts#faq',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'What is a scam alert on AirdropGuard?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'A scam alert means a project has been flagged for high-risk behavior such as phishing, fake claims, malicious contracts, or other fraud indicators.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'What should I do if a project appears here?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Do not connect your wallet, do not sign transactions, and do not share seed phrases or private keys. Review details and avoid interaction until evidence changes.',
+            },
+          },
+        ],
+      },
+    ],
+  }), [scams]);
 
   useEffect(() => {
     async function load() {
@@ -126,6 +173,12 @@ export default function ScamAlertsPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <SEO
+        title="Scam Alerts & Blacklisted Airdrop Projects | AirdropGuard"
+        description="Track known crypto scam alerts, blacklisted projects, and high-risk airdrops before you connect your wallet."
+        canonical={canonicalFromPath('/scam-alerts')}
+        schema={scamSchema}
+      />
       {/* Header */}
       <div className="mb-10">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-rose-500/10 border border-rose-500/20 text-xs font-semibold text-rose-400 mb-5">
