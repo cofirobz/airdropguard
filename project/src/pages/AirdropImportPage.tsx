@@ -758,7 +758,7 @@ export default function AirdropImportPage() {
           <>
             {/* Scraped list filters */}
             <div className="flex flex-wrap gap-2 mb-3">
-              <div className="relative flex-1 min-w-[140px]">
+              <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 pointer-events-none" />
                 <input
                   value={scrapedSearch}
@@ -1037,7 +1037,7 @@ export default function AirdropImportPage() {
         {/* Filters */}
         <div className="flex flex-wrap gap-2 mb-4">
           {/* Search */}
-          <div className="relative flex-1 min-w-[160px]">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 pointer-events-none" />
             <input
               value={pendingSearch}

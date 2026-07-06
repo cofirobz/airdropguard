@@ -118,7 +118,7 @@ function PlanCard({ plan, onCheckout, checkoutLoading }: { plan: Plan; onCheckou
       {/* Most Popular badge */}
       {plan.highlight && (
         <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-          <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-neon-purple to-neon-blue text-white text-[11px] font-bold px-3.5 py-1 rounded-full shadow-lg shadow-neon-purple/30 whitespace-nowrap">
+          <span className="inline-flex max-w-full items-center gap-1.5 bg-gradient-to-r from-neon-purple to-neon-blue text-white text-[11px] font-bold px-3.5 py-1 rounded-full shadow-lg shadow-neon-purple/30 text-center [overflow-wrap:anywhere]">
             <Star className="w-3 h-3 fill-current" />
             Most Popular
           </span>

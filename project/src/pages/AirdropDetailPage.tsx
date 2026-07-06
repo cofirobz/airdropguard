@@ -1770,14 +1770,14 @@ function ResearchTabNav({
 }) {
   return (
     <div id="airdrop-tabs" className="sticky top-20 z-30 mb-8 rounded-3xl border border-white/10 bg-dark-950/95 p-2 shadow-lg shadow-black/20 backdrop-blur-md">
-      <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex flex-wrap items-center gap-2">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key)}
             className={cn(
-              'flex min-h-[44px] shrink-0 items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition-colors',
+              'flex min-h-[44px] min-w-0 items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition-colors',
               activeTab === tab.key
                 ? 'bg-neon-purple text-white shadow-lg shadow-neon-purple/15'
                 : 'text-gray-500 hover:bg-white/[0.05] hover:text-white'
@@ -1789,7 +1789,7 @@ function ResearchTabNav({
         ))}
 
         {showProgress && (
-          <div className="ml-auto hidden shrink-0 items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-2 lg:flex">
+          <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-2 lg:ml-auto lg:w-auto lg:justify-start">
           <div className="text-right">
             <div className="text-[9px] uppercase tracking-wider text-gray-600">Research progress</div>
             <div className="text-xs font-bold text-gray-300">{completionPct}% tasks complete</div>
@@ -1866,7 +1866,7 @@ function MobileAirdropActionBar({
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-dark-950/95 px-3 py-3 shadow-2xl shadow-black/80 backdrop-blur-xl lg:hidden">
-      <div className="mx-auto flex max-w-lg items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mx-auto grid max-w-lg grid-cols-[auto_1fr_1fr_auto] items-center gap-2">
         <div className="min-w-[68px] shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] px-2.5 py-2 text-center">
           <div className={cn('text-lg font-black tabular-nums leading-none', scoreTone)}>{oppScore}</div>
           <div className="mt-0.5 text-[9px] uppercase tracking-wider text-gray-600">Score</div>
@@ -1877,7 +1877,7 @@ function MobileAirdropActionBar({
             href={safePrimaryUrl}
             target="_blank"
             rel="noopener noreferrer nofollow"
-            className="flex min-h-[48px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-neon-purple px-3 py-3 text-sm font-bold text-white shadow-lg shadow-neon-purple/15"
+            className="flex min-h-[48px] min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-neon-purple px-2.5 py-3 text-sm font-bold text-white shadow-lg shadow-neon-purple/15"
           >
             <ExternalLink className="h-4 w-4" />
             Analyze Token
@@ -1886,7 +1886,7 @@ function MobileAirdropActionBar({
           <button
             type="button"
             onClick={onTasksClick}
-            className="flex min-h-[48px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-neon-purple px-3 py-3 text-sm font-bold text-white shadow-lg shadow-neon-purple/15"
+            className="flex min-h-[48px] min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-neon-purple px-2.5 py-3 text-sm font-bold text-white shadow-lg shadow-neon-purple/15"
           >
             <ListChecks className="h-4 w-4" />
             Tasks
@@ -1899,7 +1899,7 @@ function MobileAirdropActionBar({
             href={airdrop.website_url}
             target="_blank"
             rel="noopener noreferrer nofollow"
-            className="flex min-h-[48px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-3 py-3 text-sm font-bold text-sky-300"
+            className="flex min-h-[48px] min-w-0 w-full items-center justify-center gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-2.5 py-3 text-sm font-bold text-sky-300"
           >
             <ExternalLink className="h-4 w-4" />
             Site
@@ -1907,7 +1907,7 @@ function MobileAirdropActionBar({
         ) : (
           <Link
             to="/wallet-checker"
-            className="flex min-h-[48px] min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-3 py-3 text-sm font-bold text-sky-300"
+            className="flex min-h-[48px] min-w-0 w-full items-center justify-center gap-2 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-2.5 py-3 text-sm font-bold text-sky-300"
           >
             <ShieldAlert className="h-4 w-4" />
             Wallet

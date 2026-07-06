@@ -340,7 +340,7 @@ function LiveOpportunitiesSection({ airdrops }: { airdrops: Airdrop[] }) {
   ];
 
   return (
-    <section id="live-opportunities" className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+    <section id="live-opportunities" className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Live opportunities</div>
@@ -362,7 +362,7 @@ function LiveOpportunitiesSection({ airdrops }: { airdrops: Airdrop[] }) {
 
 function WhySection() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+    <section className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Why AirdropGuard</div>
@@ -391,7 +391,7 @@ function HomepageHowItWorksSection() {
   ];
 
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+    <section className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">How it works</div>
@@ -424,7 +424,7 @@ function HomepageHowItWorksSection() {
 
 function CopilotPreviewSection() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+    <section className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="grid gap-4 lg:grid-cols-[0.94fr_1.06fr] lg:items-stretch">
         <div className="rounded-[30px] border border-violet-300/20 bg-[linear-gradient(160deg,rgba(139,92,246,0.12),rgba(6,10,22,0.96))] p-5">
           <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-100">
@@ -472,7 +472,7 @@ function CopilotPreviewSection() {
 
 function HomepageTrustSection({ counters }: { counters: CounterItem[] }) {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+    <section className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Social proof</div>
@@ -498,7 +498,7 @@ function HomepageTrustSection({ counters }: { counters: CounterItem[] }) {
 
 function FreeVsProSection() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+    <section className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Free vs Pro</div>
@@ -546,7 +546,7 @@ function FreeVsProSection() {
 
 function HomepageFinalCtaSection() {
   return (
-    <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+    <section className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="relative overflow-hidden rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_24%),radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_24%),linear-gradient(180deg,#09111e_0%,#040814_100%)] px-5 py-10 text-center sm:px-10 sm:py-14">
         <div className="mx-auto max-w-3xl">
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Final step</div>

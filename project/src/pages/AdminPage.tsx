@@ -34,7 +34,7 @@ function ToastBar({ toast, onDismiss }: { toast: Toast; onDismiss: () => void })
     return () => clearTimeout(t);
   }, [toast, onDismiss]);
   return (
-    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-lg text-sm font-medium whitespace-nowrap ${
+    <div className={`fixed bottom-4 left-1/2 z-[60] flex w-[calc(100vw-1.5rem)] max-w-md -translate-x-1/2 items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
       toast.type === 'success'
         ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
         : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
@@ -42,7 +42,7 @@ function ToastBar({ toast, onDismiss }: { toast: Toast; onDismiss: () => void })
       {toast.type === 'success'
         ? <CheckCircle2 className="w-4 h-4 shrink-0" />
         : <AlertTriangle className="w-4 h-4 shrink-0" />}
-      {toast.msg}
+      <span className="ag-text-safe min-w-0">{toast.msg}</span>
       <button onClick={onDismiss} aria-label="Dismiss notification" className="ml-1 opacity-60 hover:opacity-100 transition-opacity">
         <X className="w-3.5 h-3.5" />
       </button>
@@ -8501,9 +8501,9 @@ export default function AdminPage() {
       </section>
 
       <section id="admin-users" className={`rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-3 ${canShowSection('users') ? '' : 'hidden'}`}>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-bold text-white">USERS</h2>
-          <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search users" className="w-52 bg-dark-900/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white" />
+          <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search users" className="w-full sm:w-52 bg-dark-900/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white" />
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
           <div className="rounded-xl border border-white/10 px-3 py-2"><p className="text-gray-500">New users</p><p className="text-white font-semibold">{newUsersCount}</p></div>

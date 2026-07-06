@@ -403,7 +403,7 @@ export default function AirdropGuardIntelligenceCentre() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-black/25 px-6 py-5 text-center min-w-[180px]">
+            <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-5 text-center sm:px-6">
               <p className="text-xs text-gray-400">AI Confidence</p>
               <p className="text-4xl font-bold text-emerald-400">
                 {aiConfidence.score}%

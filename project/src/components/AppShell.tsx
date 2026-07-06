@@ -888,7 +888,7 @@ export default function AppShell({
           <button
             type="button"
             onClick={() => setAiDrawerOpen(true)}
-            className="-mt-8 inline-flex h-[78px] w-[78px] flex-col items-center justify-center self-center justify-self-center rounded-full border border-cyan-200/85 bg-[radial-gradient(circle_at_30%_30%,#67e8f9,transparent_42%),linear-gradient(145deg,#06b6d4,#2563eb_55%,#0b1225)] text-white shadow-[0_0_0_10px_rgba(34,211,238,0.2),0_22px_40px_rgba(14,165,233,0.45),0_0_30px_rgba(6,182,212,0.22)] transition-all duration-200 active:scale-[0.97] hover:scale-105"
+            className="-mt-7 inline-flex h-[72px] w-[72px] flex-col items-center justify-center self-center justify-self-center rounded-full border border-cyan-200/85 bg-[radial-gradient(circle_at_30%_30%,#67e8f9,transparent_42%),linear-gradient(145deg,#06b6d4,#2563eb_55%,#0b1225)] text-white shadow-[0_0_0_8px_rgba(34,211,238,0.2),0_20px_36px_rgba(14,165,233,0.45),0_0_24px_rgba(6,182,212,0.22)] transition-all duration-200 active:scale-[0.97] hover:scale-105"
             aria-label="Open AI Copilot"
           >
             <AiOrb className="h-6 w-6" />

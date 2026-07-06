@@ -1297,7 +1297,7 @@ export default function CustomerDashboard() {
               }`}>{subscriptionStatus}</span>
             </div>
             <div className="relative flex flex-wrap gap-3">
-              <a href="/api-docs" className="flex-1 btn-secondary text-sm flex items-center justify-center gap-2 min-w-[140px]">
+              <a href="/api-docs" className="flex-1 btn-secondary text-sm flex items-center justify-center gap-2 min-w-0 sm:min-w-[140px]">
                 <ExternalLink className="w-4 h-4" /> API Docs
               </a>
               <button
@@ -1347,7 +1347,7 @@ export default function CustomerDashboard() {
             <p className="text-sm font-semibold text-white">Unlock API Access</p>
             <p className="text-xs text-gray-500 mt-0.5">No API subscription row was found for this user. Choose a plan to create API access.</p>
           </div>
-          <Link to="/pricing" className="relative btn-primary text-sm px-4 py-2 shrink-0 whitespace-nowrap">
+          <Link to="/pricing" className="relative btn-primary text-sm px-4 py-2 shrink-0 text-center">
             View Plans
           </Link>
         </div>

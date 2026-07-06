@@ -1998,13 +1998,13 @@ export default function WalletSafetySnapshot({ onResultStateChange }: WalletSafe
           </div>
 
           <div className="sticky top-16 z-20 -mx-4 sm:-mx-5 px-4 sm:px-5 py-2 bg-dark-950/95 backdrop-blur-xl border-y border-white/5">
-            <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex flex-wrap gap-2">
               {tabs.map(({ id, label, icon: Icon }) => {
                 const active = activeTab === id;
                 return (
-                  <button key={id} type="button" onClick={() => setActiveTab(id)} className={cn('flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold whitespace-nowrap border transition-colors', active ? 'bg-sky-500/15 border-sky-500/25 text-sky-300' : 'bg-white/[0.03] border-white/5 text-gray-500 hover:text-gray-300')}>
+                  <button key={id} type="button" onClick={() => setActiveTab(id)} className={cn('flex min-h-[40px] min-w-0 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold border transition-colors sm:justify-start', active ? 'bg-sky-500/15 border-sky-500/25 text-sky-300' : 'bg-white/[0.03] border-white/5 text-gray-500 hover:text-gray-300')}>
                     <Icon className="w-3.5 h-3.5" />
-                    {label}
+                    <span className="ag-text-safe">{label}</span>
                   </button>
                 );
               })}
