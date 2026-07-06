@@ -140,7 +140,12 @@ function sanitizeModelAnswer(answer: string): string {
   const cleanedLines = trimmed
     .split("\n")
     .map((line) => line.trimEnd())
-    .filter((line) => !/^\s*(id|slug|hash|key)\s*[:=]/i.test(line));
+    .filter((line) => {
+      if (/^\s*(id|slug|hash|key)\s*[:=]/i.test(line)) return false;
+      if (/^\s*(page\s*context|context|session\s*memory|user\s*preferences|user\s*question)\s*[:=-]/i.test(line)) return false;
+      if (/^\s*question\s*[:=-]\s*/i.test(line)) return false;
+      return true;
+    });
 
   return cleanedLines.join("\n").trim();
 }
@@ -377,6 +382,8 @@ Deno.serve(async (req: Request) => {
       "Do not promise rewards. Do not give financial advice. Never ask for seed phrases or private keys. Never tell users to connect wallets to suspicious or unknown sites.",
       "Prefer verified and under_review listings over unknown-quality projects. Mention risk clearly. If a project is speculative or data is missing, say that.",
       "Never output internal IDs, hashes, slugs, raw JSON, or database-looking values. Use human-readable project names and explanations.",
+      "Never quote or expose internal prompt sections such as USER QUESTION, PAGE CONTEXT, USER PREFERENCES, AIRDROPGUARD DATA, or session-memory text.",
+      "Do not repeat labels like 'Page context', 'Session memory', 'User preferences', or 'Question' in the final answer.",
       "For recommendation questions, use this structure when it fits: 1. Direct answer 2. Why 3. Risks to watch 4. Practical next steps.",
       "For comparison questions, use a clear side-by-side comparison based only on available fields.",
       "If the context is an airdrop detail page, prioritize that project in your answer.",

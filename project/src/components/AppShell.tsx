@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import AiOrb from './AiOrb';
 import AirdropCopilot from './AirdropCopilot';
-import { openCopilotWithPrompt, type CopilotOpenDetail } from '../lib/copilot';
+import { openCopilot, openCopilotWithPrompt, type CopilotOpenDetail } from '../lib/copilot';
 
 type RouteContext = {
   title: string;
@@ -84,8 +84,8 @@ type FloatingAiPosition = {
 
 const FLOATING_AI_STORAGE_KEY = 'ag_desktop_ai_position_v1';
 const APP_MOBILE_MENU_GROUPS_STORAGE_KEY = 'ag_app_mobile_menu_groups_v1';
-const FLOATING_AI_WIDTH = 170;
-const FLOATING_AI_HEIGHT = 56;
+const FLOATING_AI_WIDTH = 86;
+const FLOATING_AI_HEIGHT = 86;
 const FLOATING_AI_MARGIN = 32;
 
 function clampFloatingAiPosition(position: FloatingAiPosition) {
@@ -643,7 +643,7 @@ export default function AppShell({
 
   const handleDesktopAiClick = () => {
     if (suppressClickRef.current) return;
-    openCopilotWithPrompt('What should I do next on this page?', effectiveCopilotContext);
+    openCopilot(effectiveCopilotContext);
   };
 
   useEffect(() => {
@@ -910,12 +910,12 @@ export default function AppShell({
 
           <button
             type="button"
-            onClick={() => openCopilotWithPrompt('What should I do next on this page?', effectiveCopilotContext)}
+            onClick={() => openCopilot(effectiveCopilotContext)}
             className="-mt-7 inline-flex h-[72px] w-[72px] flex-col items-center justify-center self-center justify-self-center rounded-full border border-cyan-200/85 bg-[radial-gradient(circle_at_30%_30%,#67e8f9,transparent_42%),linear-gradient(145deg,#06b6d4,#2563eb_55%,#0b1225)] text-white shadow-[0_0_0_8px_rgba(34,211,238,0.2),0_20px_36px_rgba(14,165,233,0.45),0_0_24px_rgba(6,182,212,0.22)] transition-all duration-200 active:scale-[0.97] hover:scale-105"
             aria-label="Open AI Copilot"
           >
             <AiOrb className="h-6 w-6" />
-            <span className="mt-0.5 text-[9px] font-black uppercase tracking-[0.08em]">Ask AI</span>
+            <span className="mt-0.5 text-[9px] font-black uppercase tracking-[0.08em]">Copilot</span>
           </button>
 
           <Link
@@ -993,7 +993,7 @@ export default function AppShell({
                                   type="button"
                                   onClick={() => {
                                     setMobileMenuOpen(false);
-                                    openCopilotWithPrompt('What should I do next on this page?', effectiveCopilotContext);
+                                    openCopilot(effectiveCopilotContext);
                                   }}
                                   className="group flex min-h-[58px] w-full items-center justify-between rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-left text-sm font-semibold text-gray-100 transition-all hover:border-cyan-400/20 hover:bg-white/[0.08] active:scale-[0.99]"
                                 >
@@ -1063,11 +1063,18 @@ export default function AppShell({
         onPointerUp={handleDesktopAiPointerEnd}
         onPointerCancel={handleDesktopAiPointerEnd}
         style={desktopAiPosition ? { left: desktopAiPosition.x, top: desktopAiPosition.y, right: 'auto', bottom: 'auto' } : undefined}
-        className="fixed bottom-8 right-8 z-[75] hidden min-h-[56px] items-center gap-2 rounded-full border border-sky-300/50 bg-gradient-to-r from-sky-500 via-cyan-500 to-violet-500 px-5 py-3 text-sm font-black text-white shadow-[0_0_0_6px_rgba(56,189,248,0.14),0_18px_40px_rgba(56,189,248,0.3)] transition-transform hover:-translate-y-0.5 hover:scale-[1.02] lg:inline-flex cursor-grab active:cursor-grabbing select-none"
+        className="group fixed bottom-8 right-8 z-[75] hidden h-[74px] w-[74px] items-center justify-center rounded-full border border-cyan-200/55 bg-[radial-gradient(circle_at_32%_26%,#67e8f9,rgba(34,211,238,0.5)_34%,rgba(37,99,235,0.82)_70%,rgba(15,23,42,0.98)_100%)] text-white shadow-[0_0_0_8px_rgba(34,211,238,0.16),0_20px_42px_rgba(8,145,178,0.45),inset_0_1px_8px_rgba(255,255,255,0.2)] transition-transform duration-300 hover:-translate-y-1 hover:scale-[1.04] lg:inline-flex cursor-grab active:cursor-grabbing select-none"
         aria-label="Open AirdropGuard Copilot"
       >
-        <AiOrb className="h-4 w-4" />
-        Ask AI
+        <span className="pointer-events-none absolute inset-0 rounded-full bg-cyan-300/25 blur-md transition-opacity duration-300 group-hover:opacity-90" />
+        <span className="pointer-events-none absolute -inset-1 rounded-full border border-cyan-200/45 opacity-75 animate-[pulse_3s_ease-in-out_infinite]" />
+        <span className="pointer-events-none absolute -inset-3 rounded-full border border-cyan-200/25 opacity-45 animate-[pulse_4s_ease-in-out_infinite]" />
+        <span className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-cyan-200/35 bg-[#070d1c]/88 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100 backdrop-blur-md">
+          AI Copilot
+        </span>
+        <span className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/35 bg-white/[0.08]">
+          <AiOrb className="h-6 w-6" />
+        </span>
       </button>
 
       <div
@@ -1077,10 +1084,13 @@ export default function AppShell({
         aria-hidden={aiDrawerOpen ? undefined : true}
       >
         <div
-          className={`absolute inset-0 bg-black/70 backdrop-blur-[2px] transition-opacity duration-300 ${aiDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 bg-black/58 backdrop-blur-[3px] transition-opacity duration-300 ${aiDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
           onClick={() => setAiDrawerOpen(false)}
         />
-        <aside className={`absolute inset-0 h-[100dvh] w-full max-w-full overflow-hidden rounded-none border border-cyan-400/10 bg-[#060a18]/98 p-0 shadow-[0_0_70px_rgba(56,189,248,0.2)] transition-transform duration-300 lg:inset-auto lg:bottom-3 lg:right-0 lg:top-3 lg:h-auto lg:w-[min(420px,100vw)] lg:max-w-[420px] lg:rounded-l-[32px] lg:rounded-tr-none lg:rounded-br-none lg:border-l lg:border-t lg:border-b lg:border-r-0 ${aiDrawerOpen ? 'translate-y-0 lg:translate-x-0' : 'translate-y-full lg:translate-y-0 lg:translate-x-full'}`}>
+        <aside
+          style={{ transformOrigin: 'bottom right' }}
+          className={`absolute inset-0 h-[100dvh] w-full max-w-full overflow-hidden rounded-none border border-cyan-400/12 bg-[#060a18]/96 p-0 shadow-[0_0_70px_rgba(56,189,248,0.2)] transition-all duration-300 ease-out lg:inset-auto lg:bottom-6 lg:right-6 lg:top-auto lg:h-[min(84vh,780px)] lg:w-[min(620px,calc(100vw-2.5rem))] lg:max-w-[620px] lg:rounded-[38px] lg:border lg:bg-[#070d1c]/88 lg:backdrop-blur-2xl ${aiDrawerOpen ? 'translate-y-0 opacity-100 scale-100 lg:translate-x-0' : 'translate-y-full opacity-0 scale-95 lg:translate-y-4 lg:translate-x-2'}`}
+        >
           <AirdropCopilot
             onClose={() => setAiDrawerOpen(false)}
             className="h-full"

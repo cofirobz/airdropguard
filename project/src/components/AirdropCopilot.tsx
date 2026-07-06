@@ -1,25 +1,40 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Plus, Send, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Plus, Send, Paperclip, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import AiOrb from './AiOrb';
 
 const FUNCTION_NAME = 'airdrop-copilot';
 const FOOTER_NOTE = 'Educational analysis only. Never share your seed phrase.';
-const WELCOME_MESSAGE = 'Welcome to AirdropGuard Copilot. Ask about airdrop safety, compare projects, or get help prioritizing your next steps.';
+const WELCOME_MESSAGE = 'Hey, I am your AI Copilot orb. Ask me what looks safest, what is worth your time, or what to do next.';
 const QUICK_PROMPTS = [
-  { id: 'safe-beginner', label: 'Show safest beginner airdrops', question: 'Show safest beginner airdrops' },
-  { id: 'risky-projects', label: 'Which projects look risky and why?', question: 'Which projects look risky and why?' },
-  { id: 'focus-today', label: 'What should I focus on today?', question: 'What should I focus on today?' },
+  { id: 'safe-beginner', label: 'Show me safe beginner picks', question: 'Show safest beginner airdrops' },
+  { id: 'risky-projects', label: 'Which ones look risky?', question: 'Which projects look risky and why?' },
+  { id: 'focus-today', label: 'What should I do first today?', question: 'What should I focus on today?' },
   { id: 'ending-soon', label: "What's ending soon and what should I prioritize first?", question: "What's ending soon and what should I prioritize first?" },
-  { id: 'worth-time', label: 'Is this opportunity worth my time?', question: 'Is this opportunity worth my time?' },
-  { id: 'biggest-risks', label: 'What are the biggest risks?', question: 'What are the biggest risks?' },
-  { id: 'tasks-first', label: 'What tasks should I do first?', question: 'What tasks should I do first?' },
+  { id: 'worth-time', label: 'Is this one worth it?', question: 'Is this opportunity worth my time?' },
+  { id: 'biggest-risks', label: 'What are the biggest risks right now?', question: 'What are the biggest risks?' },
+  { id: 'tasks-first', label: 'Give me my first 3 tasks', question: 'What tasks should I do first?' },
   { id: 'qualify-difficulty', label: 'How hard is this to qualify for?', question: 'How hard is this to qualify for?' },
   { id: 'what-to-avoid', label: 'What should I avoid?', question: 'What should I avoid?' },
-  { id: 'simple-explain', label: 'Explain this project simply.', question: 'Explain this project simply.' },
+  { id: 'simple-explain', label: 'Explain this in plain words', question: 'Explain this project simply.' },
 ] as const;
 const UNREADABLE_RESPONSE_MESSAGE = 'I received a response, but couldn\'t read the message. Please try again.';
+const THINKING_LINES = [
+  'Reading trust signals...',
+  'Scanning chain activity...',
+  'Comparing nearby projects...',
+  'Checking wallet safety...',
+  'Finding your best next move...',
+] as const;
+
+const QUICK_ACTIONS = [
+  { id: 'analyse-opportunity', label: '🛡 Analyse this project', prompt: 'Analyse the opportunity I am viewing and tell me the safest next action.' },
+  { id: 'best-today', label: '🔥 Best opportunities today', prompt: 'What are the best opportunities today and why?' },
+  { id: 'highest-risk', label: '⚠ Highest risk projects', prompt: 'Which projects are highest risk and what should I avoid?' },
+  { id: 'hidden-gems', label: '💰 Hidden gems', prompt: 'Show hidden gem opportunities with the best trust-to-effort profile.' },
+  { id: 'what-today', label: '🎯 What should I do next?', prompt: 'What should I do today based on my current context?' },
+] as const;
 
 type ChatMessage = {
   id: string;
@@ -56,12 +71,10 @@ type AirdropCopilotProps = {
   queuedPrompt?: { text: string; nonce: number } | null;
 };
 
-const createWelcomeMessage = (pageContext?: string): ChatMessage => ({
+const createWelcomeMessage = (_pageContext?: string): ChatMessage => ({
   id: crypto.randomUUID(),
   role: 'assistant',
-  content: pageContext
-    ? `${WELCOME_MESSAGE}\n\nCurrent context: ${pageContext}`
-    : WELCOME_MESSAGE,
+  content: WELCOME_MESSAGE,
 });
 
 function getFunctionErrorMessage(payload: unknown, fallback: string): string {
@@ -239,10 +252,26 @@ function sanitizeAssistantAnswer(raw: string): string {
     text = text.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
   }
 
+  // Normalize markdown-like formatting to plain readable text.
+  text = text
+    .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '• ')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/(^|\s)[*_]([^*_]+)[*_](?=\s|$)/g, '$1$2');
+
   const cleanedLines = text
     .split('\n')
     .map((line) => line.trimEnd())
-    .filter((line) => !/^\s*(id|slug|hash|key)\s*[:=]/i.test(line));
+    .filter((line) => {
+      if (/^\s*(id|slug|hash|key)\s*[:=]/i.test(line)) return false;
+      if (/^\s*(page\s*context|context|session\s*memory|user\s*preferences|user\s*question)\s*[:=-]/i.test(line)) return false;
+      if (/^\s*question\s*[:=-]\s*/i.test(line)) return false;
+      return true;
+    });
 
   const cleaned = cleanedLines.join('\n').trim();
   if (!cleaned) return UNREADABLE_RESPONSE_MESSAGE;
@@ -254,6 +283,161 @@ function sanitizeAssistantAnswer(raw: string): string {
   }
 
   return cleaned;
+}
+
+function renderInlineText(text: string): Array<string | JSX.Element> {
+  const segments: Array<string | JSX.Element> = [];
+  const pattern = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push(text.slice(lastIndex, match.index));
+    }
+
+    const token = match[0];
+    if (token.startsWith('**') && token.endsWith('**')) {
+      segments.push(<strong key={`b-${match.index}`} className="font-semibold text-white">{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith('`') && token.endsWith('`')) {
+      segments.push(<span key={`c-${match.index}`} className="rounded-md border border-white/10 bg-white/[0.06] px-1.5 py-0.5 font-mono text-[12px] text-cyan-100">{token.slice(1, -1)}</span>);
+    } else {
+      segments.push(token);
+    }
+
+    lastIndex = match.index + token.length;
+  }
+
+  if (lastIndex < text.length) {
+    segments.push(text.slice(lastIndex));
+  }
+
+  return segments;
+}
+
+function renderRichText(content: string): JSX.Element {
+  const blocks = content
+    .replace(/\r\n/g, '\n')
+    .split('\n\n')
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="space-y-2.5">
+      {blocks.map((block, index) => {
+        const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+        const isBulletList = lines.length > 0 && lines.every((line) => /^[-*+]\s+/.test(line) || /^\d+\.\s+/.test(line));
+
+        if (isBulletList) {
+          return (
+            <ul key={`ul-${index}`} className="space-y-1.5 pl-4 text-sm leading-relaxed">
+              {lines.map((line, lineIndex) => (
+                <li key={`li-${index}-${lineIndex}`} className="list-disc text-gray-100">
+                  {renderInlineText(line.replace(/^([-*+]\s+|\d+\.\s+)/, ''))}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        const headingMatch = block.match(/^#{1,6}\s+(.+)$/m);
+        if (headingMatch) {
+          return (
+            <p key={`h-${index}`} className="text-sm font-semibold text-white">
+              {renderInlineText(headingMatch[1])}
+            </p>
+          );
+        }
+
+        return (
+          <p key={`p-${index}`} className="text-sm leading-relaxed text-gray-100">
+            {renderInlineText(block)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function deriveContextBadges(pageContext?: string): string[] {
+  if (!pageContext) return ['Viewing: AirdropGuard', 'Context: General'];
+
+  const normalized = pageContext.replace(/\s+/g, ' ').trim();
+  const badges: string[] = [];
+
+  if (/airdrop detail/i.test(normalized)) badges.push('Viewing: Airdrop Detail');
+  if (/speculative token/i.test(normalized)) badges.push('Type: Speculative Token');
+  if (/api page|developer/i.test(normalized)) badges.push('Type: API / Developer');
+  if (/dashboard/i.test(normalized)) badges.push('Viewing: Dashboard');
+  if (/scam alerts/i.test(normalized)) badges.push('Viewing: Scam Alerts');
+
+  const trustMatch = normalized.match(/trust(?:\s+score)?\s*(\d{1,3})%?/i);
+  if (trustMatch) badges.push(`Trust ${trustMatch[1]}`);
+
+  const oppMatch = normalized.match(/opportunity(?:\s+score)?\s*(\d{1,3})%?/i);
+  if (oppMatch) badges.push(`Opportunity ${oppMatch[1]}`);
+
+  if (badges.length === 0) badges.push(`Context: ${normalized.slice(0, 56)}${normalized.length > 56 ? '...' : ''}`);
+
+  return badges.slice(0, 4);
+}
+
+function deriveContextSummary(pageContext?: string): {
+  title: string;
+  status: string;
+  trust: string;
+  opportunity: string;
+} {
+  const normalized = (pageContext ?? '').replace(/\s+/g, ' ').trim();
+
+  const focusMatch = normalized.match(/today'?s focus is\s+([^,\.]+)/i);
+  const detailMatch = normalized.match(/airdrop detail[^.]*?\s+([a-z0-9\s-]{3,})/i);
+  const title = (focusMatch?.[1] ?? detailMatch?.[1] ?? 'Airdrop Overview').trim();
+
+  const trustMatch = normalized.match(/trust(?:\s+baseline|\s+score)?\s*(\d{1,3})%?/i);
+  const opportunityMatch = normalized.match(/opportunity(?:\s+score)?\s*(\d{1,3})%?/i);
+
+  const status = /speculative/i.test(normalized)
+    ? 'Speculative Token'
+    : /scam alerts/i.test(normalized)
+      ? 'Risk Monitor'
+      : 'Verified Airdrop';
+
+  return {
+    title,
+    status,
+    trust: trustMatch ? trustMatch[1] : '92',
+    opportunity: opportunityMatch ? opportunityMatch[1] : '88',
+  };
+}
+
+function buildGreeting(email?: string): string {
+  const firstName = email?.split('@')[0]?.replace(/[._-]+/g, ' ').trim();
+  const displayName = firstName
+    ? firstName
+      .split(' ')
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ')
+    : 'Explorer';
+
+  const hour = new Date().getHours();
+  const salutation = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  return `${salutation} ${displayName} 👋`;
+}
+
+function CopilotOrb({ active }: { active: boolean }) {
+  return (
+    <div className="relative mx-auto h-28 w-28 sm:h-32 sm:w-32">
+      <div className={`absolute inset-0 rounded-full bg-cyan-400/20 blur-2xl transition-opacity duration-300 ${active ? 'opacity-100' : 'opacity-70'}`} />
+      <div className={`absolute inset-1 rounded-full border border-cyan-300/35 bg-[radial-gradient(circle_at_30%_30%,rgba(103,232,249,0.7),rgba(14,116,144,0.22)_55%,rgba(2,6,23,0.82)_100%)] shadow-[0_0_26px_rgba(34,211,238,0.35)] transition-transform duration-300 ${active ? 'scale-105 animate-pulse animate-[spin_4s_linear_infinite]' : 'scale-100'}`} />
+      <div className="absolute inset-[22%] flex items-center justify-center rounded-full border border-white/20 bg-white/[0.06]">
+        <AiOrb className="h-10 w-10" />
+      </div>
+      <div className={`absolute inset-0 rounded-full border border-cyan-300/20 transition-transform duration-500 ${active ? 'scale-110 opacity-80' : 'scale-100 opacity-40'}`} />
+      <div className={`absolute -inset-4 rounded-full border border-cyan-300/15 transition-transform duration-700 ${active ? 'scale-110 opacity-70' : 'scale-100 opacity-35'}`} />
+    </div>
+  );
 }
 
 function ensureAssistantMessage(payload: unknown): string {
@@ -314,6 +498,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [thinkingIndex, setThinkingIndex] = useState(0);
   const [sessionMemory, setSessionMemory] = useState<SessionMemory>({
     previousQuestions: [],
     comparedProjects: [],
@@ -342,6 +527,24 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
     }
     return notes;
   })();
+
+  const contextBadges = useMemo(() => deriveContextBadges(pageContext), [pageContext]);
+  const contextSummary = useMemo(() => deriveContextSummary(pageContext), [pageContext]);
+
+  const draftSuggestions = useMemo(() => {
+    const q = draft.trim().toLowerCase();
+    if (!q) return [];
+    return QUICK_PROMPTS
+      .filter((prompt) => prompt.question.toLowerCase().includes(q) || prompt.label.toLowerCase().includes(q))
+      .slice(0, 4)
+      .map((prompt) => prompt.question);
+  }, [draft]);
+
+  const showLanding = useMemo(
+    () => !loading && messages.filter((message) => message.role === 'user').length === 0,
+    [messages, loading],
+  );
+  const greeting = useMemo(() => buildGreeting(user?.email), [user?.email]);
 
   const updateMemoryFromPrompt = (prompt: string) => {
     const trimmed = prompt.trim();
@@ -435,6 +638,19 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, loading]);
+
+  useEffect(() => {
+    if (!loading) {
+      setThinkingIndex(0);
+      return;
+    }
+
+    const id = window.setInterval(() => {
+      setThinkingIndex((current) => (current + 1) % THINKING_LINES.length);
+    }, 1100);
+
+    return () => window.clearInterval(id);
+  }, [loading]);
 
   const sendPrompt = async (input: string) => {
     const content = resolveQuickPromptQuestion(input);
@@ -561,16 +777,16 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
   };
 
   return (
-    <div className={`flex h-full min-h-0 w-full flex-col overflow-hidden bg-[#08101f] text-white ${className ?? ''}`}>
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-cyan-400/10 bg-[#08101f]/95 px-4 py-3 backdrop-blur sm:px-5 sm:py-4">
+    <div className={`flex h-full min-h-0 w-full flex-col overflow-hidden bg-[radial-gradient(circle_at_16%_0%,rgba(56,189,248,0.14),transparent_24%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.12),transparent_25%),linear-gradient(180deg,#040b1d_0%,#081128_100%)] text-white ${className ?? ''}`}>
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-cyan-400/15 bg-[#071129]/88 px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-4 lg:px-6">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <AiOrb className="h-7 w-7" />
-            <h2 className="text-lg font-black text-white sm:text-xl">AirdropGuard Copilot</h2>
+            <h2 className="text-lg font-black text-white sm:text-xl">AI Copilot</h2>
           </div>
           <div className="mt-1 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-xs font-semibold text-cyan-100">
             <AiOrb className="h-3.5 w-3.5" />
-            AI Online
+            AirdropGuard AI Copilot Online
           </div>
           {pageContext && (
             <p className="mt-2 max-w-md text-[11px] leading-relaxed text-gray-400">
@@ -612,34 +828,110 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
-        <div className="space-y-4">
+      <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-5 lg:px-6">
+        <div className="grid min-h-full gap-4 lg:grid-cols-[210px_minmax(0,1fr)]">
+          <aside className="hidden lg:flex lg:min-h-0 lg:flex-col lg:rounded-[26px] lg:border lg:border-cyan-300/20 lg:bg-[linear-gradient(180deg,rgba(4,12,30,0.86),rgba(6,16,38,0.86))] lg:p-3 lg:shadow-[0_10px_28px_rgba(3,8,20,0.45),0_0_36px_rgba(56,189,248,0.12)]">
+            <div className="rounded-2xl border border-cyan-300/20 bg-white/[0.03] px-3 py-3">
+              <CopilotOrb active={loading} />
+              <div className="mt-2 text-center">
+                <p className="text-[11px] font-black uppercase tracking-[0.12em] text-cyan-100">AI Copilot</p>
+                <p className="mt-1 text-xs text-gray-300">Always on for safer moves</p>
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.12em] text-gray-300">Current Context</p>
+              <p className="mt-2 truncate text-sm font-semibold text-white">{contextSummary.title}</p>
+              <p className="text-[11px] text-cyan-200">{contextSummary.status}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2 py-1.5 text-center">
+                  <p className="text-[10px] text-gray-400">Trust</p>
+                  <p className="text-base font-black text-emerald-300">{contextSummary.trust}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] px-2 py-1.5 text-center">
+                  <p className="text-[10px] text-gray-400">Opportunity</p>
+                  <p className="text-base font-black text-cyan-300">{contextSummary.opportunity}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-1.5">
+              {QUICK_ACTIONS.map((action) => (
+                <button
+                  key={`rail-${action.id}`}
+                  type="button"
+                  onClick={() => void sendPrompt(action.prompt)}
+                  disabled={loading}
+                  className="w-full rounded-xl border border-white/12 bg-white/[0.03] px-3 py-2 text-left text-[11px] font-semibold text-gray-200 transition-all duration-200 hover:border-cyan-200/40 hover:bg-cyan-500/10 hover:text-white disabled:opacity-50"
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </aside>
+
+          <div className="space-y-4">
+          {showLanding && (
+            <section className="rounded-[34px] border border-cyan-300/20 bg-white/[0.04] p-4 shadow-[0_20px_48px_rgba(8,15,30,0.45),0_0_0_1px_rgba(148,163,184,0.08)] backdrop-blur-xl sm:p-5">
+              <CopilotOrb active={loading} />
+              <div className="mt-4 text-center">
+                <p className="text-sm font-semibold text-cyan-100">{greeting}</p>
+                <h3 className="mt-1 text-xl font-black text-white sm:text-2xl">Ready to find your next opportunity?</h3>
+                <p className="mt-1 text-xs text-gray-300">Your AI Copilot orb is live and tracking this page.</p>
+              </div>
+
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {contextBadges.map((badge) => (
+                  <span key={badge} className="inline-flex items-center rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-[11px] font-semibold text-gray-200">
+                    {badge}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                {QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => void sendPrompt(action.prompt)}
+                    disabled={loading}
+                    className="group rounded-full border border-white/20 bg-[linear-gradient(135deg,rgba(125,211,252,0.14),rgba(34,211,238,0.06)_55%,rgba(15,23,42,0.42)_100%)] px-3.5 py-2 text-xs font-semibold text-gray-100 shadow-[0_4px_16px_rgba(8,20,36,0.3)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/55 hover:text-white hover:shadow-[0_0_20px_rgba(34,211,238,0.25)] active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-5 rounded-3xl border border-white/12 bg-white/[0.02] p-3.5">
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-100">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-500/10 text-[10px]">AI</span>
+                  Copilot Signal Feed
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-gray-200">
+                  {['Today\'s Best Pick', 'Recently Improved', 'Highest Reward', 'Scam Alert', 'Recently Updated'].map((insight) => (
+                    <span key={insight} className="rounded-full border border-white/12 bg-white/[0.03] px-2.5 py-1">
+                      {insight}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
+
           {messages.map((message, index) => {
             const isWelcome = index === 0 && message.role === 'assistant' && message.content.startsWith(WELCOME_MESSAGE);
+            if (isWelcome) return null;
             return (
-              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`flex max-w-[88%] items-start gap-2 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-300`}>
+                <div className={`flex max-w-[92%] items-start gap-2 lg:max-w-[88%] ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   {message.role === 'assistant' && <AiOrb className="mt-1 h-7 w-7 shrink-0" />}
-                  <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${message.role === 'user'
-                  ? 'bg-sky-500 text-white'
-                  : 'border border-white/10 bg-[#111b31] text-gray-100'
+                  <div className={`px-4 py-3 text-sm leading-relaxed shadow-[0_8px_22px_rgba(2,6,23,0.35)] ${message.role === 'user'
+                  ? 'rounded-[22px] rounded-br-[10px] border border-violet-300/20 bg-[linear-gradient(145deg,#8b5cf6,#6d28d9_58%,#4f46e5)] text-white'
+                  : 'rounded-[22px] rounded-bl-[10px] border border-cyan-300/20 bg-[linear-gradient(165deg,rgba(9,24,52,0.84),rgba(7,16,36,0.84))] text-gray-100 backdrop-blur-xl'
                 }`}>
-                    <div className="whitespace-pre-wrap break-words">{message.content}</div>
-                    {isWelcome && (
-                      <div className="mt-4 grid grid-cols-1 gap-2">
-                        {QUICK_PROMPTS.map(prompt => (
-                          <button
-                            key={prompt.id}
-                            type="button"
-                            onClick={() => void sendPrompt(prompt.question)}
-                            disabled={loading}
-                            className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-sm text-gray-100 transition-colors hover:bg-white/[0.08] disabled:opacity-60"
-                          >
-                            {prompt.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                      {message.role === 'assistant' ? renderRichText(message.content) : message.content}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -648,18 +940,21 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
 
           {loading && (
             <div className="flex justify-start">
-              <div className="flex max-w-[88%] items-center gap-2 rounded-2xl border border-white/10 bg-[#111b31] px-4 py-3 text-sm text-gray-200">
-                <AiOrb className="h-5 w-5" />
-                Thinking...
+              <div className="flex max-w-[88%] items-center gap-2 rounded-[22px] rounded-bl-[10px] border border-white/15 bg-white/[0.06] px-4 py-3 text-sm text-gray-200 backdrop-blur-xl">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-cyan-300/30 bg-cyan-500/10">
+                  <AiOrb className="h-4 w-4 animate-pulse animate-[spin_3s_linear_infinite]" />
+                </span>
+                {THINKING_LINES[thinkingIndex]}
               </div>
             </div>
           )}
 
           <div ref={endRef} />
+          </div>
         </div>
       </main>
 
-      <footer className="shrink-0 border-t border-cyan-400/10 bg-[#08101f]/98 px-4 py-3 backdrop-blur sm:px-5 sm:py-4">
+      <footer className="shrink-0 border-t border-cyan-400/15 bg-[#08101f]/88 px-4 py-3 backdrop-blur-xl sm:px-5 sm:py-4 lg:px-6">
         <form
           onSubmit={event => {
             event.preventDefault();
@@ -667,27 +962,49 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
           }}
           className="space-y-3"
         >
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 rounded-full border border-cyan-200/30 bg-[linear-gradient(135deg,rgba(8,21,45,0.82),rgba(18,24,54,0.82))] p-2 shadow-[0_0_0_1px_rgba(34,211,238,0.1),0_14px_26px_rgba(4,10,22,0.38),0_0_22px_rgba(124,58,237,0.2)] backdrop-blur-xl">
+            <button
+              type="button"
+              aria-label="Attach file (coming soon)"
+              disabled
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.03] text-gray-400"
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
             <textarea
               value={draft}
               onChange={event => setDraft(event.target.value)}
               onKeyDown={handleComposerKeyDown}
               rows={2}
               placeholder="Ask anything about crypto airdrops..."
-              className="min-h-[56px] max-h-40 min-w-0 flex-1 resize-none rounded-2xl border border-cyan-400/10 bg-[#0f1731] px-4 py-3 text-sm text-white placeholder:text-gray-500 focus:border-sky-500/45 focus:outline-none"
+              className="min-h-[52px] max-h-40 min-w-0 flex-1 resize-none rounded-full border border-transparent bg-transparent px-3 py-3 text-sm text-white placeholder:text-gray-500 focus:border-transparent focus:outline-none [overflow-wrap:anywhere]"
               disabled={loading}
               maxLength={900}
             />
             <button
               type="submit"
               disabled={!draft.trim() || loading}
-              className="inline-flex h-11 min-w-[72px] shrink-0 items-center justify-center gap-1 rounded-xl border border-sky-400/35 bg-sky-500 px-3 text-xs font-bold text-white transition-colors hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-10 min-w-[82px] shrink-0 items-center justify-center gap-1 rounded-full border border-violet-200/35 bg-[linear-gradient(145deg,#8b5cf6,#4f46e5)] px-3 text-xs font-bold text-white shadow-[0_8px_18px_rgba(79,70,229,0.35)] transition-transform duration-200 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Send message"
             >
               <Send className="h-3.5 w-3.5" />
               Send
             </button>
           </div>
+          {draftSuggestions.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {draftSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => setDraft(suggestion)}
+                  className="rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5 text-left text-[11px] text-gray-200 transition-colors hover:bg-white/[0.08]"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
           {error && <p className="text-[11px] text-rose-300">{error}</p>}
           <p className="text-[11px] text-gray-400">Press Enter to send, Shift+Enter for a new line.</p>
           <p className="text-[11px] text-gray-500">{FOOTER_NOTE}</p>
