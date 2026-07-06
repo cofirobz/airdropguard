@@ -2557,14 +2557,31 @@ export default function AirdropDetailPage() {
     async function load() {
       setLoading(true);
       setError(null);
-      const { data, error: err } = await supabase
-        .from('airdrops')
-        .select('*, airdrop_tasks(*)')
-        .eq('slug', slug!)
-        .eq('published', true)
-        .eq('review_status', 'approved')
-        .eq('is_demo', false)
-        .maybeSingle();
+      const visibilityFilter = 'and(published.eq.true,review_status.eq.approved),listing_state.eq.scam_alert';
+
+      const fetchBy = async (field: 'slug' | 'id' | 'name', value: string) => (
+        supabase
+          .from('airdrops')
+          .select('*, airdrop_tasks(*)')
+          .eq('is_demo', false)
+          .or(visibilityFilter)
+          .eq(field, value)
+          .limit(1)
+          .maybeSingle()
+      );
+
+      let { data, error: err } = await fetchBy('slug', slug);
+
+      if (!err && !data) {
+        ({ data, error: err } = await fetchBy('id', slug));
+      }
+
+      if (!err && !data) {
+        const slugAsName = decodeURIComponent(slug).replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
+        if (slugAsName.length > 0) {
+          ({ data, error: err } = await fetchBy('name', slugAsName));
+        }
+      }
 
       if (err) {
         setError(err.message);

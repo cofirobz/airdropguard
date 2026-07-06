@@ -17,6 +17,7 @@ const SIGNS = [
 
 function WarningCard({ airdrop }: { airdrop: Airdrop }) {
   const [expanded, setExpanded] = useState(false);
+  const detailTarget = `/airdrop/${airdrop.slug || airdrop.id}`;
   return (
     <div className="glass-card border border-rose-500/25 overflow-hidden">
       <div className="p-5">
@@ -29,7 +30,9 @@ function WarningCard({ airdrop }: { airdrop: Airdrop }) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm font-semibold text-white">{airdrop.name}</h3>
+              <h3 className="text-sm font-semibold text-white">
+                <Link to={detailTarget} className="hover:text-rose-200 transition-colors">{airdrop.name}</Link>
+              </h3>
               {airdrop.ticker && (
                 <span className="text-[10px] font-bold font-mono text-rose-400/80 bg-rose-500/10 border border-rose-500/20 rounded-md px-1.5 py-0.5">
                   ${airdrop.ticker}
