@@ -7,6 +7,8 @@ export type OpportunityType =
   | 'Speculative Token'
   | 'Scam Alert';
 
+type ListingClassificationInput = Pick<Airdrop, 'category' | 'listing_state' | 'human_verified'>;
+
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
@@ -58,7 +60,7 @@ export function getStatusColor(status: AirdropStatus): string {
 }
 
 export function getOpportunityType(
-  a: Pick<Airdrop, 'category' | 'listing_state' | 'human_verified'>,
+  a: ListingClassificationInput,
 ): OpportunityType {
   const categories = Array.isArray(a.category) ? a.category : [];
 
@@ -69,6 +71,25 @@ export function getOpportunityType(
   if (categories.includes('Verified Airdrop')) return 'Verified Airdrop';
   if (a.listing_state === 'verified' || a.human_verified) return 'Verified Airdrop';
   return 'Verified Airdrop';
+}
+
+export function isScamAlertListing(a: ListingClassificationInput): boolean {
+  return getOpportunityType(a) === 'Scam Alert';
+}
+
+export function isSpeculativeTokenListing(a: ListingClassificationInput): boolean {
+  return getOpportunityType(a) === 'Speculative Token';
+}
+
+export function isMainAirdropListing(a: ListingClassificationInput): boolean {
+  const type = getOpportunityType(a);
+  return type !== 'Speculative Token' && type !== 'Scam Alert';
+}
+
+export function resolveListingStateFromCategory(a: ListingClassificationInput): Airdrop['listing_state'] {
+  if (isScamAlertListing(a)) return 'scam_alert';
+  if (a.listing_state === 'under_review') return 'under_review';
+  return 'verified';
 }
 
 export function getOpportunityTypeTone(opportunityType: OpportunityType): string {

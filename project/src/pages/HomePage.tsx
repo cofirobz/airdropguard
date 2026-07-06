@@ -36,7 +36,7 @@ import NewsletterSection from '../components/NewsletterSection';
 import SEO from '../components/SEO';
 import SocialLinksStrip from '../components/SocialLinksStrip';
 import TrustStrip from '../components/TrustStrip';
-import { daysUntil } from '../lib/utils';
+import { daysUntil, isMainAirdropListing, isSpeculativeTokenListing } from '../lib/utils';
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
@@ -85,10 +85,6 @@ function parseRewardScore(value: string | null | undefined): number {
   });
 
   return Math.max(...scores, 0);
-}
-
-function isSpeculativeToken(item: Airdrop): boolean {
-  return item.category.includes('Speculative Token');
 }
 
 function TrustRing({ score, label = 'confidence' }: { score: number | null; label?: string }) {
@@ -1527,12 +1523,12 @@ export default function HomePage() {
   }, []);
 
   const opportunityAirdrops = useMemo(
-    () => airdrops.filter(item => !isSpeculativeToken(item)),
+    () => airdrops.filter(item => isMainAirdropListing(item)),
     [airdrops],
   );
 
   const speculativeTokens = useMemo(
-    () => [...airdrops.filter(item => isSpeculativeToken(item))].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()),
+    () => [...airdrops.filter(item => isSpeculativeTokenListing(item))].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()),
     [airdrops],
   );
 

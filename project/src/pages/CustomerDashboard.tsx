@@ -16,7 +16,7 @@ import { supabase } from '../lib/supabase';
 import { event as trackAnalyticsEvent } from '../lib/analytics';
 import { useAuth } from '../contexts/AuthContext';
 import type { AirdropWithTasks } from '../lib/types';
-import { getBookmarks } from '../lib/utils';
+import { getBookmarks, isMainAirdropListing } from '../lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -775,6 +775,7 @@ export default function CustomerDashboard() {
     if (airdropRes.data) {
       setAirdrops(
         (airdropRes.data as (typeof airdropRes.data[0] & { airdrop_tasks: AirdropWithTasks['tasks'] })[])
+          .filter(a => isMainAirdropListing(a))
           .map(a => ({ ...a, tasks: a.airdrop_tasks ?? [] }))
       );
     }

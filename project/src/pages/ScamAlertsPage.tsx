@@ -3,6 +3,7 @@ import { AlertTriangle, ShieldX, ExternalLink, Loader2, AlertCircle, BookOpen } 
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Airdrop } from '../lib/types';
+import { getOpportunityType } from '../lib/utils';
 
 const SIGNS = [
   'Asks for your seed phrase or private key — legitimate projects never need these',
@@ -91,13 +92,14 @@ export default function ScamAlertsPage() {
       const { data, error: err } = await supabase
         .from('airdrops')
         .select('*')
-        .eq('listing_state', 'scam_alert')
-        .eq('published', true)
         .eq('is_demo', false)
         .not('review_status', 'eq', 'replaced_demo')
         .order('updated_at', { ascending: false });
       if (err) setError(err.message);
-      else setScams(data ?? []);
+      else {
+        const rows = (data ?? []) as Airdrop[];
+        setScams(rows.filter((row) => getOpportunityType(row) === 'Scam Alert'));
+      }
       setLoading(false);
     }
     load();

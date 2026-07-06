@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import type { Airdrop, Blockchain, Category } from '../lib/types';
 import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
-import { getOpportunityType, getOpportunityTypeTone } from '../lib/utils';
+import { getOpportunityType, getOpportunityTypeTone, resolveListingStateFromCategory } from '../lib/utils';
 import {
   DEFAULT_ARTICLE_CHECKLIST,
   DEFAULT_ARTICLE_TRUST_PROFILES,
@@ -6080,6 +6080,12 @@ export default function AdminPage() {
         setForm(normalizedForm);
       }
 
+      const resolvedListingState = resolveListingStateFromCategory({
+        category: normalizedForm.category,
+        listing_state: existing?.listing_state ?? 'verified',
+        human_verified: existing?.human_verified ?? false,
+      });
+
       const parsedOverrideScore = normalizedForm.human_override_score.trim() === ''
         ? null
         : Math.max(0, Math.min(100, Number.parseInt(normalizedForm.human_override_score, 10)));
@@ -6117,6 +6123,7 @@ export default function AdminPage() {
         is_featured: normalizedForm.is_featured,
         is_trending: normalizedForm.is_trending,
         is_sponsored: normalizedForm.is_sponsored,
+        listing_state: resolvedListingState,
       };
 
       const removeUnsupportedAirdropColumns = (input: typeof payload, error: unknown) => {
@@ -6173,7 +6180,6 @@ export default function AdminPage() {
           ...payload,
           slug,
           sort_order: airdrops.length,
-          listing_state: 'verified',
         };
 
         let insertPayload = { ...baseInsertPayload };

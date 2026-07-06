@@ -87,6 +87,7 @@ Deno.serve(async (req: Request) => {
     .eq("review_status", "approved")
     .eq("is_demo", false)
     .neq("listing_state", "scam_alert")
+    .not("category", "cs", '{"Speculative Token"}')
     .order("sort_order", { ascending: true })
     .range(offset, offset + limit - 1);
 
@@ -129,6 +130,7 @@ Deno.serve(async (req: Request) => {
       .eq("review_status", "approved")
       .eq("is_demo", false)
       .neq("listing_state", "scam_alert")
+      .not("category", "cs", '{"Speculative Token"}')
       .maybeSingle();
 
     if (error) return json({ error: error.message }, 500);
