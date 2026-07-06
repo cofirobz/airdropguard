@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import AiOrb from './AiOrb';
 import AirdropCopilot from './AirdropCopilot';
+import { openCopilotWithPrompt, type CopilotOpenDetail } from '../lib/copilot';
 
 type RouteContext = {
   title: string;
@@ -71,6 +72,7 @@ type ContextualAiState = {
   label: string;
   recommendation: string;
   cta: string;
+  ctaPrompt: string;
   copilotContext: string;
   tip: string;
 };
@@ -156,6 +158,7 @@ function buildContextualAiState(pathname: string, search: string, hints: HeroHin
         ? `You have ${remainingTasks} tasks left. Start with the highest-trust unfinished mission.`
         : 'Your checklist is clear. Ask AI to pick your next high-trust mission.',
       cta: 'Continue Today\'s Mission',
+      ctaPrompt: 'What should I focus on next in my dashboard today?',
       copilotContext: `Dashboard guidance. ${remainingTasks} tasks remaining, ${watchlistCount} watchlist projects, trust baseline ${trust}%. Recommend the single best next action for today and why it matters.`,
       tip: 'Tip: Task Tracking keeps execution clear while Trust Score helps you prioritize safer missions first.',
     };
@@ -166,6 +169,7 @@ function buildContextualAiState(pathname: string, search: string, hints: HeroHin
       label: 'Wallet Intelligence',
       recommendation: 'Your wallet looks healthy? Let AI confirm risk posture and suggest the safest next connect step.',
       cta: 'Interpret Wallet Results',
+      ctaPrompt: 'Help me interpret these wallet intelligence results and tell me the safest next step.',
       copilotContext: 'Wallet Intelligence page. Summarize wallet health in plain language, highlight any red flags, and provide the safest next action.',
       tip: 'Tip: Wallet Intelligence is read-only and never requests seed phrases or private keys.',
     };
@@ -176,6 +180,7 @@ function buildContextualAiState(pathname: string, search: string, hints: HeroHin
       label: 'Airdrop Report Intelligence',
       recommendation: 'Want a fast go or no-go? Ask AI to summarize trust, effort, rewards and hidden risks.',
       cta: 'Summarize This Report',
+      ctaPrompt: 'Summarize this project and tell me if it is worth my time.',
       copilotContext: 'Airdrop detail report page. Summarize trust score, reward potential, risk level and required tasks. Then recommend go/no-go with the next concrete step.',
       tip: 'Tip: Trust Score helps safety confidence, while Opportunity Score estimates potential upside.',
     };
@@ -186,6 +191,7 @@ function buildContextualAiState(pathname: string, search: string, hints: HeroHin
       label: 'Risk Radar',
       recommendation: 'Clear high-risk alerts first, then return to opportunities with verified signals.',
       cta: 'Prioritize Risk Alerts',
+      ctaPrompt: 'Which scam alerts should I prioritize first and what should I avoid right now?',
       copilotContext: 'Scam Alerts page. Help me triage current warnings by urgency and identify what I should avoid today.',
       tip: 'Tip: Trust Score reflects confidence quality, while Scam Alerts surface active threat patterns.',
     };
@@ -196,6 +202,7 @@ function buildContextualAiState(pathname: string, search: string, hints: HeroHin
       label: 'Developer Mission Control',
       recommendation: 'New endpoint documentation may be available. Ask AI for the fastest integration plan.',
       cta: 'Get API Next Steps',
+      ctaPrompt: 'What are the next steps to start using the AirdropGuard API?',
       copilotContext: 'API page. Explain the fastest path from account access to first successful endpoint call, including practical setup steps.',
       tip: 'Tip: AI Analysis can be operationalized via API to turn research into repeatable workflows.',
     };
@@ -206,6 +213,7 @@ function buildContextualAiState(pathname: string, search: string, hints: HeroHin
       label: 'Trending Intelligence',
       recommendation: 'Three trending projects likely fit your profile. Ask AI to compare trust, effort and reward.' ,
       cta: 'Compare Trending Picks',
+      ctaPrompt: 'Compare the top trending picks and tell me which one I should start first.',
       copilotContext: `Trending browse page. Compare top opportunities for my profile with emphasis on trust, effort and reward. Current watchlist size: ${watchlistCount}.`,
       tip: 'Tip: Opportunity Score estimates upside potential while Trust Score indicates verification confidence.',
     };
@@ -215,6 +223,7 @@ function buildContextualAiState(pathname: string, search: string, hints: HeroHin
     label: 'Browse Intelligence',
     recommendation: 'Want AI to compare these for you? Get one clear recommendation and next action.',
     cta: 'Ask AI For My Best Pick',
+    ctaPrompt: 'Based on this page, what is my best next pick and why?',
     copilotContext: `Browse page. Select my best next mission from current opportunities using trust, urgency and expected effort. Watchlist: ${watchlistCount}.`,
     tip: 'Tip: AI Analysis combines trust, urgency, reward and task effort to prioritize your next move.',
   };
@@ -410,6 +419,7 @@ export default function AppShell({
   });
   const [pageCopilotContext, setPageCopilotContext] = useState<string | null>(null);
   const [heroHints, setHeroHints] = useState<HeroHints>({});
+  const [queuedPrompt, setQueuedPrompt] = useState<{ text: string; nonce: number } | null>(null);
   const [statusTick, setStatusTick] = useState(0);
   const [desktopAiPosition, setDesktopAiPosition] = useState<FloatingAiPosition | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -575,9 +585,8 @@ export default function AppShell({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const openCopilotWithContext = (context: string) => {
-    window.dispatchEvent(new CustomEvent('ag:copilot-context', { detail: { context } }));
-    setAiDrawerOpen(true);
+  const openCopilotFromCta = (prompt: string, context: string) => {
+    openCopilotWithPrompt(prompt, context);
   };
 
   const handleDesktopAiPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -634,7 +643,7 @@ export default function AppShell({
 
   const handleDesktopAiClick = () => {
     if (suppressClickRef.current) return;
-    setAiDrawerOpen(true);
+    openCopilotWithPrompt('What should I do next on this page?', effectiveCopilotContext);
   };
 
   useEffect(() => {
@@ -643,7 +652,21 @@ export default function AppShell({
       setPageCopilotContext(detail?.context ?? null);
     };
 
-    const handleOpen = () => setAiDrawerOpen(true);
+    const handleOpen = (event: Event) => {
+      const detail = (event as CustomEvent<CopilotOpenDetail | undefined>).detail;
+      const context = typeof detail?.context === 'string' ? detail.context.trim() : '';
+      const prompt = typeof detail?.prompt === 'string' ? detail.prompt.trim() : '';
+
+      if (context) {
+        setPageCopilotContext(context);
+      }
+
+      if (prompt) {
+        setQueuedPrompt({ text: prompt, nonce: Date.now() });
+      }
+
+      setAiDrawerOpen(true);
+    };
     const handleClose = () => setAiDrawerOpen(false);
     const handleHeroHints = (event: Event) => {
       const detail = (event as CustomEvent<HeroHints | undefined>).detail;
@@ -697,7 +720,7 @@ export default function AppShell({
 
           <button
             type="button"
-            onClick={() => setAiDrawerOpen(true)}
+            onClick={() => openCopilotWithPrompt('What should I focus on next from this page?', effectiveCopilotContext)}
             className="flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-xs font-semibold text-gray-300 transition-colors hover:border-sky-500/35 hover:text-white"
           >
             <span className="inline-flex items-center gap-2">
@@ -787,7 +810,7 @@ export default function AppShell({
                   </Link>
                   <button
                     type="button"
-                    onClick={() => setAiDrawerOpen(true)}
+                    onClick={() => openCopilotWithPrompt('What should I do next on this page?', effectiveCopilotContext)}
                     className="inline-flex min-h-[44px] items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-white/[0.1]"
                   >
                     <AiOrb className="h-4 w-4" />
@@ -848,7 +871,7 @@ export default function AppShell({
 
               <button
                 type="button"
-                onClick={() => openCopilotWithContext(contextualAiState.copilotContext)}
+                onClick={() => openCopilotFromCta(contextualAiState.ctaPrompt, contextualAiState.copilotContext)}
                 className="ripple-btn inline-flex min-h-[46px] shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-300/35 bg-cyan-500/22 px-4 py-2 text-xs font-black text-white transition-colors hover:bg-cyan-500/30"
               >
                 <AiOrb className="h-4 w-4" />
@@ -887,7 +910,7 @@ export default function AppShell({
 
           <button
             type="button"
-            onClick={() => setAiDrawerOpen(true)}
+            onClick={() => openCopilotWithPrompt('What should I do next on this page?', effectiveCopilotContext)}
             className="-mt-7 inline-flex h-[72px] w-[72px] flex-col items-center justify-center self-center justify-self-center rounded-full border border-cyan-200/85 bg-[radial-gradient(circle_at_30%_30%,#67e8f9,transparent_42%),linear-gradient(145deg,#06b6d4,#2563eb_55%,#0b1225)] text-white shadow-[0_0_0_8px_rgba(34,211,238,0.2),0_20px_36px_rgba(14,165,233,0.45),0_0_24px_rgba(6,182,212,0.22)] transition-all duration-200 active:scale-[0.97] hover:scale-105"
             aria-label="Open AI Copilot"
           >
@@ -970,7 +993,7 @@ export default function AppShell({
                                   type="button"
                                   onClick={() => {
                                     setMobileMenuOpen(false);
-                                    setAiDrawerOpen(true);
+                                    openCopilotWithPrompt('What should I do next on this page?', effectiveCopilotContext);
                                   }}
                                   className="group flex min-h-[58px] w-full items-center justify-between rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-left text-sm font-semibold text-gray-100 transition-all hover:border-cyan-400/20 hover:bg-white/[0.08] active:scale-[0.99]"
                                 >
@@ -1063,6 +1086,7 @@ export default function AppShell({
             className="h-full"
             pageContext={effectiveCopilotContext}
             summary={{ userName: userLabel }}
+            queuedPrompt={queuedPrompt}
           />
         </aside>
       </div>

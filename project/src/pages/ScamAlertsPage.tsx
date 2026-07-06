@@ -15,9 +15,16 @@ const SIGNS = [
   'Typosquatting website (e.g. airdropguard vs airdropguuard)',
 ];
 
+function isValidExternalUrl(value: string | null | undefined): boolean {
+  if (!value) return false;
+  if (value === 'N/A') return false;
+  return /^https?:\/\//i.test(value);
+}
+
 function WarningCard({ airdrop }: { airdrop: Airdrop }) {
   const [expanded, setExpanded] = useState(false);
   const detailTarget = `/airdrop/${airdrop.slug || airdrop.id}`;
+  const showWebsiteLink = isValidExternalUrl(airdrop.website_url);
   return (
     <div className="glass-card border border-rose-500/25 overflow-hidden">
       <div className="p-5">
@@ -44,7 +51,7 @@ function WarningCard({ airdrop }: { airdrop: Airdrop }) {
               Scam Alert
             </span>
           </div>
-          {airdrop.website_url && (
+          {showWebsiteLink && (
             <a href={airdrop.website_url} target="_blank" rel="noopener noreferrer"
               className="p-1.5 rounded-lg text-gray-600 hover:text-gray-400 transition-colors shrink-0" title="Project website">
               <ExternalLink className="w-3.5 h-3.5" />
@@ -74,6 +81,15 @@ function WarningCard({ airdrop }: { airdrop: Airdrop }) {
             )}
           </>
         )}
+
+        <div className="mt-3">
+          <Link
+            to={detailTarget}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-200 hover:bg-rose-500/15 transition-colors"
+          >
+            View scam alert
+          </Link>
+        </div>
 
         <div className="flex flex-wrap gap-2 mt-3 text-[10px] text-gray-600">
           {airdrop.blockchain.map(b => (

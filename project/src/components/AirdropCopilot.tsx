@@ -53,6 +53,7 @@ type AirdropCopilotProps = {
   summary?: CopilotSummary;
   className?: string;
   pageContext?: string;
+  queuedPrompt?: { text: string; nonce: number } | null;
 };
 
 const createWelcomeMessage = (pageContext?: string): ChatMessage => ({
@@ -304,9 +305,10 @@ async function isUnauthorizedInvokeError(error: unknown): Promise<boolean> {
   return /unauthori[sz]ed|jwt|session/i.test(error.message);
 }
 
-export default function AirdropCopilot({ onClose, summary: _summary, className, pageContext }: AirdropCopilotProps) {
+export default function AirdropCopilot({ onClose, summary: _summary, className, pageContext, queuedPrompt }: AirdropCopilotProps) {
   const { user } = useAuth();
   const endRef = useRef<HTMLDivElement | null>(null);
+  const lastHandledQueuedPromptNonceRef = useRef<number | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => [createWelcomeMessage(pageContext)]);
   const [draft, setDraft] = useState('');
@@ -533,6 +535,18 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
     }
   };
 
+  useEffect(() => {
+    const pending = queuedPrompt?.text?.trim();
+    if (!pending) return;
+    if (loading) return;
+
+    const nonce = queuedPrompt?.nonce ?? null;
+    if (nonce !== null && lastHandledQueuedPromptNonceRef.current === nonce) return;
+
+    lastHandledQueuedPromptNonceRef.current = nonce;
+    void sendPrompt(pending);
+  }, [queuedPrompt, loading]);
+
   const startNewChat = () => {
     setMessages([createWelcomeMessage(pageContext)]);
     setDraft('');
@@ -617,7 +631,7 @@ export default function AirdropCopilot({ onClose, summary: _summary, className, 
                           <button
                             key={prompt.id}
                             type="button"
-                            onClick={() => void sendPrompt(prompt.id)}
+                            onClick={() => void sendPrompt(prompt.question)}
                             disabled={loading}
                             className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-sm text-gray-100 transition-colors hover:bg-white/[0.08] disabled:opacity-60"
                           >

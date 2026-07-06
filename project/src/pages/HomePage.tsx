@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import AiOrb from '../components/AiOrb';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { Airdrop } from '../lib/types';
 import AirdropCard from '../components/AirdropCard';
 import CommunityResults from '../components/CommunityResults';
@@ -36,6 +37,7 @@ import NewsletterSection from '../components/NewsletterSection';
 import SEO from '../components/SEO';
 import SocialLinksStrip from '../components/SocialLinksStrip';
 import TrustStrip from '../components/TrustStrip';
+import { openCopilotWithPrompt } from '../lib/copilot';
 import { daysUntil, isMainAirdropListing, isSpeculativeTokenListing } from '../lib/utils';
 
 const DEFAULT_FILTERS: Filters = {
@@ -139,6 +141,38 @@ function ConversionBadge({ children }: { children: React.ReactNode }) {
       <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 animate-pulse" />
       {children}
     </span>
+  );
+}
+
+function CopilotCta({
+  prompt,
+  context,
+  className,
+  children,
+}: {
+  prompt: string;
+  context: string;
+  className: string;
+  children: React.ReactNode;
+}) {
+  const { user } = useAuth();
+
+  if (!user) {
+    return (
+      <Link to="/auth" className={className}>
+        {children}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => openCopilotWithPrompt(prompt, context)}
+      className={className}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -288,13 +322,14 @@ function HeroMockup({ item }: { item: Airdrop | null }) {
               Open report
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
-            <Link
-              to="/auth"
+            <CopilotCta
+              prompt="What should I do next with this opportunity?"
+              context="Homepage featured opportunity context. Give direct next steps with trust, risk, reward, and wallet-safety notes."
               className="inline-flex min-h-[44px] items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-white/[0.08]"
             >
               <AiOrb className="h-4 w-4" />
               Ask AI
-            </Link>
+            </CopilotCta>
           </div>
         </div>
       </div>
@@ -431,13 +466,14 @@ function CopilotPreviewSection() {
           <p className="mt-3 text-sm leading-relaxed text-gray-300">
             It gives a clear next move, not generic chatbot noise.
           </p>
-          <Link
-            to="/auth"
+          <CopilotCta
+            prompt="What should I focus on next on AirdropGuard?"
+            context="Homepage Copilot preview section. Give a direct short plan for what to do next."
             className="mt-5 inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-black text-white transition-colors hover:bg-cyan-400"
           >
             Ask AirdropGuard AI
             <ArrowRight className="h-4 w-4" />
-          </Link>
+          </CopilotCta>
         </div>
 
         <div className="rounded-[30px] border border-white/10 bg-[#0b1224]/92 p-5">
@@ -606,13 +642,17 @@ function MobileActionCards() {
   return (
     <section className="mx-auto max-w-7xl px-4 py-4 md:hidden">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Link to="/auth" className="rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(34,211,238,0.12),rgba(15,23,42,0.96))] p-4 shadow-[0_0_24px_rgba(34,211,238,0.08)]">
+        <CopilotCta
+          prompt="What is the best next move for me from the homepage?"
+          context="Homepage mobile quick action card. Give practical next steps and include safety checks."
+          className="rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(34,211,238,0.12),rgba(15,23,42,0.96))] p-4 shadow-[0_0_24px_rgba(34,211,238,0.08)]"
+        >
           <div className="flex items-center gap-2 text-sm font-bold text-white">
             <Bot className="h-4 w-4 text-cyan-300" />
             Ask AI
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-gray-300">Get a fast recommendation before you spend time or connect anywhere.</p>
-        </Link>
+        </CopilotCta>
 
         <Link to="/wallet-checker" className="rounded-[28px] border border-sky-500/20 bg-[linear-gradient(160deg,rgba(14,165,233,0.1),rgba(15,23,42,0.96))] p-4 shadow-[0_0_24px_rgba(56,189,248,0.08)]">
           <div className="flex items-center gap-2 text-sm font-bold text-white">
@@ -664,12 +704,13 @@ function TodaysBestOpportunityCard({ airdrop }: { airdrop: Airdrop | null }) {
           >
             Open report
           </Link>
-          <Link
-            to="/auth"
+          <CopilotCta
+            prompt={`Is ${airdrop.name} worth my time right now?`}
+            context={`Homepage mobile best opportunity card for ${airdrop.name}. Explain trust, risk, reward, and safest next action.`}
             className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-bold text-white"
           >
             Ask AI
-          </Link>
+          </CopilotCta>
         </div>
       </div>
     </section>
@@ -769,12 +810,13 @@ function HeroSection({
               Browse Airdrops
               <ArrowRight className="h-4 w-4" />
             </a>
-            <Link
-              to="/auth"
+            <CopilotCta
+              prompt="What should I prioritize first from the current listings?"
+              context="Homepage hero section. Recommend the best next listing with practical steps and safety warnings."
               className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] px-6 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/[0.1]"
             >
               Ask AI
-            </Link>
+            </CopilotCta>
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-2 sm:hidden">

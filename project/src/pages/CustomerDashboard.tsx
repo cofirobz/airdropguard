@@ -17,6 +17,7 @@ import { event as trackAnalyticsEvent } from '../lib/analytics';
 import { useAuth } from '../contexts/AuthContext';
 import type { AirdropWithTasks } from '../lib/types';
 import { getBookmarks, isMainAirdropListing } from '../lib/utils';
+import { openCopilotWithPrompt } from '../lib/copilot';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1138,8 +1139,11 @@ export default function CustomerDashboard() {
     });
   };
 
-  const openCopilot = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('ag:copilot-open'));
+  const openCopilot = useCallback((prompt?: string, context?: string) => {
+    openCopilotWithPrompt(
+      prompt ?? 'What should I focus on next in my dashboard today?',
+      context ?? 'Dashboard mission context. Prioritize trust, urgency, and task completion order with concrete next steps.',
+    );
   }, []);
 
   const handleBriefingActionClick = useCallback((item: { id: string; title: string; action: string; context: string }, index: number) => {
@@ -1155,13 +1159,7 @@ export default function CustomerDashboard() {
       remaining_tasks: remainingCount,
     });
 
-    window.dispatchEvent(new CustomEvent('ag:copilot-context', {
-      detail: {
-        context: item.context,
-      },
-    }));
-
-    openCopilot();
+    openCopilot(item.context, item.context);
   }, [activeTab, openCopilot, remainingCount, trustDelta, watchlistCount]);
 
   useEffect(() => {
