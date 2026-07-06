@@ -469,7 +469,7 @@ function CopilotPreviewSection() {
           <CopilotCta
             prompt="What should I focus on next on AirdropGuard?"
             context="Homepage Copilot preview section. Give a direct short plan for what to do next."
-            className="mt-5 inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-black text-white transition-colors hover:bg-cyan-400"
+            className="mt-5 inline-flex min-h-[46px] items-center gap-2 rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-black text-slate-950 transition-colors hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100 focus-visible:ring-offset-2 focus-visible:ring-offset-[#061025]"
           >
             Ask AirdropGuard AI
             <ArrowRight className="h-4 w-4" />
@@ -550,7 +550,7 @@ function FreeVsProSection() {
             <li>Community results</li>
           </ul>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Link to="/auth" className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-cyan-500 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-cyan-400">
+            <Link to="/auth" className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 transition-colors hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100 focus-visible:ring-offset-2 focus-visible:ring-offset-[#061025]">
               Start Free
             </Link>
             <Link to="/auth" className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]">
@@ -1750,7 +1750,7 @@ export default function HomePage() {
             <div className="mt-5 flex flex-col gap-2.5 sm:mt-7 sm:flex-row">
               <Link
                 to="/auth"
-                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-6 py-3 text-sm font-black text-white shadow-[0_12px_26px_rgba(34,211,238,0.26)] transition-colors hover:bg-cyan-400"
+                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-6 py-3 text-sm font-black text-slate-950 shadow-[0_12px_26px_rgba(34,211,238,0.26)] transition-colors hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100 focus-visible:ring-offset-2 focus-visible:ring-offset-[#040a17]"
               >
                 Start Free
                 <ArrowRight className="h-4 w-4" />

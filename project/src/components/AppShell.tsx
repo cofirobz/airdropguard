@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -20,8 +20,9 @@ import {
   X,
 } from 'lucide-react';
 import AiOrb from './AiOrb';
-import AirdropCopilot from './AirdropCopilot';
 import { openCopilot, openCopilotWithPrompt, type CopilotOpenDetail } from '../lib/copilot';
+
+const AirdropCopilot = lazy(() => import('./AirdropCopilot'));
 
 type RouteContext = {
   title: string;
@@ -1091,13 +1092,23 @@ export default function AppShell({
           style={{ transformOrigin: 'bottom right' }}
           className={`absolute inset-0 h-[100dvh] w-full max-w-full overflow-hidden rounded-none border border-cyan-400/12 bg-[#060a18]/96 p-0 shadow-[0_0_70px_rgba(56,189,248,0.2)] transition-all duration-300 ease-out lg:inset-auto lg:bottom-6 lg:right-6 lg:top-auto lg:h-[min(84vh,780px)] lg:w-[min(620px,calc(100vw-2.5rem))] lg:max-w-[620px] lg:rounded-[38px] lg:border lg:bg-[#070d1c]/88 lg:backdrop-blur-2xl ${aiDrawerOpen ? 'translate-y-0 opacity-100 scale-100 lg:translate-x-0' : 'translate-y-full opacity-0 scale-95 lg:translate-y-4 lg:translate-x-2'}`}
         >
-          <AirdropCopilot
-            onClose={() => setAiDrawerOpen(false)}
-            className="h-full"
-            pageContext={effectiveCopilotContext}
-            summary={{ userName: userLabel }}
-            queuedPrompt={queuedPrompt}
-          />
+          {aiDrawerOpen && (
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center text-sm text-gray-300">
+                  Loading AI Copilot...
+                </div>
+              }
+            >
+              <AirdropCopilot
+                onClose={() => setAiDrawerOpen(false)}
+                className="h-full"
+                pageContext={effectiveCopilotContext}
+                summary={{ userName: userLabel }}
+                queuedPrompt={queuedPrompt}
+              />
+            </Suspense>
+          )}
         </aside>
       </div>
     </div>

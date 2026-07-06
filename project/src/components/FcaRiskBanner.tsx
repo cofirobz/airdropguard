@@ -8,7 +8,7 @@ export function FcaRiskBanner() {
         security analysis, human reviewed insights, and educational information only. This is not
         financial, legal or investment advice. Always do your own research (DYOR).{" "}
         <a href="/risk-disclosure" style={linkStyle}>
-          Learn more
+          Read the crypto risk disclosure
         </a>
       </span>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import type React from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
@@ -25,9 +25,23 @@ import {
   Star,
   UserCircle2,
 } from "lucide-react";
-import AppShell, { isAuthenticatedAppPath } from "./AppShell";
 import SocialLinksStrip from "./SocialLinksStrip";
 import { useAuth } from "../contexts/AuthContext";
+
+const AppShell = lazy(() => import("./AppShell"));
+
+function isAuthenticatedAppPath(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/airdrop/") ||
+    pathname.startsWith("/dashboard") ||
+    pathname === "/wallet-checker" ||
+    pathname === "/scam-alerts" ||
+    pathname === "/pricing" ||
+    pathname === "/api-pricing" ||
+    pathname === "/api-docs"
+  );
+}
 
 const PUBLIC_MENU_GROUPS_STORAGE_KEY = "ag_public_mobile_menu_groups_v1";
 
@@ -501,18 +515,26 @@ export default function Layout() {
       </a>
 
       {isAppRoute ? (
-        <AppShell
-          userLabel={user?.email ?? 'Explorer'}
-          onSignOut={signOut}
-          routeContext={{
-            title: routeTitle,
-            subtitle: routeSubtitle,
-            copilotContext: routeCopilotContext ?? 'Authenticated app page. Use the current route context when answering.',
-          }}
-          contentClassName={location.pathname.startsWith('/dashboard') ? 'mx-auto max-w-[1180px] space-y-6' : 'space-y-6'}
+        <Suspense
+          fallback={
+            <div className="flex min-h-[55vh] items-center justify-center text-sm text-gray-400">
+              Loading app shell...
+            </div>
+          }
         >
-          <Outlet />
-        </AppShell>
+          <AppShell
+            userLabel={user?.email ?? 'Explorer'}
+            onSignOut={signOut}
+            routeContext={{
+              title: routeTitle,
+              subtitle: routeSubtitle,
+              copilotContext: routeCopilotContext ?? 'Authenticated app page. Use the current route context when answering.',
+            }}
+            contentClassName={location.pathname.startsWith('/dashboard') ? 'mx-auto max-w-[1180px] space-y-6' : 'space-y-6'}
+          >
+            <Outlet />
+          </AppShell>
+        </Suspense>
       ) : (
         <>
       <nav className={`fixed inset-x-0 top-0 z-50 bg-dark-950/98 shadow-[0_14px_40px_rgba(2,6,23,0.18)] supports-[backdrop-filter]:bg-dark-950/95 transition-transform duration-300 ease-out ${navHidden ? '-translate-y-full' : 'translate-y-0'}`}>
