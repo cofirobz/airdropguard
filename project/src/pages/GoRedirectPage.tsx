@@ -1,18 +1,36 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import SEO from '../components/SEO';
 import { canonicalFromPath } from '../lib/seo';
 
 export default function GoRedirectPage() {
-  const { slug = '' } = useParams();
+  const { slug = '', source: sourceFromPath = '' } = useParams();
+  const location = useLocation();
   const cleanSlug = slug.toLowerCase().trim();
   const validSlug = /^[a-z0-9-]+$/.test(cleanSlug);
+  const sourceFromQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return (params.get('source') || '').toLowerCase().trim();
+  }, [location.search]);
+
+  const cleanSource = useMemo(() => {
+    const candidate = (sourceFromQuery || sourceFromPath || '').toLowerCase().trim();
+    if (!candidate) return '';
+    const normalized = candidate
+      .replace(/[^a-z0-9-\s_]/g, '')
+      .replace(/[\s_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    return /^[a-z0-9-]+$/.test(normalized) ? normalized : '';
+  }, [sourceFromPath, sourceFromQuery]);
+
   const [started, setStarted] = useState(false);
 
   const edgeUrl = useMemo(() => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-    return `${supabaseUrl}/functions/v1/affiliate-redirect/${encodeURIComponent(cleanSlug)}`;
-  }, [cleanSlug]);
+    const sourceQuery = cleanSource ? `?source=${encodeURIComponent(cleanSource)}` : '';
+    return `${supabaseUrl}/functions/v1/affiliate-redirect/${encodeURIComponent(cleanSlug)}${sourceQuery}`;
+  }, [cleanSlug, cleanSource]);
 
   useEffect(() => {
     if (!validSlug) return;
@@ -26,7 +44,7 @@ export default function GoRedirectPage() {
         <SEO
           title="Link unavailable | AirdropGuard"
           description="This affiliate link is unavailable."
-          canonical={canonicalFromPath(`/go/${cleanSlug}`)}
+          canonical={canonicalFromPath(`/go/${cleanSlug}${cleanSource ? `/${cleanSource}` : ''}`)}
           noindex
         />
         <section className="rounded-2xl border border-white/10 bg-dark-900/60 p-6 text-center space-y-3">
@@ -45,7 +63,7 @@ export default function GoRedirectPage() {
       <SEO
         title="Redirecting | AirdropGuard"
         description="Redirecting to verified partner link."
-        canonical={canonicalFromPath(`/go/${cleanSlug}`)}
+        canonical={canonicalFromPath(`/go/${cleanSlug}${cleanSource ? `/${cleanSource}` : ''}`)}
         noindex
       />
       <section className="rounded-2xl border border-white/10 bg-dark-900/60 p-6 text-center space-y-3">

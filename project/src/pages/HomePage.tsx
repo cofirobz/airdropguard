@@ -36,6 +36,7 @@ import FilterBar, { type Filters } from '../components/FilterBar';
 import NewsletterSection from '../components/NewsletterSection';
 import SEO from '../components/SEO';
 import SocialLinksStrip from '../components/SocialLinksStrip';
+import AffiliatePlacementCta from '../components/AffiliatePlacementCta';
 import { openCopilotWithPrompt } from '../lib/copilot';
 import { canonicalFromPath, homeSeoTitle } from '../lib/seo';
 import { daysUntil, isMainAirdropListing, isSpeculativeTokenListing } from '../lib/utils';
@@ -1874,6 +1875,12 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <AffiliatePlacementCta
+        source="homepage"
+        title="Homepage security partner"
+        subtitle="This button is placement-tracked and automatically routes through the active affiliate record."
+      />
 
       <section id="airdrops" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-16">
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

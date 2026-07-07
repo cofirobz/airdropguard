@@ -12,6 +12,7 @@ import {
   Home, Activity, CreditCard, LogOut, Settings,
 } from 'lucide-react';
 import AiOrb from '../components/AiOrb';
+import AffiliatePlacementCta from '../components/AffiliatePlacementCta';
 import SEO from '../components/SEO';
 import { supabase } from '../lib/supabase';
 import { event as trackAnalyticsEvent } from '../lib/analytics';
@@ -1683,6 +1684,13 @@ export default function CustomerDashboard() {
         <section>
           {apiAccessSection}
         </section>
+
+        <AffiliatePlacementCta
+          source="dashboard"
+          title="Dashboard partner"
+          subtitle="Clicks from mission control are tracked under the dashboard placement source."
+          className="px-0 py-0"
+        />
 
         <section className="rounded-[28px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(6,14,32,0.96),rgba(8,20,42,0.92))] p-4 shadow-[0_18px_45px_rgba(3,8,24,0.45)] sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">

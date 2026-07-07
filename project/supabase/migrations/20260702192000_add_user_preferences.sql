@@ -10,19 +10,23 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
 
 ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "select_own_user_preferences" ON public.user_preferences;
 CREATE POLICY "select_own_user_preferences"
 ON public.user_preferences FOR SELECT TO authenticated
 USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "insert_own_user_preferences" ON public.user_preferences;
 CREATE POLICY "insert_own_user_preferences"
 ON public.user_preferences FOR INSERT TO authenticated
 WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "update_own_user_preferences" ON public.user_preferences;
 CREATE POLICY "update_own_user_preferences"
 ON public.user_preferences FOR UPDATE TO authenticated
 USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "delete_own_user_preferences" ON public.user_preferences;
 CREATE POLICY "delete_own_user_preferences"
 ON public.user_preferences FOR DELETE TO authenticated
 USING (auth.uid() = user_id);

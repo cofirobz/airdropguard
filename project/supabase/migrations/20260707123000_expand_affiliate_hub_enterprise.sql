@@ -168,6 +168,8 @@ CREATE POLICY "affiliate_opportunities_admin_delete"
   ON public.affiliate_opportunities FOR DELETE TO authenticated
   USING (EXISTS (SELECT 1 FROM public.admin_users WHERE id = auth.uid()));
 
+DROP VIEW IF EXISTS public.affiliate_links_public;
+
 CREATE OR REPLACE VIEW public.affiliate_links_public
 WITH (security_invoker = true)
 AS

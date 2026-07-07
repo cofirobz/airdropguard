@@ -3035,8 +3035,8 @@ export default function AdminPage() {
     setUsersLoading(true);
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id,email,created_at,last_login_at')
+        .from('admin_users')
+        .select('user_id,created_at')
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -3044,11 +3044,11 @@ export default function AdminPage() {
 
       const rows = (data ?? []) as Array<Record<string, unknown>>;
       const mapped: OpsUser[] = rows.map((row) => ({
-        id: String(row.id ?? crypto.randomUUID()),
-        email: String(row.email ?? 'unknown@user.local'),
+        id: String(row.user_id ?? crypto.randomUUID()),
+        email: `admin+${String(row.user_id ?? 'unknown').slice(0, 8)}@airdropguard.local`,
         createdAt: String(row.created_at ?? new Date().toISOString()),
-        lastSeenAt: String(row.last_login_at ?? row.created_at ?? new Date().toISOString()),
-        plan: 'free',
+        lastSeenAt: String(row.created_at ?? new Date().toISOString()),
+        plan: 'premium',
       }));
 
       setOpsUsers(mapped);

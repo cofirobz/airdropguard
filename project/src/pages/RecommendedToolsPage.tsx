@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import SEO from '../components/SEO';
 import { supabase } from '../lib/supabase';
 import { canonicalFromPath } from '../lib/seo';
+import { buildAffiliateGoUrl } from '../lib/affiliate';
 
 interface RecommendedTool {
   id: string;
@@ -85,9 +86,9 @@ export default function RecommendedToolsPage() {
               <h2 className="mt-1 text-lg font-semibold text-white">{tool.name}</h2>
               <p className="mt-2 min-h-[44px] text-sm text-gray-300">{tool.description || 'Security-focused tool recommended by AirdropGuard.'}</p>
               <div className="mt-4 flex items-center justify-between gap-2">
-                <span className="text-[11px] text-gray-500">Internal link: /go/{tool.slug}</span>
+                <span className="text-[11px] text-gray-500">Internal link: {buildAffiliateGoUrl(tool.slug, 'recommended-tools')}</span>
                 <Link
-                  to={`/go/${tool.slug}`}
+                  to={buildAffiliateGoUrl(tool.slug, 'recommended-tools')}
                   className="rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20"
                 >
                   Visit Partner

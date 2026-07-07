@@ -15,6 +15,7 @@ import {
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import SEO from '../components/SEO';
+import AffiliatePlacementCta from '../components/AffiliatePlacementCta';
 import { canonicalFromPath } from '../lib/seo';
 
 const FUNCTIONS_BASE_URL = 'https://YOUR_PROJECT_REF.supabase.co/functions/v1';
@@ -309,6 +310,13 @@ export default function ApiDocsPage() {
           </Link>
         </div>
       </section>
+
+      <AffiliatePlacementCta
+        source="api-docs"
+        title="API Docs partner"
+        subtitle="Documentation traffic to partners is tagged with the api-docs placement source."
+        className="mb-8 px-0 py-0"
+      />
 
       <section className="mb-8 glass-card rounded-2xl p-6">
         <div className="mb-3 flex items-center gap-2">

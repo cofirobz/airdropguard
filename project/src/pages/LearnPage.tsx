@@ -6,6 +6,7 @@ import {
   Code2, Globe, BarChart3, Bot, LayoutDashboard, Key, TrendingUp,
 } from 'lucide-react';
 import SEO from '../components/SEO';
+import AffiliatePlacementCta from '../components/AffiliatePlacementCta';
 import { canonicalFromPath } from '../lib/seo';
 
 // ── Visual flow for AirdropGuard API article ──────────────────────────────────
@@ -548,6 +549,13 @@ export default function LearnPage() {
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
+
+      <AffiliatePlacementCta
+        source="learn"
+        title="Learn page partner"
+        subtitle="Reader clicks from guides are tracked to the learn placement automatically."
+        className="mb-8 px-0 py-0"
+      />
 
       {/* Category tabs */}
       <div className="sticky top-20 z-20 -mx-4 mb-8 border-b border-white/5 bg-dark-950/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:py-0">

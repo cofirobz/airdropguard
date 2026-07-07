@@ -10,9 +10,40 @@ const corsHeaders = {
 function parseSlug(req: Request): string {
   const url = new URL(req.url);
   const parts = url.pathname.split('/').filter(Boolean);
-  const fromPath = parts[parts.length - 1] || '';
+  const fnIdx = parts.findIndex((part) => part === 'affiliate-redirect');
+  const fromPath = fnIdx >= 0 ? (parts[fnIdx + 1] || '') : (parts[parts.length - 1] || '');
   const normalized = fromPath.toLowerCase().trim();
   return /^[a-z0-9-]+$/.test(normalized) ? normalized : '';
+}
+
+function parseSource(req: Request): string | null {
+  const url = new URL(req.url);
+  const fromQuery = (url.searchParams.get('source') || '').toLowerCase().trim();
+  const parts = url.pathname.split('/').filter(Boolean);
+  const fnIdx = parts.findIndex((part) => part === 'affiliate-redirect');
+  const fromPath = fnIdx >= 0 ? (parts[fnIdx + 2] || '') : '';
+  const candidate = (fromQuery || fromPath || '').toLowerCase().trim();
+
+  if (!candidate) return null;
+  const normalized = candidate
+    .replace(/[^a-z0-9-\s_]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  return /^[a-z0-9-]+$/.test(normalized) ? normalized : null;
+}
+
+function applyTracker(destination: string, trackerValue: string | null): string {
+  if (!trackerValue) return destination;
+
+  try {
+    const url = new URL(destination);
+    url.searchParams.set('tracker', trackerValue);
+    return url.toString();
+  } catch {
+    return destination;
+  }
 }
 
 function cleanUnavailableHtml(slug: string): string {
@@ -69,6 +100,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const slug = parseSlug(req);
+  const source = parseSource(req);
   if (!slug) {
     return new Response(cleanUnavailableHtml('invalid-slug'), {
       status: 404,
@@ -102,6 +134,21 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  let trackerValue: string | null = null;
+  if (source) {
+    const { data: placement } = await supabase
+      .from('affiliate_placements')
+      .select('tracker_value, enabled')
+      .eq('affiliate_link_id', link.id)
+      .eq('placement_name', source)
+      .eq('enabled', true)
+      .maybeSingle();
+
+    trackerValue = placement?.tracker_value ?? null;
+  }
+
+  const finalDestination = applyTracker(destination, trackerValue);
+
   const referrer = req.headers.get('referer');
   const userAgent = req.headers.get('user-agent');
   const clientIp = resolveClientIp(req);
@@ -124,6 +171,8 @@ Deno.serve(async (req: Request) => {
     await supabase.from('affiliate_clicks').insert({
       affiliate_link_id: link.id,
       slug,
+      placement_name: source,
+      tracker_value: trackerValue,
       referrer,
       user_agent: userAgent,
       ip_hash: ipHash,
@@ -135,5 +184,5 @@ Deno.serve(async (req: Request) => {
     .update({ last_click_at: new Date().toISOString() })
     .eq('id', link.id);
 
-  return Response.redirect(destination, 302);
+  return Response.redirect(finalDestination, 302);
 });

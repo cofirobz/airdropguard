@@ -70,6 +70,7 @@ function App() {
                 <Route path="auth" element={<AuthPage />} />
                 <Route path="dashboard" element={<CustomerDashboard />} />
                 <Route path="go/:slug" element={<GoRedirectPage />} />
+                <Route path="go/:slug/:source" element={<GoRedirectPage />} />
                 <Route path="learn" element={<LearnPage />} />
                 <Route path="more" element={<Navigate to="/dashboard" replace />} />
                 <Route path="api-pricing" element={<Navigate to="/pricing" replace />} />

@@ -16,7 +16,7 @@ import { supabase } from '../../lib/supabase';
 
 type SortKey = 'alphabetical' | 'most_clicked' | 'newest' | 'recently_edited' | 'highest_priority';
 type FilterStatus = 'all' | 'active' | 'inactive';
-type ViewTab = 'affiliates' | 'analytics' | 'opportunities' | 'settings';
+type ViewTab = 'affiliates' | 'placements' | 'analytics' | 'opportunities' | 'settings';
 
 type PlacementKey =
   | 'recommended_tools'
@@ -59,10 +59,22 @@ interface AffiliateClickRow {
   id: string;
   affiliate_link_id: string;
   slug: string;
+  placement_name: string | null;
+  tracker_value: string | null;
   referrer: string | null;
   user_agent: string | null;
   ip_hash: string | null;
   created_at: string;
+}
+
+interface AffiliatePlacementRow {
+  id: string;
+  affiliate_link_id: string;
+  placement_name: string;
+  tracker_value: string | null;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 interface AffiliateOpportunity {
@@ -305,6 +317,7 @@ export function AffiliateHubSection({
   const [tab, setTab] = useState<ViewTab>('affiliates');
   const [rows, setRows] = useState<AffiliateLinkRow[]>([]);
   const [recentClicks, setRecentClicks] = useState<AffiliateClickRow[]>([]);
+  const [placements, setPlacements] = useState<AffiliatePlacementRow[]>([]);
   const [opportunities, setOpportunities] = useState<AffiliateOpportunity[]>([]);
   const [settings, setSettings] = useState<AffiliateSettings | null>(null);
 
@@ -334,21 +347,32 @@ export function AffiliateHubSection({
 
   const [opportunityForm, setOpportunityForm] = useState(BLANK_OPPORTUNITY);
 
+  const [placementAffiliateId, setPlacementAffiliateId] = useState('');
+  const [placementName, setPlacementName] = useState('');
+  const [placementTracker, setPlacementTracker] = useState('');
+  const [placementEnabled, setPlacementEnabled] = useState(true);
+  const [editingPlacementId, setEditingPlacementId] = useState<string | null>(null);
+
   const internalUrlForSlug = useCallback((slug: string) => `${safeHost()}/go/${slug}`, []);
+  const internalUrlForPlacement = useCallback((slug: string, source: string) => `${safeHost()}/go/${slug}?source=${encodeURIComponent(source)}`, []);
 
   const fetchAffiliateData = useCallback(async () => {
     setLoading(true);
     try {
-      const [linksRes, clicksRes, oppRes, settingsRes] = await Promise.all([
+      const [linksRes, clicksRes, placementsRes, oppRes, settingsRes] = await Promise.all([
         supabase
           .from('affiliate_links')
           .select('id, name, slug, category, description, destination_url, disclosure_text, logo_url, affiliate_network, commission_rate, cookie_duration_days, payment_threshold, payment_method, notes, priority_order, tags, is_featured, placements, is_active, created_at, updated_at, last_click_at')
           .order('updated_at', { ascending: false }),
         supabase
           .from('affiliate_clicks')
-          .select('id, affiliate_link_id, slug, referrer, user_agent, ip_hash, created_at')
+          .select('id, affiliate_link_id, slug, placement_name, tracker_value, referrer, user_agent, ip_hash, created_at')
           .order('created_at', { ascending: false })
           .limit(1000),
+        supabase
+          .from('affiliate_placements')
+          .select('id, affiliate_link_id, placement_name, tracker_value, enabled, created_at, updated_at')
+          .order('updated_at', { ascending: false }),
         supabase
           .from('affiliate_opportunities')
           .select('*')
@@ -361,6 +385,7 @@ export function AffiliateHubSection({
 
       if (linksRes.error) throw linksRes.error;
       if (clicksRes.error) throw clicksRes.error;
+      if (placementsRes.error) throw placementsRes.error;
       if (oppRes.error) throw oppRes.error;
       if (settingsRes.error) throw settingsRes.error;
 
@@ -373,6 +398,7 @@ export function AffiliateHubSection({
 
       setRows(normalizedRows);
       setRecentClicks((clicksRes.data ?? []) as AffiliateClickRow[]);
+      setPlacements((placementsRes.data ?? []) as AffiliatePlacementRow[]);
       setOpportunities((oppRes.data ?? []) as AffiliateOpportunity[]);
       setSettings((settingsRes.data ?? null) as AffiliateSettings | null);
     } catch (error) {
@@ -380,6 +406,7 @@ export function AffiliateHubSection({
       showToast(message, 'error');
       setRows([]);
       setRecentClicks([]);
+      setPlacements([]);
       setOpportunities([]);
     } finally {
       setLoading(false);
@@ -390,6 +417,13 @@ export function AffiliateHubSection({
     if (!visible) return;
     void fetchAffiliateData();
   }, [visible, fetchAffiliateData]);
+
+  useEffect(() => {
+    if (rows.length === 0) return;
+    if (!placementAffiliateId || !rows.some((row) => row.id === placementAffiliateId)) {
+      setPlacementAffiliateId(rows[0].id);
+    }
+  }, [placementAffiliateId, rows]);
 
   const clickStatsById = useMemo(() => {
     const startToday = new Date();
@@ -565,6 +599,9 @@ export function AffiliateHubSection({
     if (!/^https?:\/\//i.test(destination)) return showToast('Destination URL must start with http:// or https://', 'error');
     if (form.is_active && !destination) return showToast('Cannot enable an affiliate without destination URL.', 'error');
 
+    const duplicateByName = rows.some((row) => row.name.toLowerCase() === form.name.trim().toLowerCase() && row.id !== editingId);
+    if (duplicateByName) return showToast('An affiliate partner with this name already exists. Use one record per company.', 'error');
+
     setSaving(true);
     try {
       const payload = {
@@ -630,35 +667,6 @@ export function AffiliateHubSection({
     await fetchAffiliateData();
   }, [fetchAffiliateData, showToast]);
 
-  const duplicateAffiliate = useCallback(async (row: AffiliateLinkRow) => {
-    const baseSlug = `${row.slug}-copy`;
-    const payload = {
-      name: `${row.name} Copy`,
-      slug: normalizeSlug(`${baseSlug}-${Date.now().toString().slice(-5)}`),
-      category: row.category,
-      description: row.description,
-      destination_url: row.destination_url,
-      logo_url: row.logo_url,
-      disclosure_text: row.disclosure_text,
-      affiliate_network: row.affiliate_network,
-      commission_rate: row.commission_rate,
-      cookie_duration_days: row.cookie_duration_days,
-      payment_threshold: row.payment_threshold,
-      payment_method: row.payment_method,
-      notes: row.notes,
-      priority_order: row.priority_order,
-      tags: row.tags,
-      is_active: false,
-      is_featured: false,
-      placements: row.placements,
-    };
-
-    const { error } = await supabase.from('affiliate_links').insert(payload);
-    if (error) return showToast(error.message, 'error');
-    showToast(`${row.name} duplicated as draft.`);
-    await fetchAffiliateData();
-  }, [fetchAffiliateData, showToast]);
-
   const copyInternalUrl = useCallback(async (slug: string) => {
     try {
       await navigator.clipboard.writeText(internalUrlForSlug(slug));
@@ -667,6 +675,125 @@ export function AffiliateHubSection({
       showToast('Copy failed.', 'error');
     }
   }, [internalUrlForSlug, showToast]);
+
+  const normalizePlacementName = useCallback((value: string) => value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-\s_]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, ''), []);
+
+  const placementRows = useMemo(() => {
+    if (!placementAffiliateId) return placements;
+    return placements.filter((row) => row.affiliate_link_id === placementAffiliateId);
+  }, [placementAffiliateId, placements]);
+
+  const placementAnalyticsRows = useMemo(() => {
+    const startToday = new Date();
+    startToday.setHours(0, 0, 0, 0);
+    const start7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const start30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const grouped = new Map<string, { affiliateId: string; placementName: string; today: number; d7: number; d30: number; lifetime: number }>();
+
+    recentClicks.forEach((click) => {
+      const placementName = click.placement_name || 'unknown';
+      const key = `${click.affiliate_link_id}:${placementName}`;
+      const at = new Date(click.created_at);
+      const current = grouped.get(key) ?? {
+        affiliateId: click.affiliate_link_id,
+        placementName,
+        today: 0,
+        d7: 0,
+        d30: 0,
+        lifetime: 0,
+      };
+      current.lifetime += 1;
+      if (at >= startToday) current.today += 1;
+      if (at >= start7d) current.d7 += 1;
+      if (at >= start30d) current.d30 += 1;
+      grouped.set(key, current);
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => b.lifetime - a.lifetime);
+  }, [recentClicks]);
+
+  const resetPlacementForm = useCallback(() => {
+    setEditingPlacementId(null);
+    setPlacementName('');
+    setPlacementTracker('');
+    setPlacementEnabled(true);
+  }, []);
+
+  const startEditPlacement = useCallback((placement: AffiliatePlacementRow) => {
+    setEditingPlacementId(placement.id);
+    setPlacementAffiliateId(placement.affiliate_link_id);
+    setPlacementName(placement.placement_name);
+    setPlacementTracker(placement.tracker_value || '');
+    setPlacementEnabled(placement.enabled);
+  }, []);
+
+  const savePlacement = useCallback(async () => {
+    if (!placementAffiliateId) return showToast('Choose an affiliate partner first.', 'error');
+
+    const normalizedPlacement = normalizePlacementName(placementName);
+    if (!normalizedPlacement) return showToast('Placement name is required.', 'error');
+
+    const duplicatePlacement = placements.some((row) => (
+      row.affiliate_link_id === placementAffiliateId
+      && row.placement_name === normalizedPlacement
+      && row.id !== editingPlacementId
+    ));
+    if (duplicatePlacement) return showToast('This placement already exists for the selected affiliate.', 'error');
+
+    const payload = {
+      affiliate_link_id: placementAffiliateId,
+      placement_name: normalizedPlacement,
+      tracker_value: placementTracker.trim() || null,
+      enabled: placementEnabled,
+    };
+
+    const response = editingPlacementId
+      ? await supabase.from('affiliate_placements').update(payload).eq('id', editingPlacementId)
+      : await supabase.from('affiliate_placements').insert(payload);
+
+    if (response.error) return showToast(response.error.message, 'error');
+
+    showToast(editingPlacementId ? 'Placement updated.' : 'Placement added.');
+    resetPlacementForm();
+    await fetchAffiliateData();
+  }, [editingPlacementId, fetchAffiliateData, normalizePlacementName, placementAffiliateId, placementEnabled, placementName, placementTracker, placements, resetPlacementForm, showToast]);
+
+  const togglePlacement = useCallback(async (placement: AffiliatePlacementRow) => {
+    const { error } = await supabase
+      .from('affiliate_placements')
+      .update({ enabled: !placement.enabled })
+      .eq('id', placement.id);
+    if (error) return showToast(error.message, 'error');
+    showToast(`Placement ${placement.enabled ? 'disabled' : 'enabled'}.`);
+    await fetchAffiliateData();
+  }, [fetchAffiliateData, showToast]);
+
+  const deletePlacement = useCallback(async (placement: AffiliatePlacementRow) => {
+    const { error } = await supabase
+      .from('affiliate_placements')
+      .delete()
+      .eq('id', placement.id);
+    if (error) return showToast(error.message, 'error');
+    showToast('Placement deleted.');
+    await fetchAffiliateData();
+  }, [fetchAffiliateData, showToast]);
+
+  const copyPlacementUrl = useCallback(async (placement: AffiliatePlacementRow) => {
+    const link = rows.find((row) => row.id === placement.affiliate_link_id);
+    if (!link) return showToast('Affiliate not found for this placement.', 'error');
+    try {
+      await navigator.clipboard.writeText(internalUrlForPlacement(link.slug, placement.placement_name));
+      showToast('Placement URL copied.');
+    } catch {
+      showToast('Copy failed.', 'error');
+    }
+  }, [internalUrlForPlacement, rows, showToast]);
 
   const selectAllVisible = useCallback(() => {
     if (selectedIds.length === filteredRows.length && filteredRows.length > 0) {
@@ -882,6 +1009,7 @@ export function AffiliateHubSection({
       <div className="flex flex-wrap gap-2">
         {([
           { id: 'affiliates', label: 'Affiliates' },
+          { id: 'placements', label: 'Affiliate Placements' },
           { id: 'analytics', label: 'Analytics' },
           { id: 'opportunities', label: 'Opportunities' },
           { id: 'settings', label: 'Settings' },
@@ -1070,7 +1198,6 @@ export function AffiliateHubSection({
                               <button onClick={() => void toggleFeatured(row)} className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-100"><Star className="h-3 w-3" />{row.is_featured ? 'Unfeature' : 'Feature'}</button>
                               <button onClick={() => void copyInternalUrl(row.slug)} className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/[0.03] px-2 py-1 text-[11px] text-gray-200"><Copy className="h-3 w-3" />Copy</button>
                               <button onClick={() => window.open(row.destination_url, '_blank', 'noopener,noreferrer')} className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/[0.03] px-2 py-1 text-[11px] text-gray-200"><ExternalLink className="h-3 w-3" />Open</button>
-                              <button onClick={() => void duplicateAffiliate(row)} className="rounded-lg border border-violet-500/25 bg-violet-500/10 px-2 py-1 text-[11px] text-violet-100">Duplicate</button>
                               <button onClick={() => setConfirm({ open: true, title: `Delete ${row.name}?`, description: 'This action cannot be undone.', danger: true, onConfirm: () => { setConfirm((prev) => ({ ...prev, open: false })); void deleteAffiliate(row); } })} className="inline-flex items-center gap-1 rounded-lg border border-rose-500/25 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-100"><Trash2 className="h-3 w-3" />Delete</button>
                             </div>
                           </td>
@@ -1113,6 +1240,96 @@ export function AffiliateHubSection({
               </div>
             </>
           )}
+        </div>
+      ) : null}
+
+      {tab === 'placements' ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div className="rounded-xl border border-white/10 bg-dark-900/50 px-3 py-2"><p className="text-[10px] text-gray-500">Total placements</p><p className="text-sm font-semibold text-white tabular-nums">{placements.length}</p></div>
+            <div className="rounded-xl border border-white/10 bg-dark-900/50 px-3 py-2"><p className="text-[10px] text-gray-500">Enabled</p><p className="text-sm font-semibold text-white tabular-nums">{placements.filter((p) => p.enabled).length}</p></div>
+            <div className="rounded-xl border border-white/10 bg-dark-900/50 px-3 py-2"><p className="text-[10px] text-gray-500">Affiliates with placements</p><p className="text-sm font-semibold text-white tabular-nums">{new Set(placements.map((p) => p.affiliate_link_id)).size}</p></div>
+            <div className="rounded-xl border border-white/10 bg-dark-900/50 px-3 py-2"><p className="text-[10px] text-gray-500">Tracked clicks</p><p className="text-sm font-semibold text-white tabular-nums">{recentClicks.filter((c) => Boolean(c.placement_name)).length}</p></div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-dark-900/45 p-3 space-y-3">
+            <p className="text-[11px] uppercase tracking-[0.1em] text-emerald-200">Add or Edit Placement</p>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+              <select value={placementAffiliateId} onChange={(e) => setPlacementAffiliateId(e.target.value)} className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white">
+                <option value="">Select affiliate</option>
+                {rows.map((row) => <option key={`placement-affiliate-${row.id}`} value={row.id}>{row.name}</option>)}
+              </select>
+              <input value={placementName} onChange={(e) => setPlacementName(e.target.value)} placeholder="Placement name (example: homepage)" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
+              <input value={placementTracker} onChange={(e) => setPlacementTracker(e.target.value)} placeholder="Tracker value (example: homepage)" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
+              <label className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-gray-200">
+                <input type="checkbox" checked={placementEnabled} onChange={(e) => setPlacementEnabled(e.target.checked)} className="h-3.5 w-3.5" />
+                Enabled
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {editingPlacementId ? <button onClick={resetPlacementForm} className="rounded-lg border border-white/15 bg-white/[0.03] px-3 py-1.5 text-xs text-gray-200">Cancel edit</button> : null}
+              <button onClick={() => void savePlacement()} className="inline-flex items-center gap-1 rounded-lg border border-emerald-400/30 bg-emerald-500/12 px-3 py-1.5 text-xs text-emerald-100">
+                {editingPlacementId ? <Pencil className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                {editingPlacementId ? 'Save placement' : 'Add placement'}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-dark-900/45 p-3 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="text-xs text-gray-300">Filter by affiliate:</label>
+              <select value={placementAffiliateId} onChange={(e) => setPlacementAffiliateId(e.target.value)} className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-1.5 text-xs text-white">
+                <option value="">All affiliates</option>
+                {rows.map((row) => <option key={`placement-filter-${row.id}`} value={row.id}>{row.name}</option>)}
+              </select>
+            </div>
+
+            {placementRows.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-white/20 bg-dark-900/35 p-4 text-sm text-gray-400">No placements found for the selected filter.</div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-white/10 bg-dark-900/45">
+                <table className="min-w-[980px] w-full text-left text-xs">
+                  <thead className="bg-dark-900/70 text-gray-300">
+                    <tr>
+                      <th className="px-3 py-2">Affiliate</th>
+                      <th className="px-3 py-2">Placement</th>
+                      <th className="px-3 py-2">Tracker</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">URL</th>
+                      <th className="px-3 py-2">Updated</th>
+                      <th className="px-3 py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {placementRows.map((placement) => {
+                      const affiliate = rows.find((row) => row.id === placement.affiliate_link_id);
+                      const placementUrl = affiliate ? internalUrlForPlacement(affiliate.slug, placement.placement_name) : '-';
+                      return (
+                        <tr key={placement.id} className="border-t border-white/10 text-gray-200">
+                          <td className="px-3 py-2 font-medium">{affiliate?.name || 'Unknown affiliate'}</td>
+                          <td className="px-3 py-2">{placement.placement_name}</td>
+                          <td className="px-3 py-2">{placement.tracker_value || '-'}</td>
+                          <td className="px-3 py-2">
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] ${placement.enabled ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/30 bg-amber-500/10 text-amber-200'}`}>{placement.enabled ? 'Enabled' : 'Disabled'}</span>
+                          </td>
+                          <td className="px-3 py-2 text-cyan-200">{placementUrl}</td>
+                          <td className="px-3 py-2 text-gray-400">{new Date(placement.updated_at).toLocaleString()}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-1.5">
+                              <button onClick={() => startEditPlacement(placement)} className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-200">Edit</button>
+                              <button onClick={() => void togglePlacement(placement)} className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] text-amber-100">{placement.enabled ? 'Disable' : 'Enable'}</button>
+                              <button onClick={() => void copyPlacementUrl(placement)} className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-white/[0.03] px-2 py-1 text-[11px] text-gray-200"><Copy className="h-3 w-3" />Copy URL</button>
+                              <button onClick={() => setConfirm({ open: true, title: `Delete placement ${placement.placement_name}?`, description: 'This action cannot be undone.', danger: true, onConfirm: () => { setConfirm((prev) => ({ ...prev, open: false })); void deletePlacement(placement); } })} className="inline-flex items-center gap-1 rounded-lg border border-rose-500/25 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-100"><Trash2 className="h-3 w-3" />Delete</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
 
@@ -1163,6 +1380,43 @@ export function AffiliateHubSection({
           </div>
 
           <div className="rounded-xl border border-white/10 bg-dark-900/45 p-3">
+            <p className="text-[11px] uppercase tracking-[0.1em] text-emerald-200">Clicks By Placement</p>
+            <div className="mt-2 overflow-x-auto">
+              <table className="min-w-[920px] w-full text-left text-xs">
+                <thead className="text-gray-300">
+                  <tr>
+                    <th className="px-2 py-1.5">Partner</th>
+                    <th className="px-2 py-1.5">Placement</th>
+                    <th className="px-2 py-1.5">Today</th>
+                    <th className="px-2 py-1.5">7 Days</th>
+                    <th className="px-2 py-1.5">30 Days</th>
+                    <th className="px-2 py-1.5">Lifetime</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {placementAnalyticsRows.length === 0 ? (
+                    <tr>
+                      <td className="px-2 py-2 text-gray-500" colSpan={6}>No placement click data yet.</td>
+                    </tr>
+                  ) : placementAnalyticsRows.map((row) => {
+                    const partner = rows.find((affiliate) => affiliate.id === row.affiliateId)?.name ?? 'Unknown partner';
+                    return (
+                      <tr key={`${row.affiliateId}-${row.placementName}`} className="border-t border-white/10 text-gray-200">
+                        <td className="px-2 py-1.5">{partner}</td>
+                        <td className="px-2 py-1.5">{row.placementName}</td>
+                        <td className="px-2 py-1.5 tabular-nums">{row.today}</td>
+                        <td className="px-2 py-1.5 tabular-nums">{row.d7}</td>
+                        <td className="px-2 py-1.5 tabular-nums">{row.d30}</td>
+                        <td className="px-2 py-1.5 tabular-nums">{row.lifetime}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-dark-900/45 p-3">
             <p className="text-[11px] uppercase tracking-[0.1em] text-emerald-200">Recent Clicks</p>
             <div className="mt-2 overflow-x-auto">
               <table className="min-w-[860px] w-full text-left text-xs">
@@ -1171,6 +1425,8 @@ export function AffiliateHubSection({
                     <th className="px-2 py-1.5">Time</th>
                     <th className="px-2 py-1.5">Partner</th>
                     <th className="px-2 py-1.5">Slug</th>
+                    <th className="px-2 py-1.5">Placement</th>
+                    <th className="px-2 py-1.5">Tracker</th>
                     <th className="px-2 py-1.5">Referrer</th>
                     <th className="px-2 py-1.5">Browser</th>
                     <th className="px-2 py-1.5">Device</th>
@@ -1185,6 +1441,8 @@ export function AffiliateHubSection({
                         <td className="px-2 py-1.5">{new Date(click.created_at).toLocaleString()}</td>
                         <td className="px-2 py-1.5">{partner}</td>
                         <td className="px-2 py-1.5">{click.slug}</td>
+                        <td className="px-2 py-1.5">{click.placement_name || '-'}</td>
+                        <td className="px-2 py-1.5">{click.tracker_value || '-'}</td>
                         <td className="px-2 py-1.5 text-gray-400">{click.referrer ? click.referrer.slice(0, 64) : 'Direct'}</td>
                         <td className="px-2 py-1.5">{inferBrowser(click.user_agent)}</td>
                         <td className="px-2 py-1.5">{inferDevice(click.user_agent)}</td>

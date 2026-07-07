@@ -1,0 +1,2 @@
+-- Placeholder migration to align local history with linked remote.
+-- This file intentionally contains no SQL operations.

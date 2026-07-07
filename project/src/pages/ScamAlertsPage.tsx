@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ShieldX, ExternalLink, Loader2, AlertCircle, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SEO from '../components/SEO';
+import AffiliatePlacementCta from '../components/AffiliatePlacementCta';
 import { canonicalFromPath } from '../lib/seo';
 import { supabase } from '../lib/supabase';
 import type { Airdrop } from '../lib/types';
@@ -220,6 +221,13 @@ export default function ScamAlertsPage() {
           </p>
         </div>
       </div>
+
+      <AffiliatePlacementCta
+        source="scam-alert"
+        title="Scam Alerts safety partner"
+        subtitle="Placement tracking marks these clicks as scam-alert origin for cleaner analytics."
+        className="mb-8 px-0 py-0"
+      />
 
       {/* Scam listings */}
       {loading ? (
