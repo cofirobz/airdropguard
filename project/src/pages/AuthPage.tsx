@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, Loader2, Shield, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
 
 declare function gtag(...args: unknown[]): void;
 
@@ -77,6 +79,12 @@ export default function AuthPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-20">
+      <SEO
+        title="Account Access | AirdropGuard"
+        description="Sign in or create your AirdropGuard account."
+        canonical={canonicalFromPath('/auth')}
+        noindex
+      />
       <div className="glass-card p-8">
         <div className="flex justify-center mb-6">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-neon-purple/20 to-neon-blue/20 border border-neon-purple/20 flex items-center justify-center">

@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Activity,
   BookOpen,
+  ChevronDown,
   ChevronRight,
   Flame,
   Home,
@@ -488,6 +489,7 @@ export default function AppShell({
       title: 'Discover',
       items: [
         { to: '/', label: 'Browse Airdrops', icon: Home },
+        { to: '/#speculative-tokens', label: 'Speculative Tokens', icon: Flame },
         { to: '/?filter=trending', label: 'Trending', icon: Flame },
         { to: '/learn', label: 'Learn', icon: BookOpen },
       ],

@@ -1708,6 +1708,11 @@ export default function HomePage() {
           position: index + 1,
           url: `https://airdropguard.com/airdrop/${airdrop.slug}`,
           name: airdrop.name,
+          description: (() => {
+            const summary = String(airdrop.ai_summary ?? '').trim();
+            if (!summary || /\b(tba|to be announced|coming soon)\b/i.test(summary)) return undefined;
+            return summary;
+          })(),
         })),
       },
     ],
@@ -1957,7 +1962,7 @@ export default function HomePage() {
       </section>
 
       {speculativeTokens.length > 0 && (
-        <section className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 lg:px-8 lg:pb-8">
+        <section id="speculative-tokens" className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 lg:px-8 lg:pb-8">
           <div className="rounded-3xl border border-rose-500/20 bg-rose-500/5 p-5 sm:p-7">
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>

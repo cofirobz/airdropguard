@@ -33,6 +33,7 @@ export type ArticleReviewChecklist = {
 };
 
 export const DEFAULT_REVIEWER = 'AirdropGuard Team';
+const DEFAULT_REVIEW_DATE = '2026-06-20T00:00:00.000Z';
 
 export const DEFAULT_ARTICLE_TRUST_PROFILES: ArticleTrustProfile[] = [
   {
@@ -42,8 +43,8 @@ export const DEFAULT_ARTICLE_TRUST_PROFILES: ArticleTrustProfile[] = [
     publicationStatus: 'published',
     verificationStatus: 'verified_airdropguard',
     reviewedBy: DEFAULT_REVIEWER,
-    reviewedAt: null,
-    lastUpdatedAt: null,
+    reviewedAt: DEFAULT_REVIEW_DATE,
+    lastUpdatedAt: DEFAULT_REVIEW_DATE,
     estimatedReadMinutes: 11,
     sources: {
       officialDocsUrl: 'https://ethereum.org/en/security/',
@@ -60,8 +61,8 @@ export const DEFAULT_ARTICLE_TRUST_PROFILES: ArticleTrustProfile[] = [
     publicationStatus: 'published',
     verificationStatus: 'verified_airdropguard',
     reviewedBy: DEFAULT_REVIEWER,
-    reviewedAt: null,
-    lastUpdatedAt: null,
+    reviewedAt: DEFAULT_REVIEW_DATE,
+    lastUpdatedAt: DEFAULT_REVIEW_DATE,
     estimatedReadMinutes: 10,
     sources: {
       officialDocsUrl: null,
@@ -78,8 +79,8 @@ export const DEFAULT_ARTICLE_TRUST_PROFILES: ArticleTrustProfile[] = [
     publicationStatus: 'published',
     verificationStatus: 'verified_airdropguard',
     reviewedBy: DEFAULT_REVIEWER,
-    reviewedAt: null,
-    lastUpdatedAt: null,
+    reviewedAt: DEFAULT_REVIEW_DATE,
+    lastUpdatedAt: DEFAULT_REVIEW_DATE,
     estimatedReadMinutes: 12,
     sources: {
       officialDocsUrl: 'https://ethereum.org/en/security/scams/',
@@ -96,8 +97,8 @@ export const DEFAULT_ARTICLE_TRUST_PROFILES: ArticleTrustProfile[] = [
     publicationStatus: 'published',
     verificationStatus: 'verified_airdropguard',
     reviewedBy: DEFAULT_REVIEWER,
-    reviewedAt: null,
-    lastUpdatedAt: null,
+    reviewedAt: DEFAULT_REVIEW_DATE,
+    lastUpdatedAt: DEFAULT_REVIEW_DATE,
     estimatedReadMinutes: 16,
     sources: {
       officialDocsUrl: 'https://ethereum.org/en/layer-2/',

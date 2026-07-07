@@ -12,12 +12,14 @@ import {
   Home, Activity, CreditCard, LogOut, Settings,
 } from 'lucide-react';
 import AiOrb from '../components/AiOrb';
+import SEO from '../components/SEO';
 import { supabase } from '../lib/supabase';
 import { event as trackAnalyticsEvent } from '../lib/analytics';
 import { useAuth } from '../contexts/AuthContext';
 import type { AirdropWithTasks } from '../lib/types';
 import { getBookmarks, isMainAirdropListing } from '../lib/utils';
 import { openCopilotWithPrompt } from '../lib/copilot';
+import { canonicalFromPath } from '../lib/seo';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1356,6 +1358,12 @@ export default function CustomerDashboard() {
 
  return (
   <>
+    <SEO
+      title="Dashboard | AirdropGuard"
+      description="Private mission control dashboard."
+      canonical={canonicalFromPath('/dashboard')}
+      noindex
+    />
     {activeTab === 'overview' && (
       <div className="space-y-4 animate-in">
         <section className="mission-control-hero mission-grid relative isolate overflow-hidden rounded-[30px] border border-cyan-300/30 p-4 shadow-[0_30px_80px_rgba(2,6,23,0.65)] sm:p-6">

@@ -72,7 +72,7 @@ export function HomepageMidBannerSlot({ banner }: { banner?: SponsoredBannerData
 		active: false,
 		advertiserName: 'Mid-Page Advertiser',
 		destinationUrl: 'https://example.com/mid-page',
-		ctaText: 'Learn More',
+		ctaText: 'View sponsor details',
 		label: 'Advertisement',
 		altText: 'Homepage mid-page advertisement slot',
 	};

@@ -1,12 +1,11 @@
 import { Fragment, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Loader2, Brain, CheckCircle2,
   Eye, EyeOff,
-  Database, Shield, Activity, Mail, Users, Key, Zap, RefreshCw,
+  RefreshCw,
   Inbox, CheckCheck, XCircle, ChevronDown, ChevronUp, ExternalLink,
   FileText, Plus, X, Pencil, Trash2, AlertTriangle, LogOut, ShieldCheck, Gift,
   ImagePlus, Monitor, CalendarClock, BadgeCheck, Bell, Newspaper, Radar, Sparkles,
@@ -23,6 +22,8 @@ import {
   verificationStatusLabel,
   verificationStatusTone,
 } from '../lib/articleTrust';
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -104,29 +105,6 @@ function VerificationNotesModal({
             Save Verification
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── StatCard ─────────────────────────────────────────────────────────────────
-
-function StatCard({
-  label, value, icon: Icon, iconBg, iconClass, sub,
-}: {
-  label: string; value: number | string;
-  icon: React.ComponentType<{ className?: string }>;
-  iconBg: string; iconClass: string; sub?: string;
-}) {
-  return (
-    <div className="glass-card p-4 flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${iconBg}`}>
-        <Icon className={`w-5 h-5 ${iconClass}`} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xl font-bold text-white tabular-nums leading-tight">{value}</p>
-        <p className="text-xs text-gray-500 leading-tight mt-0.5">{label}</p>
-        {sub && <p className="text-[10px] text-gray-600 mt-0.5">{sub}</p>}
       </div>
     </div>
   );
@@ -491,14 +469,6 @@ type DiscoveryCandidate = {
   reasonDetected: string;
 };
 
-type DiscoveryExtractionResult = {
-  candidates: DiscoveryCandidate[];
-  cardsFound: number;
-  candidatesRejected: number;
-  rejectedByReason: Record<string, number>;
-  rejectionSamples: string[];
-};
-
 type PendingDiscoveryCandidate = {
   id: string;
   sourceId: string;
@@ -565,13 +535,6 @@ type CompetitorWatchScanResult = {
 
 type CompetitorWatchScanResponse = {
   results: CompetitorWatchScanResult[];
-};
-
-type SourceAdapter = {
-  id: string;
-  label: string;
-  hostPatterns: RegExp[];
-  listingPathPatterns: RegExp[];
 };
 
 type AdminNotification = {
@@ -774,57 +737,6 @@ function normalizeSourceTrustLevel(value: string | null | undefined): DiscoveryT
   if (lowered === 'high' || lowered === 'medium' || lowered === 'low') return lowered;
   return 'medium';
 }
-
-const DISCOVERY_SOURCE_ADAPTERS: SourceAdapter[] = [
-  {
-    id: 'airdrop-io',
-    label: 'airdrop.io',
-    hostPatterns: [/^airdrop\.io$/i, /(^|\.)airdrop\.io$/i],
-    listingPathPatterns: [/\/airdrop\/[a-z0-9-]{3,}/i, /\/project\/[a-z0-9-]{3,}/i],
-  },
-  {
-    id: 'airdrops-io',
-    label: 'airdrops.io',
-    hostPatterns: [/^airdrops\.io$/i, /(^|\.)airdrops\.io$/i],
-    listingPathPatterns: [/\/airdrop\//i, /\/project\//i, /\/campaign\//i, /\/token\//i],
-  },
-  {
-    id: 'airdropalert',
-    label: 'airdropalert.com',
-    hostPatterns: [/^airdropalert\.com$/i, /(^|\.)airdropalert\.com$/i],
-    listingPathPatterns: [/\/airdrops\/[a-z0-9-]{3,}/i, /\/airdrop\/[a-z0-9-]{3,}/i],
-  },
-  {
-    id: 'layer3',
-    label: 'Layer3',
-    hostPatterns: [/^layer3\.xyz$/i, /(^|\.)layer3\.xyz$/i],
-    listingPathPatterns: [/\/quests\/[a-z0-9-]{3,}/i, /\/campaigns\/[a-z0-9-]{3,}/i, /\/bounties\/[a-z0-9-]{3,}/i],
-  },
-  {
-    id: 'galxe',
-    label: 'Galxe',
-    hostPatterns: [/^galxe\.com$/i, /(^|\.)galxe\.com$/i],
-    listingPathPatterns: [/\/quest\/[a-z0-9-]{3,}/i, /\/campaign\/[a-z0-9-]{3,}/i, /\/events\/[a-z0-9-]{3,}/i],
-  },
-  {
-    id: 'intract',
-    label: 'Intract',
-    hostPatterns: [/^intract\.io$/i, /(^|\.)intract\.io$/i],
-    listingPathPatterns: [/\/quest\//i, /\/campaign\//i, /\/tasks\//i],
-  },
-  {
-    id: 'zealy',
-    label: 'Zealy',
-    hostPatterns: [/^zealy\.io$/i, /(^|\.)zealy\.io$/i],
-    listingPathPatterns: [/\/c\/[^/]+\/questboard\/[a-z0-9-]{3,}/i, /\/questboard\/[a-z0-9-]{3,}/i],
-  },
-  {
-    id: 'coinmarketcap-airdrops',
-    label: 'CoinMarketCap Airdrops',
-    hostPatterns: [/^coinmarketcap\.com$/i, /(^|\.)coinmarketcap\.com$/i],
-    listingPathPatterns: [/\/airdrop\/[a-z0-9-]{3,}/i],
-  },
-];
 
 const SOURCE_RELIABILITY_SCORES: Record<string, number> = {
   'airdrop-io': 74,
@@ -1101,31 +1013,6 @@ function getSourceHealthIndicator(successRate: number, lastStatus: CompetitorSou
   return 'amber';
 }
 
-const BLOCKCHAIN_KEYWORDS: Array<{ keyword: string; value: string }> = [
-  { keyword: 'ethereum', value: 'Ethereum' },
-  { keyword: 'base', value: 'Base' },
-  { keyword: 'arbitrum', value: 'Arbitrum' },
-  { keyword: 'optimism', value: 'Optimism' },
-  { keyword: 'solana', value: 'Solana' },
-  { keyword: 'polygon', value: 'Polygon' },
-  { keyword: 'bsc', value: 'BNB Chain' },
-  { keyword: 'bnb', value: 'BNB Chain' },
-  { keyword: 'avalanche', value: 'Avalanche' },
-  { keyword: 'sui', value: 'Sui' },
-  { keyword: 'aptos', value: 'Aptos' },
-];
-
-const CATEGORY_KEYWORDS: Array<{ keyword: string; value: string }> = [
-  { keyword: 'defi', value: 'DeFi' },
-  { keyword: 'nft', value: 'NFT' },
-  { keyword: 'gaming', value: 'Gaming' },
-  { keyword: 'social', value: 'Social' },
-  { keyword: 'infra', value: 'Infrastructure' },
-  { keyword: 'layer 2', value: 'Layer2' },
-  { keyword: 'wallet', value: 'Wallet' },
-  { keyword: 'dao', value: 'DAO' },
-];
-
 function toTitleCase(value: string): string {
   return value
     .split(' ')
@@ -1185,406 +1072,6 @@ function normalizeProjectName(name: string): string {
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function resolveSourceAdapter(sourceUrl: string): SourceAdapter | null {
-  try {
-    const hostname = new URL(sourceUrl).hostname.replace(/^www\./, '').toLowerCase();
-    return DISCOVERY_SOURCE_ADAPTERS.find((adapter) => adapter.hostPatterns.some((pattern) => pattern.test(hostname))) || null;
-  } catch {
-    return null;
-  }
-}
-
-function pickTextContent(...candidates: Array<string | null | undefined>): string | null {
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    const cleaned = candidate.replace(/\s+/g, ' ').trim();
-    if (cleaned) return cleaned;
-  }
-  return null;
-}
-
-function inferBlockchainFromText(text: string): string | null {
-  const lowered = text.toLowerCase();
-  const matched = BLOCKCHAIN_KEYWORDS.find((item) => lowered.includes(item.keyword));
-  return matched ? matched.value : null;
-}
-
-function inferCategoryFromText(text: string): string | null {
-  const lowered = text.toLowerCase();
-  const matched = CATEGORY_KEYWORDS.find((item) => lowered.includes(item.keyword));
-  return matched ? matched.value : null;
-}
-
-function extractDateFromText(text: string): string | null {
-  const isoLike = text.match(/\b\d{4}-\d{2}-\d{2}\b/);
-  if (isoLike) return isoLike[0];
-
-  const natural = text.match(/\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2}(?:,\s*\d{4})?\b/i);
-  if (natural) return natural[0];
-
-  return null;
-}
-
-function extractOfficialUrlsFromCard(card: Element, sourceUrl: string): {
-  docsUrl: string | null;
-  githubUrl: string | null;
-  xUrl: string | null;
-  discordUrl: string | null;
-} {
-  let docsUrl: string | null = null;
-  let githubUrl: string | null = null;
-  let xUrl: string | null = null;
-  let discordUrl: string | null = null;
-
-  const anchors = Array.from(card.querySelectorAll('a[href]'));
-  for (const anchor of anchors) {
-    const href = anchor.getAttribute('href');
-    if (!href) continue;
-    let resolved: URL;
-    try {
-      resolved = new URL(href, sourceUrl);
-    } catch {
-      continue;
-    }
-
-    const host = resolved.hostname.replace(/^www\./, '').toLowerCase();
-    const value = resolved.toString();
-    if (!githubUrl && host.includes('github.com')) githubUrl = value;
-    if (!xUrl && (host === 'x.com' || host.endsWith('.x.com') || host.includes('twitter.com'))) xUrl = value;
-    if (!discordUrl && (host.includes('discord.gg') || host.includes('discord.com'))) discordUrl = value;
-    if (!docsUrl && (host.includes('docs.') || resolved.pathname.toLowerCase().includes('/docs'))) docsUrl = value;
-  }
-
-  return { docsUrl, githubUrl, xUrl, discordUrl };
-}
-
-function inferFundingFromText(text: string): string | null {
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  const fundingMatch = normalized.match(/\b(raised|funded|seed|series\s+[a-z]|backed\s+by)\b[^.\n]{0,120}/i);
-  return fundingMatch ? fundingMatch[0] : null;
-}
-
-function inferTeamFromText(text: string): string | null {
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  const teamMatch = normalized.match(/\b(founder|founded\s+by|team|co-?founder)\b[^.\n]{0,120}/i);
-  return teamMatch ? teamMatch[0] : null;
-}
-
-type AdapterParserRule = {
-  cardSelectors: string[];
-  titleSelectors: string[];
-  descriptionSelectors: string[];
-  dateSelectors: string[];
-  linkSelectors: string[];
-};
-
-const ADAPTER_PARSER_RULES: Record<string, AdapterParserRule> = {
-  galxe: {
-    cardSelectors: ['[data-testid*="campaign" i]', '[data-testid*="quest" i]', 'article', 'li'],
-    titleSelectors: ['h1', 'h2', 'h3', '[data-testid*="title" i]', '[class*="title" i]'],
-    descriptionSelectors: ['p', '[data-testid*="description" i]', '[class*="desc" i]'],
-    dateSelectors: ['time', '[data-testid*="date" i]', '[class*="date" i]'],
-    linkSelectors: ['a[href*="/quest/"]', 'a[href*="/campaign/"]', 'a[href*="/events/"]'],
-  },
-  layer3: {
-    cardSelectors: ['[data-testid*="quest" i]', '[class*="quest" i]', 'article', 'li'],
-    titleSelectors: ['h1', 'h2', 'h3', '[class*="title" i]', '[class*="name" i]'],
-    descriptionSelectors: ['p', '[class*="description" i]', '[class*="summary" i]'],
-    dateSelectors: ['time', '[class*="date" i]'],
-    linkSelectors: ['a[href*="/quests/"]', 'a[href*="/campaigns/"]', 'a[href*="/bounties/"]'],
-  },
-  zealy: {
-    cardSelectors: ['[data-testid*="quest" i]', '[class*="quest" i]', 'article', 'li'],
-    titleSelectors: ['h1', 'h2', 'h3', '[class*="title" i]', '[class*="name" i]'],
-    descriptionSelectors: ['p', '[class*="description" i]', '[class*="summary" i]'],
-    dateSelectors: ['time', '[class*="date" i]'],
-    linkSelectors: ['a[href*="/questboard/"]', 'a[href*="/c/"]'],
-  },
-  airdropalert: {
-    cardSelectors: ['[class*="airdrop" i]', '[class*="post" i]', 'article', 'li'],
-    titleSelectors: ['h1', 'h2', 'h3', '[class*="title" i]', '[rel="bookmark"]'],
-    descriptionSelectors: ['p', '[class*="excerpt" i]', '[class*="summary" i]'],
-    dateSelectors: ['time', '[class*="date" i]'],
-    linkSelectors: ['a[href*="/airdrops/"]', 'a[href*="/airdrop/"]'],
-  },
-  'airdrop-io': {
-    cardSelectors: ['[class*="airdrop" i]', 'article', 'li'],
-    titleSelectors: ['h1', 'h2', 'h3', '[class*="title" i]', '[class*="name" i]'],
-    descriptionSelectors: ['p', '[class*="description" i]', '[class*="summary" i]'],
-    dateSelectors: ['time', '[class*="date" i]'],
-    linkSelectors: ['a[href*="/airdrop/"]', 'a[href*="/project/"]'],
-  },
-  'coinmarketcap-airdrops': {
-    cardSelectors: ['[data-testid*="airdrop" i]', '[class*="airdrop" i]', 'article', 'li', 'tr'],
-    titleSelectors: ['h1', 'h2', 'h3', '[class*="title" i]', '[data-testid*="name" i]'],
-    descriptionSelectors: ['p', '[class*="description" i]', '[class*="summary" i]'],
-    dateSelectors: ['time', '[class*="date" i]'],
-    linkSelectors: ['a[href*="/airdrop/"]'],
-  },
-};
-
-const DEFAULT_ADAPTER_PARSER_RULE: AdapterParserRule = {
-  cardSelectors: ['article', 'li', 'div', 'section'],
-  titleSelectors: ['h1', 'h2', 'h3', 'h4', '[class*="title" i]', '[data-testid*="title" i]'],
-  descriptionSelectors: ['p', '[class*="desc" i]', '[class*="summary" i]'],
-  dateSelectors: ['time', '[class*="date" i]', '[data-testid*="date" i]'],
-  linkSelectors: ['a[href]'],
-};
-
-const NAVIGATION_PATH_SEGMENTS = new Set([
-  'airdrop',
-  'airdrops',
-  'campaign',
-  'campaigns',
-  'quest',
-  'quests',
-  'explore',
-  'discover',
-  'leaderboard',
-  'community',
-  'communities',
-  'categories',
-  'category',
-  'tags',
-  'tag',
-  'search',
-  'news',
-  'blog',
-]);
-
-const GENERIC_CARD_TEXT_TOKENS = new Set([
-  'view details',
-  'learn more',
-  'join now',
-  'explore',
-  'see more',
-  'airdrops',
-  'campaigns',
-  'quests',
-]);
-
-function getAdapterParserRule(adapter: SourceAdapter): AdapterParserRule {
-  return ADAPTER_PARSER_RULES[adapter.id] || DEFAULT_ADAPTER_PARSER_RULE;
-}
-
-function isNavigationListingUrl(rawUrl: string): boolean {
-  try {
-    const parsed = new URL(rawUrl);
-    const parts = parsed.pathname
-      .split('/')
-      .map((part) => part.trim().toLowerCase())
-      .filter(Boolean);
-
-    if (parts.length === 0) return true;
-
-    const last = parts[parts.length - 1];
-    if (NAVIGATION_PATH_SEGMENTS.has(last)) return true;
-    if (parts.length <= 2 && parts.every((part) => NAVIGATION_PATH_SEGMENTS.has(part))) return true;
-    return false;
-  } catch {
-    return true;
-  }
-}
-
-function hasMeaningfulProjectSignal(text: string): boolean {
-  const cleaned = text.toLowerCase().replace(/\s+/g, ' ').trim();
-  if (!cleaned || cleaned.length < 20) return false;
-  return !Array.from(GENERIC_CARD_TEXT_TOKENS).every((token) => cleaned.includes(token));
-}
-
-function collectAdapterCards(doc: Document, adapter: SourceAdapter): Element[] {
-  const rule = getAdapterParserRule(adapter);
-  const cards = new Set<Element>();
-
-  for (const selector of rule.cardSelectors) {
-    const nodes = doc.querySelectorAll(selector);
-    nodes.forEach((node) => {
-      const card = node.closest('article, li, div, section, tr') || node;
-      cards.add(card);
-    });
-  }
-
-  return Array.from(cards);
-}
-
-function pickCardNodeText(card: Element, selectors: string[]): string | null {
-  for (const selector of selectors) {
-    const node = card.querySelector(selector);
-    const text = pickTextContent(node?.textContent);
-    if (text) return text;
-  }
-  return null;
-}
-
-function isProjectListingUrl(rawUrl: string, adapter: SourceAdapter): boolean {
-  if (isGenericSourceUrl(rawUrl)) return false;
-  if (isNavigationListingUrl(rawUrl)) return false;
-  return adapter.listingPathPatterns.some((pattern) => pattern.test(rawUrl));
-}
-
-function extractDiscoveryCandidatesFromHtml(
-  html: string,
-  source: CompetitorSource,
-  adapter: SourceAdapter
-): DiscoveryExtractionResult {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const cards = collectAdapterCards(doc, adapter);
-  const fallbackAnchors = cards.length === 0 ? Array.from(doc.querySelectorAll('a[href]')) : [];
-  const parserRule = getAdapterParserRule(adapter);
-  const dedupe = new Set<string>();
-  const found: DiscoveryCandidate[] = [];
-  let rejectedCount = 0;
-  const rejectedByReason: Record<string, number> = {};
-  const rejectionSamples: string[] = [];
-
-  const reject = (reason: string, sample?: string | null) => {
-    rejectedCount += 1;
-    rejectedByReason[reason] = (rejectedByReason[reason] || 0) + 1;
-    if (sample && rejectionSamples.length < 8) {
-      rejectionSamples.push(`${reason}: ${sample.slice(0, 120)}`);
-    }
-  };
-
-  const sourceHostname = (() => {
-    try {
-      return new URL(source.source_url).hostname.replace(/^www\./, '');
-    } catch {
-      return '';
-    }
-  })();
-
-  const processingUnits = cards.length > 0
-    ? cards
-    : fallbackAnchors.map((anchor) => anchor.closest('article, li, div, section, tr') || anchor);
-
-  for (const card of processingUnits) {
-    const candidateLinks = new Set<string>();
-    const scopedLinkNodes = new Set<Element>();
-
-    for (const selector of parserRule.linkSelectors) {
-      card.querySelectorAll(selector).forEach((node) => scopedLinkNodes.add(node));
-    }
-    card.querySelectorAll('a[href]').forEach((node) => scopedLinkNodes.add(node));
-
-    for (const node of Array.from(scopedLinkNodes)) {
-      const href = node.getAttribute('href');
-      if (!href) continue;
-      try {
-        const resolved = new URL(href, source.source_url).toString();
-        if (!isProjectListingUrl(resolved, adapter)) continue;
-        candidateLinks.add(resolved);
-      } catch {
-        continue;
-      }
-    }
-
-    const listingUrl = Array.from(candidateLinks)[0] || source.source_url;
-    const hasListingLink = candidateLinks.size > 0;
-
-    const rawName = pickTextContent(
-      pickCardNodeText(card, parserRule.titleSelectors),
-      card.getAttribute('data-project-name'),
-      card.getAttribute('aria-label'),
-      card.getAttribute('title')
-    );
-    const projectName = sanitizeProjectCandidate(rawName);
-
-    if (!projectName) {
-      reject('no_project_like_title', rawName);
-      continue;
-    }
-
-    if (isGenericOpportunityName(projectName)) {
-      reject('generic_project_name', projectName);
-      continue;
-    }
-
-    const shortDescription = pickCardNodeText(card, parserRule.descriptionSelectors);
-    const explicitDate = pickCardNodeText(card, parserRule.dateSelectors);
-    const listingDate = explicitDate ? extractDateFromText(explicitDate) : extractDateFromText(card.textContent || '');
-    const fullCardText = card.textContent || '';
-    const officialUrls = extractOfficialUrlsFromCard(card, source.source_url);
-    const fundingInfo = inferFundingFromText(fullCardText);
-    const teamInfo = inferTeamFromText(fullCardText);
-
-    if (!shortDescription && !listingDate && !hasMeaningfulProjectSignal(fullCardText)) {
-      continue;
-    }
-
-    const projectUrl = (() => {
-      const externalAnchors = Array.from(card.querySelectorAll('a[href^="http"]'));
-      for (const externalAnchor of externalAnchors) {
-        const value = externalAnchor.getAttribute('href');
-        if (!value) continue;
-        if (isGenericSourceUrl(value)) continue;
-        try {
-          const externalUrl = new URL(value, source.source_url);
-          if (externalUrl.hostname.replace(/^www\./, '') === sourceHostname) {
-            continue;
-          }
-          return externalUrl.toString();
-        } catch {
-          continue;
-        }
-      }
-      return null;
-    })();
-
-    const combinedText = [projectName, shortDescription, fullCardText].join(' ');
-    const blockchain = inferBlockchainFromText(combinedText);
-    const category = inferCategoryFromText(combinedText);
-    const hasDescription = Boolean(shortDescription && shortDescription.trim());
-    const hasEcosystemSignal = Boolean(blockchain || category);
-
-    if (!(hasListingLink || hasDescription || hasEcosystemSignal)) {
-      reject('missing_supporting_signal', projectName);
-      continue;
-    }
-
-    const confidence: 'low' | 'medium' | 'high' = projectUrl && shortDescription
-      ? 'high'
-      : shortDescription || listingDate
-      ? 'medium'
-      : 'low';
-
-    const dedupeKey = `${normalizeProjectName(projectName)}::${listingUrl}`;
-    if (dedupe.has(dedupeKey)) {
-      reject('duplicate_candidate', projectName);
-      continue;
-    }
-    dedupe.add(dedupeKey);
-
-    found.push({
-      projectName,
-      projectUrl,
-      listingUrl,
-      blockchain,
-      category,
-      shortDescription,
-      listingDate,
-      confidence,
-      sourceLabel: adapter.label,
-      officialDocsUrl: officialUrls.docsUrl,
-      githubUrl: officialUrls.githubUrl,
-      officialXUrl: officialUrls.xUrl,
-      officialDiscordUrl: officialUrls.discordUrl,
-      fundingInfo,
-      teamInfo,
-      detectedKeywords: [],
-      reasonDetected: 'Detected by adapter card extraction.',
-    });
-  }
-
-  return {
-    candidates: found,
-    cardsFound: processingUnits.length,
-    candidatesRejected: rejectedCount,
-    rejectedByReason,
-    rejectionSamples,
-  };
 }
 
 const COMPETITOR_STATUS_META: Record<CompetitorOpportunityStatus, { label: string; tone: string }> = {
@@ -1920,7 +1407,7 @@ const BLANK_BANNER_FORM: BannerFormData = {
   archived: false,
 };
 
-function deriveBannerStatus(status: BannerStatus, startDate: string, endDate: string): BannerStatus {
+function deriveBannerStatus(status: BannerStatus, _startDate: string, endDate: string): BannerStatus {
   if (status === 'Expired') return 'Expired';
   const now = new Date().getTime();
   const endMs = endDate ? new Date(endDate).getTime() : Number.NaN;
@@ -1936,6 +1423,11 @@ function getBannerStatusClass(status: BannerStatus): string {
   if (status === 'Enquiry') return 'text-violet-300 border-violet-500/25 bg-violet-500/10';
   if (status === 'Expired') return 'text-rose-300 border-rose-500/25 bg-rose-500/10';
   return 'text-gray-300 border-white/15 bg-white/[0.04]';
+}
+
+function hasLastAnalyzedAt(airdrop: Airdrop): boolean {
+  const value = (airdrop as Airdrop & { last_analyzed_at?: string | null }).last_analyzed_at;
+  return Boolean(String(value ?? '').trim());
 }
 
 function getBannerDisplayStatus(status: BannerStatus, startDate: string, endDate: string): BannerDisplayStatus {
@@ -3021,7 +2513,7 @@ export default function AdminPage() {
   const [competitorErrorDetails, setCompetitorErrorDetails] = useState<string | null>(null);
   const [competitorNotConfigured, setCompetitorNotConfigured] = useState(false);
   const [competitorSourceScanResults, setCompetitorSourceScanResults] = useState<Record<string, CompetitorSourceScanResult>>({});
-  const [competitorScanDebugResults, setCompetitorScanDebugResults] = useState<Record<string, CompetitorScanDebugResult>>({});
+  const [, setCompetitorScanDebugResults] = useState<Record<string, CompetitorScanDebugResult>>({});
   const [previewScanModeEnabled, setPreviewScanModeEnabled] = useState(false);
   const [pendingDiscoveryCandidates, setPendingDiscoveryCandidates] = useState<PendingDiscoveryCandidate[]>([]);
   const [checkingCompetitors, setCheckingCompetitors] = useState(false);
@@ -3047,29 +2539,10 @@ export default function AdminPage() {
     () => banners.filter((b) => b.status === 'Enquiry' || b.status === 'Awaiting Artwork').length,
     [banners]
   );
-  const liveBannerAds = useMemo(
-    () => banners.filter((b) => deriveBannerStatus(b.status, b.startDate, b.endDate) === 'Live' && b.enabled).length,
-    [banners]
-  );
-  const expiringBannerAds = useMemo(() => {
-    const now = new Date().getTime();
-    const inSevenDays = now + 7 * 86_400_000;
-    return banners.filter((b) => {
-      if (!b.endDate) return false;
-      const endMs = new Date(b.endDate).getTime();
-      return Number.isFinite(endMs) && endMs >= now && endMs <= inSevenDays;
-    }).length;
-  }, [banners]);
   const pendingScamReports = useMemo(
     () => scamReports.filter((r) => r.status === 'pending').length,
     [scamReports]
   );
-  const siteHealthIssues = useMemo(() => {
-    const unpublished = (stats?.totalAirdrops ?? 0) - (stats?.publishedAirdrops ?? 0);
-    const unscored = (stats?.totalAirdrops ?? 0) - (stats?.scoredAirdrops ?? 0);
-    const unanalyzed = (stats?.totalAirdrops ?? 0) - (stats?.analyzedAirdrops ?? 0);
-    return Math.max(0, unpublished) + Math.max(0, unscored) + Math.max(0, unanalyzed);
-  }, [stats]);
 
   const expiringListings = useMemo(() => {
     const now = Date.now();
@@ -3081,10 +2554,7 @@ export default function AdminPage() {
     });
   }, [airdrops]);
 
-  const failedAiQueue = useMemo(
-    () => airdrops.filter((a) => !(a.last_analyzed_at && String(a.last_analyzed_at).trim())),
-    [airdrops]
-  );
+  const failedAiQueue = useMemo(() => airdrops.filter((a) => !hasLastAnalyzedAt(a)), [airdrops]);
 
   const missingProjectInfo = useMemo(() => {
     const asRecord = (item: Airdrop) => item as unknown as Record<string, unknown>;
@@ -3114,21 +2584,6 @@ export default function AdminPage() {
     () => controlArticles.filter((a) => a.status !== 'published'),
     [controlArticles]
   );
-
-  const bannerDisplaySummary = useMemo(() => {
-    let active = 0;
-    let scheduled = 0;
-    let expired = 0;
-
-    banners.forEach((banner) => {
-      const display = getBannerDisplayStatus(banner.status, banner.startDate, banner.endDate);
-      if (display === 'Active') active += 1;
-      if (display === 'Scheduled') scheduled += 1;
-      if (display === 'Expired') expired += 1;
-    });
-
-    return { active, scheduled, expired };
-  }, [banners]);
 
   const filteredUsers = useMemo(() => {
     if (!userSearch.trim()) return opsUsers;
@@ -6086,13 +5541,6 @@ export default function AdminPage() {
         human_verified: existing?.human_verified ?? false,
       });
 
-      const parsedOverrideScore = normalizedForm.human_override_score.trim() === ''
-        ? null
-        : Math.max(0, Math.min(100, Number.parseInt(normalizedForm.human_override_score, 10)));
-
-      const fallbackScore = existing?.trust_score ?? null;
-      const finalPublishedScore = parsedOverrideScore ?? fallbackScore;
-
       currentStep = 'prepare_payload';
       const payload = {
         name: normalizedForm.name.trim(),
@@ -7414,6 +6862,12 @@ export default function AdminPage() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden pb-28 lg:pb-8">
+      <SEO
+        title="Admin | AirdropGuard"
+        description="Private admin control centre."
+        canonical={canonicalFromPath('/admin')}
+        noindex
+      />
       <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-dark-950/95 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="min-w-0">
@@ -9069,7 +8523,7 @@ export default function AdminPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           <button onClick={refreshAllAnalysis} className="px-3 py-2 rounded-xl border border-violet-400/25 bg-violet-500/10 text-xs text-violet-200">Refresh all projects</button>
           <button onClick={() => jumpToSection('admin-ai-queue')} className="px-3 py-2 rounded-xl border border-violet-400/25 bg-violet-500/10 text-xs text-violet-200">Failed AI queue</button>
-          <button onClick={() => openFirstAirdropMatch((a) => !(a.last_analyzed_at && String(a.last_analyzed_at).trim()), 'No failed AI analysis found')} className="px-3 py-2 rounded-xl border border-violet-400/25 bg-violet-500/10 text-xs text-violet-200">Reanalyse project</button>
+          <button onClick={() => openFirstAirdropMatch((a) => !hasLastAnalyzedAt(a), 'No failed AI analysis found')} className="px-3 py-2 rounded-xl border border-violet-400/25 bg-violet-500/10 text-xs text-violet-200">Reanalyse project</button>
           <button onClick={() => window.open('https://status.openai.com', '_blank', 'noopener,noreferrer')} className="px-3 py-2 rounded-xl border border-violet-400/25 bg-violet-500/10 text-xs text-violet-200">OpenAI status</button>
         </div>
         <div className="text-xs text-gray-300">AI health: {stats?.analyzedAirdrops ?? 0}/{stats?.totalAirdrops ?? 0} projects analysed.</div>
@@ -9660,7 +9114,7 @@ export default function AdminPage() {
                       </p>
                     )}
                     <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">AI analysis: {a.last_analyzed_at ? 'Available' : 'Not run'}</div>
+                      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">AI analysis: {hasLastAnalyzedAt(a) ? 'Available' : 'Not run'}</div>
                       <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">Reviewer notes: {a.blacklist_reason ? 'Available' : 'None'}</div>
                     </div>
                     {a.blacklist_reason && <p className="text-[11px] text-amber-300">Notes: {a.blacklist_reason}</p>}

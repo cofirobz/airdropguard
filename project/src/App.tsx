@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
@@ -68,6 +68,7 @@ function App() {
                 <Route path="auth" element={<AuthPage />} />
                 <Route path="dashboard" element={<CustomerDashboard />} />
                 <Route path="learn" element={<LearnPage />} />
+                <Route path="more" element={<Navigate to="/dashboard" replace />} />
                 <Route path="api-pricing" element={<PricingPage />} />
                 <Route path="pricing" element={<PricingPage />} />
                 <Route path="scam-alerts" element={<ScamAlertsPage />} />

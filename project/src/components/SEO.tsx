@@ -26,6 +26,7 @@ export default function SEO({
 }: SEOProps) {
   const pageUrl = canonical || SITE_URL;
   const fullTitle = title.includes(SITE_NAME) ? title : `${title} | ${SITE_NAME}`;
+  const jsonLdBlocks = (Array.isArray(schema) ? schema : schema ? [schema] : []).filter(Boolean);
 
   return (
     <Helmet>
@@ -51,12 +52,13 @@ export default function SEO({
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={image} />
+      <meta name="twitter:url" content={pageUrl} />
 
-      {schema && (
-        <script type="application/ld+json">
-          {JSON.stringify(schema)}
+      {jsonLdBlocks.map((entry, index) => (
+        <script key={`jsonld-${index}`} type="application/ld+json">
+          {JSON.stringify(entry)}
         </script>
-      )}
+      ))}
     </Helmet>
   );
 }

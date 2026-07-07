@@ -258,7 +258,7 @@ function Footer() {
               aria-label="AirdropGuard home"
             >
               <img
-                src="/favicon.svg"
+                src="/airdrop_guards.webp"
                 alt="AirdropGuard"
                 width={44}
                 height={44}
@@ -552,7 +552,7 @@ export default function Layout() {
               aria-label="AirdropGuard home"
             >
               <img
-                src="/favicon.svg"
+                src="/airdrop_guards.webp"
                 alt="AirdropGuard"
                 width={44}
                 height={44}

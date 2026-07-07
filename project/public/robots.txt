@@ -1,6 +1,12 @@
 # Allow all compliant search engines
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /auth
+Disallow: /test
+Disallow: /dev
+Disallow: /private
 
 # Block AI training bots
 User-agent: GPTBot

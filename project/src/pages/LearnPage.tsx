@@ -468,6 +468,15 @@ export default function LearnPage() {
   const visible = tab === 'all' ? GUIDES : GUIDES.filter(g => g.category === tab);
   const cryptoGuides  = visible.filter(g => g.category === 'Crypto Basics');
   const devGuides     = visible.filter(g => g.category === 'Developer & API');
+  const schemaReadyGuides = useMemo(
+    () => GUIDES.filter((guide) => {
+      const title = guide.title.trim();
+      const summary = guide.summary.trim();
+      if (!title || !summary) return false;
+      return !/\b(tba|to be announced|coming soon)\b/i.test(`${title} ${summary}`);
+    }),
+    [],
+  );
   const learnSchema = useMemo(() => ({
     '@context': 'https://schema.org',
     '@graph': [
@@ -482,17 +491,17 @@ export default function LearnPage() {
       {
         '@type': 'FAQPage',
         '@id': 'https://airdropguard.com/learn#faq',
-        mainEntity: GUIDES.slice(0, 10).map((guide) => ({
+        mainEntity: schemaReadyGuides.map((guide) => ({
           '@type': 'Question',
           name: guide.title,
           acceptedAnswer: {
             '@type': 'Answer',
-            text: guide.paras[0] ?? guide.summary,
+            text: guide.summary,
           },
         })),
       },
     ],
-  }), []);
+  }), [schemaReadyGuides]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
