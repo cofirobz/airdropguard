@@ -31,12 +31,14 @@ export default function RecommendedToolsPage() {
         const { data, error } = await supabase
           .from('affiliate_links_public')
           .select('id, name, slug, category, description, disclosure_text, logo_url, is_featured, priority_order')
+          .order('is_featured', { ascending: false })
           .order('priority_order', { ascending: true });
 
         if (error) throw error;
         if (!active) return;
         setTools((data ?? []) as RecommendedTool[]);
-      } catch {
+      } catch (error) {
+        console.error('[Public][RecommendedTools] Failed to load affiliate_links_public', error);
         if (!active) return;
         setTools([]);
       } finally {
@@ -72,7 +74,7 @@ export default function RecommendedToolsPage() {
         {loading ? (
           <div className="rounded-xl border border-white/10 bg-dark-900/50 p-4 text-sm text-gray-300">Loading tools...</div>
         ) : tools.length === 0 ? (
-          <div className="rounded-xl border border-white/10 bg-dark-900/50 p-4 text-sm text-gray-300">No active affiliate tools are available right now.</div>
+          <div className="rounded-xl border border-white/10 bg-dark-900/50 p-4 text-sm text-gray-300">No recommended tools are active yet.</div>
         ) : (
           tools.map((tool) => (
             <article key={tool.id} className="rounded-xl border border-white/10 bg-dark-900/50 p-4">
