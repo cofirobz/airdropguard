@@ -45,16 +45,28 @@ function isAuthenticatedAppPath(pathname: string): boolean {
 
 const PUBLIC_MENU_GROUPS_STORAGE_KEY = "ag_public_mobile_menu_groups_v1";
 
-declare function gtag(...args: unknown[]): void;
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
 
 function usePageTracking() {
   const location = useLocation();
+  const lastTrackedPathRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (typeof gtag === "undefined") return;
+    const gtag = window.gtag;
+    if (typeof gtag !== "function") return;
+
+    const path = location.pathname + location.search;
+    if (lastTrackedPathRef.current === path) return;
+
+    lastTrackedPathRef.current = path;
 
     gtag("event", "page_view", {
-      page_path: location.pathname + location.search,
+      page_path: path,
+      page_location: window.location.href,
       page_title: document.title,
     });
   }, [location.pathname, location.search]);

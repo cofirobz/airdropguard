@@ -26,6 +26,24 @@
   <meta name="twitter:description" content="Discover verified crypto airdrops, review AI-assisted trust signals, check wallet safety and research before you connect." />
   <meta name="twitter:image" content="https://airdropguard.com/airdrop_guards.png" />
 
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+
+    var GA_PRODUCTION_HOSTS = ['airdropguard.com', 'www.airdropguard.com'];
+    var isProductionHost = GA_PRODUCTION_HOSTS.indexOf(window.location.hostname) !== -1;
+
+    if (isProductionHost) {
+      var gaScript = document.createElement('script');
+      gaScript.async = true;
+      gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-VM7RM4GBJ1';
+      document.head.appendChild(gaScript);
+
+      gtag('js', new Date());
+      gtag('config', 'G-VM7RM4GBJ1', { send_page_view: false });
+    }
+  </script>
+
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -60,22 +78,5 @@
   <div id="root"></div>
 
   <script type="module" src="/src/main.tsx"></script>
-
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-
-    window.addEventListener('load', function () {
-      setTimeout(function () {
-        var script = document.createElement('script');
-        script.async = true;
-        script.src = 'https://www.googletagmanager.com/gtag/js?id=G-VM7RM4GBJ1';
-        document.head.appendChild(script);
-
-        gtag('js', new Date());
-        gtag('config', 'G-VM7RM4GBJ1', { send_page_view: false });
-      }, 3200);
-    });
-  </script>
 </body>
 </html>
