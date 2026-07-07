@@ -22,12 +22,27 @@ const AuthContext = createContext<AuthContextValue>({
   signOut: async () => {},
 });
 
-async function resolveAdmin(userId: string): Promise<boolean> {
-  const { data } = await supabase
+async function resolveAdmin(user: User): Promise<boolean> {
+  const appRole = typeof user.app_metadata?.role === 'string' ? user.app_metadata.role.toLowerCase() : '';
+  const userRole = typeof user.user_metadata?.role === 'string' ? user.user_metadata.role.toLowerCase() : '';
+  if (appRole === 'admin' || userRole === 'admin') return true;
+
+  const { data, error } = await supabase
     .from('admin_users')
     .select('id')
-    .eq('id', userId)
+    .eq('id', user.id)
     .maybeSingle();
+
+  if (error) {
+    console.error('[Auth] Failed to resolve admin status', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    return false;
+  }
+
   return !!data;
 }
 
@@ -42,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        const admin = await resolveAdmin(session.user.id);
+        const admin = await resolveAdmin(session.user);
         setIsAdmin(admin);
       }
       setLoading(false);
@@ -52,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        const admin = await resolveAdmin(session.user.id);
+        const admin = await resolveAdmin(session.user);
         setIsAdmin(admin);
       } else {
         setIsAdmin(false);

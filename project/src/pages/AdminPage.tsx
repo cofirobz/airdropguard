@@ -5840,7 +5840,6 @@ export default function AdminPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate('/auth?redirect=/admin'); return; }
-    if (!isAdmin) { navigate('/'); }
   }, [authLoading, user, isAdmin, navigate]);
 
   // ── Fetch airdrops ─────────────────────────────────────────────────────────
@@ -6858,7 +6857,33 @@ export default function AdminPage() {
     );
   }
 
-  if (!isAdmin) return null;
+  if (!isAdmin) {
+    return (
+      <div className="min-h-[70vh] px-4 py-12 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-xl rounded-2xl border border-white/10 bg-dark-900/70 p-6 text-center shadow-xl">
+          <ShieldCheck className="mx-auto h-8 w-8 text-cyan-300" />
+          <h1 className="mt-3 text-xl font-semibold text-white">Admin access required</h1>
+          <p className="mt-2 text-sm text-gray-300">
+            This account is signed in but does not have permission to open the admin control centre.
+          </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <button
+              onClick={() => navigate('/')}
+              className="inline-flex min-h-[42px] items-center justify-center rounded-xl border border-white/15 px-4 py-2 text-sm font-medium text-gray-200 hover:border-white/30 hover:bg-white/5"
+            >
+              Go to home
+            </button>
+            <button
+              onClick={() => navigate('/auth?redirect=/admin')}
+              className="inline-flex min-h-[42px] items-center justify-center rounded-xl border border-cyan-400/35 bg-cyan-500/15 px-4 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/25"
+            >
+              Switch account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen overflow-x-hidden pb-28 lg:pb-8">
