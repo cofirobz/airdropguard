@@ -35,6 +35,7 @@ function isAuthenticatedAppPath(pathname: string): boolean {
     pathname === "/" ||
     pathname.startsWith("/airdrop/") ||
     pathname.startsWith("/dashboard") ||
+    pathname === "/recommended-tools" ||
     pathname === "/wallet-checker" ||
     pathname === "/scam-alerts" ||
     pathname === "/pricing" ||
@@ -147,6 +148,14 @@ function buildRouteHeaderContent(pathname: string, search: string) {
     };
   }
 
+  if (pathname === '/recommended-tools') {
+    return {
+      eyebrow: 'Recommendations',
+      title: 'Recommended Tools',
+      subtitle: 'Trusted partner tools curated for safer Web3 workflows.',
+    };
+  }
+
   if (pathname === '/learn' || pathname === '/articles' || pathname.startsWith('/articles/')) {
     return {
       eyebrow: 'Learn',
@@ -180,6 +189,7 @@ function buildRouteHeaderContent(pathname: string, search: string) {
 
 const primaryNavItems = [
   { to: "/", label: "Airdrops", icon: Home },
+  { to: "/recommended-tools", label: "Recommended Tools", icon: Star },
   { to: "/wallet-checker", label: "Wallet Intelligence", icon: Wallet },
   { to: "/dashboard", label: "Copilot", icon: Bot },
   { to: "/pricing", label: "Pricing", icon: Key },
@@ -187,6 +197,7 @@ const primaryNavItems = [
 
 const researchNavItems = [
   { to: "/articles", label: "Articles", icon: Newspaper },
+  { to: "/recommended-tools", label: "Recommended Tools", icon: Star },
   { to: "/whitepaper", label: "Whitepaper", icon: FileText },
   { to: "/scam-alerts", label: "Scam Alerts", icon: Shield },
 ];
@@ -223,6 +234,7 @@ const footerColumns = [
     title: "Airdrops",
     links: [
       { to: "/", label: "Browse Airdrops" },
+      { to: "/recommended-tools", label: "Recommended Tools" },
       { to: "/?filter=trending", label: "Trending Airdrops" },
       { to: "/?filter=ending", label: "Ending Soon" },
       { to: "/scam-alerts", label: "Scam Alerts" },
@@ -233,6 +245,7 @@ const footerColumns = [
     links: [
       { to: "/learn", label: "Learn" },
       { to: "/articles", label: "Articles" },
+      { to: "/recommended-tools", label: "Recommended Tools" },
       { to: "/whitepaper", label: "Whitepaper" },
       { to: "/wallet-checker", label: "Wallet Checker" },
     ],
@@ -494,6 +507,7 @@ export default function Layout() {
       items: [
         { to: '/', label: 'Browse Airdrops', icon: Home },
         { to: '/?filter=trending', label: 'Trending', icon: Flame },
+        { to: '/recommended-tools', label: 'Recommended Tools', icon: Star },
         { to: '/learn', label: 'Learn', icon: BookOpen },
       ],
     },

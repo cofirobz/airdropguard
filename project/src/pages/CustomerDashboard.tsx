@@ -1520,7 +1520,7 @@ export default function CustomerDashboard() {
                 </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
                 <div className="relative sm:max-w-xs">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <input
@@ -1539,6 +1539,13 @@ export default function CustomerDashboard() {
                   <RefreshCw className="h-4 w-4" />
                   Refresh
                 </button>
+                <Link
+                  to="/recommended-tools"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/14 px-4 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/24"
+                >
+                  <Star className="h-3.5 w-3.5" />
+                  Recommended Tools
+                </Link>
                 {featuredMission ? (
                   <Link
                     to={`/airdrop/${featuredMission.slug}`}

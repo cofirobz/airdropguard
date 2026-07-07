@@ -184,6 +184,20 @@ function normalizeSlug(input: string): string {
     .replace(/^-|-$/g, '');
 }
 
+function normalizeOptionalHttpUrl(input: string): string | null {
+  const raw = input.trim();
+  if (!raw) return null;
+
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(withProtocol);
+    if (!/^https?:$/i.test(parsed.protocol)) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 function safeHost(): string {
   if (typeof window === 'undefined') return 'https://airdropguard.com';
   return window.location.origin;
@@ -593,11 +607,13 @@ export function AffiliateHubSection({
   const saveAffiliateLink = useCallback(async () => {
     const slug = normalizeSlug(form.slug);
     const destination = form.destination_url.trim();
+    const normalizedLogoUrl = normalizeOptionalHttpUrl(form.logo_url);
 
     if (!form.name.trim()) return showToast('Partner name is required.', 'error');
     if (!slug) return showToast('Slug is required.', 'error');
     if (!/^https?:\/\//i.test(destination)) return showToast('Destination URL must start with http:// or https://', 'error');
     if (form.is_active && !destination) return showToast('Cannot enable an affiliate without destination URL.', 'error');
+    if (form.logo_url.trim() && !normalizedLogoUrl) return showToast('Logo URL must be a valid http(s) URL.', 'error');
 
     const duplicateByName = rows.some((row) => row.name.toLowerCase() === form.name.trim().toLowerCase() && row.id !== editingId);
     if (duplicateByName) return showToast('An affiliate partner with this name already exists. Use one record per company.', 'error');
@@ -610,7 +626,7 @@ export function AffiliateHubSection({
         category: form.category.trim() || null,
         description: form.description.trim() || null,
         destination_url: destination,
-        logo_url: form.logo_url.trim() || null,
+        logo_url: normalizedLogoUrl,
         disclosure_text: form.disclosure_text.trim() || null,
         affiliate_network: form.affiliate_network.trim() || null,
         commission_rate: form.commission_rate.trim() || null,

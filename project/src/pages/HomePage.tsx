@@ -1819,6 +1819,13 @@ export default function HomePage() {
                 Start Free
                 <ArrowRight className="h-4 w-4" />
               </Link>
+              <Link
+                to="/recommended-tools"
+                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-emerald-400/25 bg-emerald-500/12 px-6 py-3 text-sm font-bold text-emerald-100 backdrop-blur transition-colors hover:bg-emerald-500/20"
+              >
+                <Star className="h-4 w-4" />
+                Recommended Tools
+              </Link>
               <a
                 href="#live-opportunities"
                 className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] px-6 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/[0.1]"

@@ -117,6 +117,7 @@ export function isAuthenticatedAppPath(pathname: string): boolean {
     pathname === '/' ||
     pathname.startsWith('/airdrop/') ||
     pathname.startsWith('/dashboard') ||
+    pathname === '/recommended-tools' ||
     pathname === '/wallet-checker' ||
     pathname === '/scam-alerts' ||
     pathname === '/pricing' ||
@@ -250,6 +251,12 @@ function buildSidebarItems(pathname: string, search: string): NavItem[] {
       label: 'Trending',
       icon: Flame,
       active: pathname === '/' && search === '?filter=trending',
+    },
+    {
+      to: '/recommended-tools',
+      label: 'Recommended Tools',
+      icon: Star,
+      active: pathname === '/recommended-tools',
     },
     {
       to: '/wallet-checker',
@@ -491,6 +498,7 @@ export default function AppShell({
         { to: '/', label: 'Browse Airdrops', icon: Home },
         { to: '/#speculative-tokens', label: 'Speculative Tokens', icon: Flame },
         { to: '/?filter=trending', label: 'Trending', icon: Flame },
+        { to: '/recommended-tools', label: 'Recommended Tools', icon: Star },
         { to: '/learn', label: 'Learn', icon: BookOpen },
       ],
     },
