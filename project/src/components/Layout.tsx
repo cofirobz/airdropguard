@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import type React from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import {
@@ -26,9 +26,8 @@ import {
   UserCircle2,
 } from "lucide-react";
 import SocialLinksStrip from "./SocialLinksStrip";
+import AppShell from "./AppShell";
 import { useAuth } from "../contexts/AuthContext";
-
-const AppShell = lazy(() => import("./AppShell"));
 
 function isAuthenticatedAppPath(pathname: string): boolean {
   return (
