@@ -24,7 +24,7 @@ import {
 } from '../lib/articleTrust';
 import SEO from '../components/SEO';
 import { canonicalFromPath } from '../lib/seo';
-import { AffiliateHubSection } from '../components/admin/AffiliateHubSection';
+import { AffiliateHubSection } from '../components/admin/AffiliateHubSection.tsx';
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 

@@ -5,11 +5,11 @@ import { AuthProvider } from './contexts/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
 import ScrollToTop from './components/ScrollToTop';
 import { FcaRiskBanner } from './components/FcaRiskBanner';
+import AdminPage from './pages/AdminPage';
 
 const Layout = lazy(() => import('./components/Layout'));
 const HomePage = lazy(() => import('./pages/HomePage'));
 const AirdropDetailPage = lazy(() => import('./pages/AirdropDetailPage'));
-const AdminPage = lazy(() => import('./pages/AdminPage'));
 const AirdropImportPage = lazy(() => import('./pages/AirdropImportPage'));
 const AdvertisePage = lazy(() => import('./pages/AdvertisePage'));
 const ApiDocsPage = lazy(() => import('./pages/ApiDocsPage'));
