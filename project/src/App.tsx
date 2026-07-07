@@ -21,6 +21,8 @@ const ScamAlertsPage = lazy(() => import('./pages/ScamAlertsPage'));
 const SubmitAirdropPage = lazy(() => import('./pages/SubmitAirdropPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const WalletCheckerPage = lazy(() => import('./pages/WalletCheckerPage'));
+const GoRedirectPage = lazy(() => import('./pages/GoRedirectPage'));
+const RecommendedToolsPage = lazy(() => import('./pages/RecommendedToolsPage'));
 const ArticlesPage = lazy(() => import('./pages/ArticlesPage'));
 const Layer2page = lazy(() => import('./pages/Layer2page'));
 const VerifyCryptoAirdropsSafely2026Page = lazy(() => import('./pages/VerifyCryptoAirdropsSafely2026Page'));
@@ -67,10 +69,12 @@ function App() {
                 <Route path="api-docs" element={<ApiDocsPage />} />
                 <Route path="auth" element={<AuthPage />} />
                 <Route path="dashboard" element={<CustomerDashboard />} />
+                <Route path="go/:slug" element={<GoRedirectPage />} />
                 <Route path="learn" element={<LearnPage />} />
                 <Route path="more" element={<Navigate to="/dashboard" replace />} />
                 <Route path="api-pricing" element={<Navigate to="/pricing" replace />} />
                 <Route path="pricing" element={<PricingPage />} />
+                <Route path="recommended-tools" element={<RecommendedToolsPage />} />
                 <Route path="scam-alerts" element={<ScamAlertsPage />} />
                 <Route path="submit" element={<SubmitAirdropPage />} />
                 <Route path="terms" element={<TermsPage />} />

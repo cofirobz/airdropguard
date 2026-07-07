@@ -24,6 +24,7 @@ import {
 } from '../lib/articleTrust';
 import SEO from '../components/SEO';
 import { canonicalFromPath } from '../lib/seo';
+import { AffiliateHubSection } from '../components/admin/AffiliateHubSection';
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -305,7 +306,7 @@ interface BannerAd {
 type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt'>;
 
 type ContentView = 'airdrops' | 'articles' | 'hero' | 'featured' | 'trending' | 'learn' | 'sections';
-type AdminView = 'overview' | 'airdrops' | 'speculative-tokens' | 'submissions' | 'competitor-watch' | 'ignored-deleted-projects' | 'articles' | 'social-admin' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
+type AdminView = 'overview' | 'airdrops' | 'speculative-tokens' | 'submissions' | 'competitor-watch' | 'ignored-deleted-projects' | 'articles' | 'social-admin' | 'affiliate-hub' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
 
 interface ControlArticle {
   id: string;
@@ -2448,7 +2449,7 @@ export default function AdminPage() {
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [bannerForm, setBannerForm] = useState<BannerFormData>(BLANK_BANNER_FORM);
   const [previewBannerId, setPreviewBannerId] = useState<string | null>(null);
-  const [adminView, setAdminView] = useState<AdminView>('overview');
+  const [adminView, setAdminView] = useState<AdminView>('affiliate-hub');
   const [contentView, setContentView] = useState<ContentView>('airdrops');
   const [controlArticles, setControlArticles] = useState<ControlArticle[]>([
     {
@@ -2931,18 +2932,18 @@ export default function AdminPage() {
   }, [deletedSuppressions]);
 
   const adminNavItems: Array<{ id: AdminView; label: string; blurb: string }> = useMemo(() => [
-    { id: 'overview', label: 'Overview', blurb: 'Command centre summary and alerts' },
-    { id: 'airdrops', label: 'Airdrops', blurb: 'Listings, publish, health, queue' },
-    { id: 'speculative-tokens', label: 'Speculative Tokens', blurb: 'High-risk token listings and security review' },
-    { id: 'submissions', label: 'Submissions', blurb: 'Project and scam report triage' },
-    { id: 'competitor-watch', label: 'Competitor Watch', blurb: 'Missing-opportunity monitoring' },
-    { id: 'ignored-deleted-projects', label: 'Ignored / Deleted Projects', blurb: 'Suppression fingerprints and restore controls' },
-    { id: 'articles', label: 'Articles', blurb: 'Unified content editor, SEO and publishing workflow' },
-    { id: 'social-admin', label: 'Social Admin', blurb: 'Discord update queue, approvals and scheduling' },
-    { id: 'advertise-admin', label: 'Advertise Admin', blurb: 'Paid visibility, API and campaign operations' },
+    { id: 'overview', label: 'Overview', blurb: 'KPI cards, activity and quick actions' },
+    { id: 'airdrops', label: 'Airdrops', blurb: 'Listings, publish queue, health and lifecycle' },
+    { id: 'speculative-tokens', label: 'Scam Alerts', blurb: 'High-risk/speculative token monitoring and controls' },
+    { id: 'submissions', label: 'Submissions', blurb: 'Project submissions and scam report triage' },
+    { id: 'competitor-watch', label: 'Analytics', blurb: 'Discovery analytics, monitoring and competitor signals' },
+    { id: 'articles', label: 'Articles & SEO', blurb: 'Unified content editor, SEO and publishing workflow' },
+    { id: 'social-admin', label: 'Settings', blurb: 'Operational settings and social publishing controls' },
+    { id: 'affiliate-hub', label: 'Affiliate Hub', blurb: 'Partner links, placements, opportunities and click analytics' },
+    { id: 'advertise-admin', label: 'API & Subscriptions', blurb: 'Paid visibility, API products and subscriber operations' },
     { id: 'users', label: 'Users', blurb: 'Users and adoption overview' },
-    { id: 'audit-logs', label: 'Audit Logs', blurb: 'Human decision trail' },
-    { id: 'system-tools', label: 'System Tools', blurb: 'AI queue and system maintenance' },
+    { id: 'audit-logs', label: 'Audit Log', blurb: 'Human decision trail and admin actions' },
+    { id: 'system-tools', label: 'System Tools', blurb: 'AI queue and maintenance operations' },
   ], []);
 
   const activeAdminNavItem = useMemo(
@@ -6290,10 +6291,9 @@ export default function AdminPage() {
       fetchAIDrafts();
       fetchCompetitorWatchData();
       fetchAdminNotifications();
-      fetchDeletedSuppressions();
       fetchDiscordSocialOps();
     }
-  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications, fetchDeletedSuppressions, fetchDiscordSocialOps]);
+  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications, fetchDiscordSocialOps]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -6905,7 +6905,7 @@ export default function AdminPage() {
               : <Brain className="w-4 h-4" />}
             {refreshingAll ? 'Analyzing…' : 'Refresh All AI'}
           </button>
-          <button onClick={() => { setExpandedAdminPanels({}); fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); fetchDeletedSuppressions(); fetchDiscordSocialOps(); }}
+          <button onClick={() => { setExpandedAdminPanels({}); fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); fetchDiscordSocialOps(); }}
             aria-label="Refresh admin data"
             className="min-h-[44px] px-3 py-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
@@ -7157,6 +7157,14 @@ export default function AdminPage() {
             onAction={() => { setAdminView('competitor-watch'); jumpToSection('admin-competitor-watch'); }}
           />
           <ActionCard
+            title="Affiliate Hub"
+            count={0}
+            status="Partner operations"
+            blurb="Manage affiliate links, placements, analytics and opportunities."
+            actionLabel="Open Affiliate Hub"
+            onAction={() => { setAdminView('affiliate-hub'); jumpToSection('admin-affiliate-hub'); }}
+          />
+          <ActionCard
             title="Today's Audit Entries"
             count={auditLoading || auditError ? 0 : auditEntriesTodayCount}
             status={auditNeedsAttentionStatus}
@@ -7352,6 +7360,11 @@ export default function AdminPage() {
           })}
         </div>
       </section>
+
+      <AffiliateHubSection
+        visible={canShowSection('affiliate-hub')}
+        showToast={showToast}
+      />
 
       <section id="admin-content" className={`rounded-2xl border border-sky-500/20 bg-sky-500/[0.05] p-4 space-y-4 ${canShowSection('articles') ? '' : 'hidden'}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
