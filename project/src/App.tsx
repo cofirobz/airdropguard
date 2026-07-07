@@ -69,7 +69,7 @@ function App() {
                 <Route path="dashboard" element={<CustomerDashboard />} />
                 <Route path="learn" element={<LearnPage />} />
                 <Route path="more" element={<Navigate to="/dashboard" replace />} />
-                <Route path="api-pricing" element={<PricingPage />} />
+                <Route path="api-pricing" element={<Navigate to="/pricing" replace />} />
                 <Route path="pricing" element={<PricingPage />} />
                 <Route path="scam-alerts" element={<ScamAlertsPage />} />
                 <Route path="submit" element={<SubmitAirdropPage />} />

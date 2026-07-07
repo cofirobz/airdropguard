@@ -9,6 +9,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { AirdropStatus, RewardPotential, RiskLevel, Difficulty } from '../lib/types';
 import { cn, daysUntil, formatDate } from '../lib/utils';
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -714,6 +716,12 @@ export default function AirdropImportPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <SEO
+        title="Admin Import | AirdropGuard"
+        description="Private admin import workflow."
+        canonical={canonicalFromPath('/admin/airdrop-import')}
+        noindex
+      />
 
       {/* Header */}
       <div className="flex items-center justify-between">

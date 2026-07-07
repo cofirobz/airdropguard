@@ -12,6 +12,7 @@ import {
   verificationStatusLabel,
   verificationStatusTone,
 } from '../lib/articleTrust';
+import { canonicalFromPath } from '../lib/seo';
 
 function VerificationIcon({ status }: { status: VerificationStatus }) {
   if (status === 'verified_airdropguard') return <BadgeCheck className="h-3.5 w-3.5" />;
@@ -61,17 +62,51 @@ export default function ArticlesPage() {
     };
   }, []);
 
-  const articleSchema = useMemo(() => ({
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    name: 'AirdropGuard Articles',
-    description: 'AirdropGuard educational articles with transparent AI and human verification provenance.',
-  }), []);
-
   const publishedProfiles = useMemo(
     () => profiles.filter((article) => article.publicationStatus === 'published'),
     [profiles]
   );
+
+  const articleSchema = useMemo(() => ({
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        '@id': 'https://airdropguard.com/articles#collection',
+        name: 'AirdropGuard Articles',
+        url: 'https://airdropguard.com/articles',
+        description: 'AirdropGuard educational articles with transparent AI and human verification provenance.',
+      },
+      {
+        '@type': 'ItemList',
+        '@id': 'https://airdropguard.com/articles#list',
+        itemListElement: publishedProfiles.map((article, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          url: `https://airdropguard.com${article.urlPath}`,
+          name: article.title,
+        })),
+      },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': 'https://airdropguard.com/articles#breadcrumb',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: 'https://airdropguard.com/',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Articles',
+            item: 'https://airdropguard.com/articles',
+          },
+        ],
+      },
+    ],
+  }), [publishedProfiles]);
 
   const fullyVerifiedCount = useMemo(
     () => publishedProfiles.filter((article) => article.verificationStatus === 'verified_airdropguard').length,
@@ -86,9 +121,9 @@ export default function ArticlesPage() {
       </div>
 
       <SEO
-        title="Articles"
-        description="Security-first crypto education with transparent AI and human verification metadata."
-        canonical="https://airdropguard.com/articles"
+        title="Crypto Airdrop Security Articles | AirdropGuard"
+        description="Read security-first crypto airdrop guides, scam-detection playbooks, and AI-reviewed research with transparent verification metadata."
+        canonical={canonicalFromPath('/articles')}
         type="website"
         schema={articleSchema}
       />

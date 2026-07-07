@@ -1,4 +1,6 @@
 import { Shield, AlertTriangle, Bot, Scale, Mail } from 'lucide-react';
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
 
 const EFFECTIVE_DATE = 'June 17, 2025';
 const LAST_UPDATED   = 'June 17, 2025';
@@ -34,6 +36,30 @@ function Section({ id, title, children, icon, highlight }: SectionProps) {
 export default function TermsPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <SEO
+        title="Terms of Service and Usage Policy | AirdropGuard"
+        description="Review AirdropGuard terms of service, permitted use, AI-training restrictions, disclaimers, and platform legal terms."
+        canonical={canonicalFromPath('/terms')}
+        schema={{
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'WebPage',
+              '@id': 'https://airdropguard.com/terms#webpage',
+              name: 'AirdropGuard Terms of Service',
+              url: 'https://airdropguard.com/terms',
+            },
+            {
+              '@type': 'BreadcrumbList',
+              '@id': 'https://airdropguard.com/terms#breadcrumb',
+              itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://airdropguard.com/' },
+                { '@type': 'ListItem', position: 2, name: 'Terms', item: 'https://airdropguard.com/terms' },
+              ],
+            },
+          ],
+        }}
+      />
       {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-4">

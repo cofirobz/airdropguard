@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
 
 // ─── Plan data ────────────────────────────────────────────────────────────────
 
@@ -283,6 +285,41 @@ export default function PricingPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <SEO
+        title="API Pricing Plans for Builders and Teams | AirdropGuard"
+        description="Compare AirdropGuard API pricing plans, request limits, and integration tiers for builders, products, and enterprise teams."
+        canonical={canonicalFromPath('/pricing')}
+        schema={{
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'WebPage',
+              '@id': 'https://airdropguard.com/pricing#webpage',
+              name: 'AirdropGuard API Pricing',
+              url: 'https://airdropguard.com/pricing',
+              description: 'API pricing plans and request limits for AirdropGuard.',
+            },
+            {
+              '@type': 'BreadcrumbList',
+              '@id': 'https://airdropguard.com/pricing#breadcrumb',
+              itemListElement: [
+                {
+                  '@type': 'ListItem',
+                  position: 1,
+                  name: 'Home',
+                  item: 'https://airdropguard.com/',
+                },
+                {
+                  '@type': 'ListItem',
+                  position: 2,
+                  name: 'Pricing',
+                  item: 'https://airdropguard.com/pricing',
+                },
+              ],
+            },
+          ],
+        }}
+      />
 
       {/* Header */}
       <div className="text-center max-w-2xl mx-auto mb-14">

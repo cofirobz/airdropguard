@@ -1715,6 +1715,18 @@ export default function HomePage() {
           })(),
         })),
       },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': 'https://airdropguard.com/#breadcrumb',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: 'https://airdropguard.com/',
+          },
+        ],
+      },
     ],
   };
 
@@ -1845,6 +1857,23 @@ export default function HomePage() {
       <CopilotPreviewSection />
       <HomepageTrustSection counters={trustCounters} />
       <FreeVsProSection />
+
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-5">
+          <p className="text-[11px] uppercase tracking-[0.14em] text-cyan-200">Research path</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-300">
+            <Link to="/learn" className="hover:text-white">Learn</Link>
+            <span className="text-gray-600">/</span>
+            <Link to="/#airdrops" className="hover:text-white">Airdrops</Link>
+            <span className="text-gray-600">/</span>
+            <Link to="/scam-alerts" className="hover:text-white">Scam Alerts</Link>
+            <span className="text-gray-600">/</span>
+            <Link to="/api-docs" className="hover:text-white">API Docs</Link>
+            <span className="text-gray-600">/</span>
+            <Link to="/pricing" className="hover:text-white">Pricing</Link>
+          </div>
+        </div>
+      </section>
 
       <section id="airdrops" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-16">
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

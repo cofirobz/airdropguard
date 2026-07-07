@@ -15,9 +15,9 @@ export function airdropSeoTitle(projectName: string): string {
 }
 
 export function speculativeSeoTitle(tokenName: string): string {
-  return `${tokenName} Token Intelligence & Risk Analysis | AirdropGuard`;
+  return `${tokenName} Token Overview & Speculative Analysis | AirdropGuard`;
 }
 
 export function scamAlertSeoTitle(projectName: string): string {
-  return `${projectName} Scam Alert & Risk Report | AirdropGuard`;
+  return `${projectName} Scam Alert | AirdropGuard`;
 }

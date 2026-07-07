@@ -500,6 +500,24 @@ export default function LearnPage() {
           },
         })),
       },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': 'https://airdropguard.com/learn#breadcrumb',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: 'https://airdropguard.com/',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Learn',
+            item: 'https://airdropguard.com/learn',
+          },
+        ],
+      },
     ],
   }), [schemaReadyGuides]);
 

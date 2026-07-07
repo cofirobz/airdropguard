@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
 
 const FUNCTIONS_BASE_URL = 'https://YOUR_PROJECT_REF.supabase.co/functions/v1';
 const API_BASE_URL = `${FUNCTIONS_BASE_URL}/api-v1`;
@@ -246,8 +248,45 @@ function EndpointCard({ endpoint, internal = false }: { endpoint: EndpointDoc; i
 }
 
 export default function ApiDocsPage() {
+  const apiDocsSchema = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'TechArticle',
+        '@id': 'https://airdropguard.com/api-docs#techarticle',
+        headline: 'AirdropGuard API Docs',
+        description: 'Developer documentation for AirdropGuard API authentication, endpoints, examples, limits, and internal route references.',
+        url: 'https://airdropguard.com/api-docs',
+      },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': 'https://airdropguard.com/api-docs#breadcrumb',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: 'https://airdropguard.com/',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'API Docs',
+            item: 'https://airdropguard.com/api-docs',
+          },
+        ],
+      },
+    ],
+  };
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+      <SEO
+        title="API Docs, Endpoints & Integration Guide | AirdropGuard"
+        description="Integrate AirdropGuard data with endpoint examples, authentication setup, response formats, rate limits, and production API workflows."
+        canonical={canonicalFromPath('/api-docs')}
+        schema={apiDocsSchema}
+      />
       <section className="mb-10 rounded-3xl border border-cyan-300/20 bg-[radial-gradient(circle_at_12%_18%,rgba(34,211,238,0.16),transparent_40%),linear-gradient(160deg,rgba(3,10,24,0.96),rgba(4,16,38,0.94)_45%,rgba(3,11,27,0.95))] p-6 shadow-[0_20px_60px_rgba(2,8,23,0.5)] sm:p-8">
         <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
           <Code2 className="h-3.5 w-3.5" />

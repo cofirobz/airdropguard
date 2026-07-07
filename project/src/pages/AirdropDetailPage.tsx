@@ -2736,11 +2736,23 @@ export default function AirdropDetailPage() {
   ];
   const pageUrl = `https://airdropguard.com/airdrop/${airdrop.slug}`;
 
-  const pageDescription =
-    airdrop.ai_summary ||
-    (isSpeculativeToken
-      ? `Research the ${airdrop.name} speculative token risk profile with AirdropGuard intelligence and external due-diligence links.`
-      : `Research the ${airdrop.name} airdrop with AirdropGuard intelligence, trust signals, risk level, reward potential and task guidance.`);
+  const pageDescription = (() => {
+    const aiSummary = String(airdrop.ai_summary ?? '').trim();
+    if (aiSummary) return aiSummary;
+    if (isScamAlert) {
+      return `Learn why ${airdrop.name} is flagged, common scam indicators, rug pull risks and how to stay safe.`;
+    }
+    if (isSpeculativeToken) {
+      return `Research speculative crypto tokens with AI analysis, funding context, ecosystem signals and risk indicators for ${airdrop.name}.`;
+    }
+    return `AI-powered security review of the ${airdrop.name} airdrop. View trust score, estimated rewards, eligibility, funding, tasks, wallet safety checks and human verification.`;
+  })();
+
+  const breadcrumbSection = isScamAlert
+    ? { name: 'Scam Alerts', item: 'https://airdropguard.com/scam-alerts' }
+    : isSpeculativeToken
+      ? { name: 'Speculative Tokens', item: 'https://airdropguard.com/#speculative-tokens' }
+      : { name: 'Airdrops', item: 'https://airdropguard.com/' };
 
   const airdropSchema = {
     '@context': 'https://schema.org',
@@ -2789,8 +2801,8 @@ export default function AirdropDetailPage() {
           {
             '@type': 'ListItem',
             position: 2,
-            name: 'Airdrops',
-            item: 'https://airdropguard.com/',
+            name: breadcrumbSection.name,
+            item: breadcrumbSection.item,
           },
           {
             '@type': 'ListItem',
@@ -2807,6 +2819,20 @@ export default function AirdropDetailPage() {
     : isSpeculativeToken
       ? speculativeSeoTitle(airdrop.name)
       : airdropSeoTitle(airdrop.name);
+
+  const relatedLearnLinks = [
+    { to: '/learn', label: 'Airdrop Safety Guides' },
+    { to: '/articles/how-to-verify-crypto-airdrops-safely-2026', label: 'How to Verify Crypto Airdrops Safely in 2026' },
+    { to: '/articles/best-ai-airdrop-scanner-tools', label: 'Best AI Airdrop Scanner Tools' },
+  ];
+  const relatedScamLinks = [
+    { to: '/scam-alerts', label: 'Latest Scam Alerts' },
+    { to: '/articles/crypto-airdrop-scam-detection-guide', label: 'Crypto Airdrop Scam Detection Guide' },
+  ];
+  const relatedSpeculativeLinks = [
+    { to: '/#speculative-tokens', label: 'Explore Speculative Tokens' },
+    { to: '/articles/layer-2-airdrops-2026', label: 'Layer 2 Risk and Opportunity Framework' },
+  ];
   return (
   <>
     <SEO
@@ -3216,6 +3242,42 @@ export default function AirdropDetailPage() {
           </div>
 
           <TrustProofPanel airdrop={airdrop} />
+
+          <div className="glass-card p-6">
+            <h2 className="text-base font-semibold text-white mb-4">Related Research</h2>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.12em] text-cyan-200 mb-2">Related Learn Guides</p>
+                <div className="flex flex-col gap-2">
+                  {relatedLearnLinks.map((item) => (
+                    <Link key={item.to} to={item.to} className="text-xs text-gray-300 hover:text-white transition-colors">
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.12em] text-rose-200 mb-2">Related Scam Alerts</p>
+                <div className="flex flex-col gap-2">
+                  {relatedScamLinks.map((item) => (
+                    <Link key={item.to} to={item.to} className="text-xs text-gray-300 hover:text-white transition-colors">
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.12em] text-amber-200 mb-2">Related Speculative Tokens</p>
+                <div className="flex flex-col gap-2">
+                  {relatedSpeculativeLinks.map((item) => (
+                    <Link key={item.to} to={item.to} className="text-xs text-gray-300 hover:text-white transition-colors">
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div ref={bottomNavigationRef} className="pt-1 sm:pt-2">
             <AirdropNavigationControls

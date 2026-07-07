@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { Send, CheckCircle2, ArrowLeft, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
 
 // ── Reusable form primitives ──────────────────────────────────────────────────
 
@@ -185,6 +187,30 @@ export default function SubmitAirdropPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <SEO
+        title="Submit a Crypto Airdrop for Review | AirdropGuard"
+        description="Submit your crypto airdrop for manual review, trust scoring, and listing consideration on AirdropGuard."
+        canonical={canonicalFromPath('/submit')}
+        schema={{
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'WebPage',
+              '@id': 'https://airdropguard.com/submit#webpage',
+              name: 'Submit Airdrop',
+              url: 'https://airdropguard.com/submit',
+            },
+            {
+              '@type': 'BreadcrumbList',
+              '@id': 'https://airdropguard.com/submit#breadcrumb',
+              itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://airdropguard.com/' },
+                { '@type': 'ListItem', position: 2, name: 'Submit Airdrop', item: 'https://airdropguard.com/submit' },
+              ],
+            },
+          ],
+        }}
+      />
       {/* Header */}
       <div className="mb-10">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border border-neon-purple/20 text-xs font-semibold text-neon-purple mb-5">

@@ -1,4 +1,6 @@
 import React from "react";
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
 
 type Pillar = {
   title: string;
@@ -103,6 +105,30 @@ const questions = [
 export default function Whitepaper() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
+      <SEO
+        title="AirdropGuard Whitepaper, Trust Framework and Methodology"
+        description="Read the AirdropGuard whitepaper covering intelligence methodology, trust framework, verification model, and long-term product roadmap."
+        canonical={canonicalFromPath('/whitepaper')}
+        schema={{
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'TechArticle',
+              '@id': 'https://airdropguard.com/whitepaper#techarticle',
+              headline: 'AirdropGuard Whitepaper',
+              url: 'https://airdropguard.com/whitepaper',
+            },
+            {
+              '@type': 'BreadcrumbList',
+              '@id': 'https://airdropguard.com/whitepaper#breadcrumb',
+              itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://airdropguard.com/' },
+                { '@type': 'ListItem', position: 2, name: 'Whitepaper', item: 'https://airdropguard.com/whitepaper' },
+              ],
+            },
+          ],
+        }}
+      />
       <Hero />
 
       <main id="whitepaper" className="max-w-7xl mx-auto px-6 py-20 space-y-24">

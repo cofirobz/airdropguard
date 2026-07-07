@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { BadgeCheck, Bot, CalendarClock, ShieldCheck, UserCheck } from 'lucide-react';
 import SEO from '../components/SEO';
+import ArticleRelatedContent from '../components/ArticleRelatedContent';
 import {
   DEFAULT_ARTICLE_TRUST_PROFILES,
   estimateReadMinutesFromBlocks,
@@ -69,24 +70,60 @@ function VerificationIcon({ status }: { status: VerificationStatus }) {
 export default function VerifyCryptoAirdropsSafely2026Page() {
   const profile = findArticleProfile(articleKey, DEFAULT_ARTICLE_TRUST_PROFILES);
   const readingTime = profile.estimatedReadMinutes || estimateReadMinutesFromBlocks(articleBlocks, 10);
+  const wordCount = useMemo(
+    () => articleBlocks.map((block) => block.text).join(' ').split(/\s+/).filter(Boolean).length,
+    [],
+  );
 
   const articleSchema = useMemo(() => ({
     '@context': 'https://schema.org',
-    '@type': 'Article',
-    headline: profile.title,
-    description: 'Step-by-step framework for how to verify crypto airdrops safely in 2026, including wallet safety checks and scam prevention.',
-    author: {
-      '@type': 'Organization',
-      name: 'AirdropGuard Team',
-    },
-    publisher: {
-      '@type': 'Organization',
-      name: 'AirdropGuard',
-    },
-    dateModified: profile.lastUpdatedAt || undefined,
-    datePublished: profile.reviewedAt || undefined,
-    url: canonical,
-  }), [profile]);
+    '@graph': [
+      {
+        '@type': 'Article',
+        '@id': `${canonical}#article`,
+        headline: profile.title,
+        description: 'Step-by-step framework for how to verify crypto airdrops safely in 2026, including wallet safety checks and scam prevention.',
+        author: {
+          '@type': 'Organization',
+          name: 'AirdropGuard Team',
+        },
+        publisher: {
+          '@type': 'Organization',
+          name: 'AirdropGuard',
+        },
+        dateModified: profile.lastUpdatedAt || undefined,
+        datePublished: profile.reviewedAt || undefined,
+        timeRequired: `PT${readingTime}M`,
+        wordCount,
+        mainEntityOfPage: canonical,
+        url: canonical,
+      },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': `${canonical}#breadcrumb`,
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: 'https://airdropguard.com/',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Articles',
+            item: 'https://airdropguard.com/articles',
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: profile.title,
+            item: canonical,
+          },
+        ],
+      },
+    ],
+  }), [profile, readingTime, wordCount]);
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-6 lg:px-8">
@@ -165,16 +202,7 @@ export default function VerifyCryptoAirdropsSafely2026Page() {
           })}
         </div>
 
-        <section className="mt-10 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="text-xl font-bold text-white">Continue safely</h2>
-          <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            <Link to="/" className="rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5 text-gray-200 hover:bg-white/[0.08]">Browse verified Airdrops</Link>
-            <Link to="/scam-alerts" className="rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5 text-gray-200 hover:bg-white/[0.08]">Review Scam Alerts</Link>
-            <Link to="/whitepaper" className="rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5 text-gray-200 hover:bg-white/[0.08]">Read methodology</Link>
-            <Link to="/api-docs" className="rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5 text-gray-200 hover:bg-white/[0.08]">Explore API Docs</Link>
-            <Link to="/pricing" className="rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5 text-gray-200 hover:bg-white/[0.08]">View API pricing</Link>
-          </div>
-        </section>
+        <ArticleRelatedContent />
       </article>
     </main>
   );

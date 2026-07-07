@@ -1,6 +1,33 @@
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
+
 export default function RiskDisclosure() {
   return (
     <main className="min-h-screen bg-slate-950 text-white px-6 py-16">
+      <SEO
+        title="Crypto Risk Disclosure and Safety Notice | AirdropGuard"
+        description="Understand cryptoasset risks, wallet safety limitations, and important disclaimers before using AirdropGuard research and listings."
+        canonical={canonicalFromPath('/risk-disclosure')}
+        schema={{
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'WebPage',
+              '@id': 'https://airdropguard.com/risk-disclosure#webpage',
+              name: 'AirdropGuard Risk Disclosure',
+              url: 'https://airdropguard.com/risk-disclosure',
+            },
+            {
+              '@type': 'BreadcrumbList',
+              '@id': 'https://airdropguard.com/risk-disclosure#breadcrumb',
+              itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://airdropguard.com/' },
+                { '@type': 'ListItem', position: 2, name: 'Risk Disclosure', item: 'https://airdropguard.com/risk-disclosure' },
+              ],
+            },
+          ],
+        }}
+      />
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl md:text-4xl font-bold mb-6">
           Risk Disclosure

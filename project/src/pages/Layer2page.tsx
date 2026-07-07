@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BadgeCheck, Bot, CalendarClock, Link as LinkIcon, ShieldCheck, UserCheck } from 'lucide-react';
 import SEO from '../components/SEO';
+import ArticleRelatedContent from '../components/ArticleRelatedContent';
 import { supabase } from '../lib/supabase';
 import {
   DEFAULT_ARTICLE_TRUST_PROFILES,
@@ -356,25 +357,61 @@ export default function Layer2page() {
 
   const profile = findArticleProfile('layer-2-airdrops-2026', profiles);
   const readingTime = profile.estimatedReadMinutes || estimateReadMinutesFromBlocks(articleBlocks, 16);
+  const wordCount = useMemo(
+    () => articleBlocks.map((block) => block.text).join(' ').split(/\s+/).filter(Boolean).length,
+    [],
+  );
   const officialSources = sourceLinks(profile);
 
   const articleSchema = useMemo(() => ({
     '@context': 'https://schema.org',
-    '@type': 'Article',
-    headline: profile.title,
-    description: 'Security-first framework for evaluating Ethereum Layer 2 airdrops in 2026 with transparent trust and verification metadata.',
-    author: {
-      '@type': 'Organization',
-      name: 'AirdropGuard Team',
-    },
-    publisher: {
-      '@type': 'Organization',
-      name: 'AirdropGuard',
-    },
-    dateModified: profile.lastUpdatedAt || undefined,
-    datePublished: profile.reviewedAt || undefined,
-    url: 'https://airdropguard.com/articles/layer-2-airdrops-2026',
-  }), [profile]);
+    '@graph': [
+      {
+        '@type': 'Article',
+        '@id': 'https://airdropguard.com/articles/layer-2-airdrops-2026#article',
+        headline: profile.title,
+        description: 'Security-first framework for evaluating Ethereum Layer 2 airdrops in 2026 with transparent trust and verification metadata.',
+        author: {
+          '@type': 'Organization',
+          name: 'AirdropGuard Team',
+        },
+        publisher: {
+          '@type': 'Organization',
+          name: 'AirdropGuard',
+        },
+        dateModified: profile.lastUpdatedAt || undefined,
+        datePublished: profile.reviewedAt || undefined,
+        timeRequired: `PT${readingTime}M`,
+        wordCount,
+        mainEntityOfPage: 'https://airdropguard.com/articles/layer-2-airdrops-2026',
+        url: 'https://airdropguard.com/articles/layer-2-airdrops-2026',
+      },
+      {
+        '@type': 'BreadcrumbList',
+        '@id': 'https://airdropguard.com/articles/layer-2-airdrops-2026#breadcrumb',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: 'https://airdropguard.com/',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Articles',
+            item: 'https://airdropguard.com/articles',
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: profile.title,
+            item: 'https://airdropguard.com/articles/layer-2-airdrops-2026',
+          },
+        ],
+      },
+    ],
+  }), [profile, readingTime, wordCount]);
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-6 lg:px-8">
@@ -474,6 +511,8 @@ export default function Layer2page() {
             return <p key={index} className="text-slate-300">{block.text}</p>;
           })}
         </div>
+
+        <ArticleRelatedContent />
       </article>
     </main>
   );
