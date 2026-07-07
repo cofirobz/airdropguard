@@ -1,8 +1,8 @@
 [build]
-  command = "npm --prefix project run build"
-  publish = "project/dist"
+  command = "npm run build"
+  publish = "dist"
 
-# Serve static asset files directly, then SPA fallback for app routes.
+# Serve static asset files directly, then SPA fallback.
 [[redirects]]
   from = "/assets/*"
   to = "/assets/:splat"
