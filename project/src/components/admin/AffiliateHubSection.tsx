@@ -335,7 +335,12 @@ export function AffiliateHubSection({
       await fetchAffiliateData();
     } catch (error) {
       const message = formatSupabaseError(error);
-      console.error('[Admin][AffiliateHub] Failed to save affiliate', { error, message });
+      console.error(editingId ? '[Admin][AffiliateHub] Failed to update affiliate' : '[Admin][AffiliateHub] Failed to create affiliate', {
+        error,
+        message,
+        editingId,
+        payloadLogoUrl: form.logo_url,
+      });
       showToast(import.meta.env.DEV ? `Save failed: ${message}` : 'Save failed.', 'error');
     } finally {
       setSaving(false);
