@@ -5839,7 +5839,8 @@ export default function AdminPage() {
   // ── Access control ────────────────────────────────────────────────────────
   useEffect(() => {
     if (authLoading) return;
-    if (!user) { navigate('/auth?redirect=/admin'); return; }
+    if (!user) { navigate('/auth?redirect=/admin', { replace: true }); return; }
+    if (!isAdmin) { navigate('/', { replace: true }); }
   }, [authLoading, user, isAdmin, navigate]);
 
   // ── Fetch airdrops ─────────────────────────────────────────────────────────
