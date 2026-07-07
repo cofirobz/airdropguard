@@ -12,111 +12,158 @@ type ComparisonRow = {
   airdropGuard: string;
 };
 
+type WhitepaperSection = {
+  id: string;
+  number: string;
+  title: string;
+};
+
+const whitepaperSections: WhitepaperSection[] = [
+  { id: 'executive-summary', number: '01', title: 'Executive Summary' },
+  { id: 'the-problem', number: '02', title: 'The Problem' },
+  { id: 'our-solution', number: '03', title: 'Our Solution' },
+  { id: 'platform-overview', number: '04', title: 'Platform Overview' },
+  { id: 'ai-intelligence', number: '05', title: 'AI Intelligence' },
+  { id: 'security-philosophy', number: '06', title: 'Security Philosophy' },
+  { id: 'opportunity-intelligence', number: '07', title: 'Opportunity Intelligence' },
+  { id: 'api-platform', number: '08', title: 'API Platform' },
+  { id: 'roadmap', number: '09', title: 'Roadmap' },
+  { id: 'methodology', number: '10', title: 'Methodology' },
+  { id: 'privacy', number: '11', title: 'Privacy' },
+  { id: 'conclusion', number: '12', title: 'Conclusion' },
+];
+
 const pillars: Pillar[] = [
   {
-    title: "Intelligence",
-    text: "Structured project assessments that separate project quality, airdrop certainty, security signals, evidence coverage and opportunity value.",
+    title: "Verified Airdrops",
+    text: "Listings are enriched with project context, task breakdowns, risk signals and analyst-reviewed status to reduce blind participation.",
   },
   {
-    title: "Verification",
-    text: "Human analyst review sits alongside automated intelligence so listings are not published purely because a model or form produced a score.",
+    title: "Speculative Tokens",
+    text: "High-interest token narratives can be tracked as speculative opportunities with explicit uncertainty signals and no implied guarantees.",
   },
   {
-    title: "Safety",
-    text: "AirdropGuard is designed around no seed phrases, no private keys, no forced wallet connections and clear risk warnings before users take action.",
+    title: "Scam Alerts",
+    text: "Threat-focused pages isolate impersonation patterns, malicious campaigns and blacklisted activity to support safer decision workflows.",
   },
   {
-    title: "Community",
-    text: "Community Results help users understand whether participants received rewards, were not eligible, or are still waiting for outcomes.",
+    title: "Wallet Intelligence",
+    text: "Read-only wallet analysis helps users inspect visible address behavior and hygiene signals before taking additional on-chain actions.",
   },
   {
-    title: "Developer Platform",
-    text: "AirdropGuard data is being shaped for wallets, portfolio trackers, Telegram bots, research tools and future enterprise integrations.",
+    title: "AI Opportunity Intelligence",
+    text: "AI-generated summaries, scoring context and copilot guidance are combined with verification controls for explainable opportunity research.",
   },
 ];
 
 const framework = [
-  ["Project Reputation", "Legitimacy, maturity, official presence, history, brand credibility and public project quality."],
-  ["Airdrop Confidence", "Evidence of an official token, campaign, snapshot, claim process, reward structure or verified eligibility route."],
-  ["Security & Threat Signals", "Known scam warnings, suspicious claims, phishing exposure, official-link integrity and user-action risk."],
-  ["Evidence Coverage", "Whether the listing has enough independent signals to justify confidence in the assessment."],
-  ["Community & Development", "Community traction, developer presence, ecosystem activity and visible project momentum."],
-  ["Timeline & Maturity", "Project milestones, launch history, funding events, major updates, token status and ongoing monitoring triggers."],
-  ["Opportunity Quality", "Reward potential, effort required, time sensitivity, task complexity and likely value for users."],
-  ["Analyst Verification", "Human review of automated findings before publishing, promoting, rejecting or blacklisting listings."],
+  ["Project Reputation", "Assesses legitimacy indicators such as official presence, project maturity, public track record and execution quality."],
+  ["Opportunity Score", "Measures practical value relative to effort, timeline, eligibility complexity and observable reward context where available."],
+  ["Airdrop Confidence", "Evaluates whether airdrop mechanics are supported by credible evidence rather than social speculation alone."],
+  ["Security & Threat Signals", "Captures phishing indicators, suspicious claims, impersonation risks and link-integrity concerns."],
+  ["Evidence Coverage", "Tracks whether enough independent signals exist to support a confident listing interpretation."],
+  ["Community & Ecosystem", "Observes community quality, developer footprint and ecosystem-level momentum that may affect opportunity outcomes."],
+  ["Timeline & Maturity", "Considers launch stage, updates, roadmap progress and lifecycle timing relevant to user participation decisions."],
+  ["Analyst Verification", "Human review validates critical findings before publish-state changes, escalations or scam classifications."],
 ];
 
 const comparisonRows: ComparisonRow[] = [
   {
-    traditional: "Lists airdrops with limited context.",
-    airdropGuard: "Evaluates airdrops through structured intelligence layers.",
+    traditional: "Discovery-first lists with minimal verification depth.",
+    airdropGuard: "Discovery plus structured intelligence and verification controls.",
   },
   {
-    traditional: "Often treats project quality and airdrop quality as the same thing.",
-    airdropGuard: "Separates Project Reputation from Airdrop Confidence.",
+    traditional: "Single headline score or generic status labels.",
+    airdropGuard: "Separate dimensions for reputation, confidence, security and opportunity.",
   },
   {
-    traditional: "Uses a single score or basic status label.",
-    airdropGuard: "Shows reputation, security, evidence, threat, opportunity and final recommendation signals.",
+    traditional: "Limited explanation of why an item is risky or promising.",
+    airdropGuard: "Plain-language explanations and evidence-linked scoring context.",
   },
   {
-    traditional: "May show token data based on ticker or name matches.",
-    airdropGuard: "Shows live market data only when an official contract address is available.",
+    traditional: "Little separation between speculative and verified opportunities.",
+    airdropGuard: "Dedicated surfaces for verified, speculative and scam-alert states.",
   },
   {
-    traditional: "Leaves users to manually understand risk.",
-    airdropGuard: "Provides user-facing explanations, missing intelligence and safety warnings.",
+    traditional: "Risk handling delegated entirely to users.",
+    airdropGuard: "Read-only wallet intelligence and safety-forward warning architecture.",
   },
   {
-    traditional: "Focuses mainly on discovery.",
-    airdropGuard: "Combines discovery, safety, tracking, community results and developer access.",
+    traditional: "Closed data experience for builders.",
+    airdropGuard: "API-ready intelligence model for developer and enterprise integrations.",
   },
 ];
 
 const roadmap = [
   {
-    phase: "Phase 1",
-    title: "Public Intelligence Platform",
-    text: "Launch verified listings, intelligence reports, human review, task tracking, community results and educational content.",
+    phase: "Near-term",
+    title: "AI Quality Expansion",
+    text: "Improve model-assisted summarization reliability, better uncertainty signalling and stronger analyst tooling for review efficiency.",
   },
   {
-    phase: "Phase 2",
-    title: "Developer & API Layer",
-    text: "Expand API access for wallets, bots, dashboards, research platforms and partner applications.",
+    phase: "Near-term",
+    title: "Broader Discovery Sources",
+    text: "Increase ingestion coverage across ecosystems, campaign channels and project intelligence sources with tighter deduplication controls.",
   },
   {
-    phase: "Phase 3",
-    title: "Advanced Risk Monitoring",
-    text: "Strengthen threat intelligence, timeline monitoring, scam alerts, official-link checks and multi-chain signals.",
+    phase: "Mid-term",
+    title: "Deeper Wallet Insights",
+    text: "Expand read-only wallet context and address-level signal interpretation for safer participation decisions.",
   },
   {
-    phase: "Phase 4",
-    title: "Consumer & Enterprise Expansion",
-    text: "Develop richer dashboards, browser extension, mobile experience and enterprise intelligence products.",
+    phase: "Mid-term",
+    title: "Personalized AI and Enterprise API",
+    text: "Deliver personalized research views and stronger enterprise-grade API access patterns for products, teams and partner platforms.",
   },
 ];
 
 const questions = [
-  "Can this project be trusted?",
-  "Is there credible evidence of an airdrop?",
-  "Is this opportunity worth my time today?",
+  "Is this opportunity credible?",
+  "What is the practical risk before participation?",
+  "Is the expected effort justified by available evidence?",
 ];
 
 export default function Whitepaper() {
+  const canonical = canonicalFromPath('/whitepaper');
+  const title = 'Whitepaper: AI-Powered Crypto Opportunity Intelligence Platform';
+  const description = 'AirdropGuard whitepaper outlining platform architecture, AI opportunity intelligence, methodology, security philosophy, API direction and privacy principles.';
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <SEO
-        title="AirdropGuard Whitepaper, Trust Framework and Methodology"
-        description="Read the AirdropGuard whitepaper covering intelligence methodology, trust framework, verification model, and long-term product roadmap."
-        canonical={canonicalFromPath('/whitepaper')}
+        title={title}
+        description={description}
+        canonical={canonical}
+        type="article"
         schema={{
           '@context': 'https://schema.org',
           '@graph': [
             {
               '@type': 'TechArticle',
               '@id': 'https://airdropguard.com/whitepaper#techarticle',
-              headline: 'AirdropGuard Whitepaper',
+              headline: 'AirdropGuard Whitepaper: AI-Powered Crypto Opportunity Intelligence Platform',
+              description,
               url: 'https://airdropguard.com/whitepaper',
+              mainEntityOfPage: 'https://airdropguard.com/whitepaper',
+              datePublished: '2026-07-07',
+              dateModified: '2026-07-07',
+              author: {
+                '@type': 'Organization',
+                name: 'AirdropGuard Research Team',
+              },
+              publisher: {
+                '@type': 'Organization',
+                name: 'AirdropGuard',
+                url: 'https://airdropguard.com',
+              },
+              about: [
+                'Verified Airdrops',
+                'Speculative Tokens',
+                'Scam Alerts',
+                'Opportunity Intelligence',
+                'Wallet Intelligence',
+                'Web3 Discovery Infrastructure',
+              ],
             },
             {
               '@type': 'BreadcrumbList',
@@ -132,91 +179,103 @@ export default function Whitepaper() {
       <Hero />
 
       <main id="whitepaper" className="max-w-7xl mx-auto px-6 py-20 space-y-24">
-        <section className="grid md:grid-cols-3 gap-6">
-          <StatCard value="01" title="Security-first" text="No seed phrases, no private keys and no forced wallet connection to access research." />
-          <StatCard value="02" title="Intelligence-led" text="Reports are designed to explain project quality, airdrop confidence and user risk separately." />
-          <StatCard value="03" title="Human-reviewed" text="Automated intelligence supports review, but analyst verification remains central to publishing decisions." />
+        <section className="rounded-3xl border border-gray-800 bg-gray-900 p-6 md:p-8">
+          <p className="text-sm uppercase tracking-wide text-gray-400 mb-5">Whitepaper Navigation</p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {whitepaperSections.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                className="rounded-xl border border-gray-800 bg-gray-950 px-4 py-3 text-gray-300 hover:border-blue-800 hover:text-white transition-colors"
+              >
+                <span className="text-blue-400 text-xs font-semibold mr-2">{section.number}</span>
+                {section.title}
+              </a>
+            ))}
+          </div>
         </section>
 
-        <Section eyebrow="01" title="Executive Summary">
+        <section className="grid md:grid-cols-3 gap-6">
+          <StatCard value="01" title="Security-first" text="No seed phrases, no private key custody and no requirement to connect a wallet to read intelligence." />
+          <StatCard value="02" title="Explainable scoring" text="Opportunity research is broken into explicit dimensions instead of a single opaque score." />
+          <StatCard value="03" title="Human oversight" text="AI assists research and triage while analyst verification controls publishing and escalation states." />
+        </section>
+
+        <Section id="executive-summary" eyebrow="01" title="Executive Summary">
           <p>
-            AirdropGuard is building a Web3 intelligence platform for crypto airdrop discovery,
-            safety and decision-making. The platform exists to help users understand not only
-            which opportunities exist, but whether those opportunities are credible, safe and
-            worth their time.
+            AirdropGuard is an AI-powered Crypto Opportunity Intelligence Platform built to help users discover opportunities while avoiding scams.
+            The platform combines machine-assisted analysis, human verification and safety-focused product design across verified airdrops,
+            speculative tokens, scam alerts, ecosystem opportunities, wallet intelligence and AI copilot workflows.
           </p>
           <p>
-            Crypto airdrops can reward early participation, but they also attract fake campaigns,
-            phishing links, impersonation accounts, wallet drainers and low-quality projects.
-            AirdropGuard responds to this problem by combining structured intelligence,
-            analyst verification, community signals, read-only safety tooling and developer access.
+            The objective is operational clarity. Users should understand what is known, what remains uncertain, what risks are visible,
+            and whether participation effort is proportionate to available evidence.
           </p>
           <p>
-            The core philosophy is simple: users should be able to check before they connect.
-            AirdropGuard does not provide financial advice. It provides clearer information,
-            transparent risk signals and safer research workflows.
+            AirdropGuard is not a token project and does not provide investment promises. It is infrastructure for safer opportunity discovery,
+            transparent risk interpretation and developer integrations.
           </p>
         </Section>
 
-        <Section eyebrow="02" title="Why AirdropGuard Exists">
+        <Section id="the-problem" eyebrow="02" title="The Problem">
           <div className="grid lg:grid-cols-2 gap-8 items-start">
             <div className="space-y-4">
               <p>
-                Most crypto users do not suffer from a lack of opportunities. They suffer from a
-                lack of trustworthy filtering. Airdrop discovery is fragmented across social media,
-                Discord servers, Telegram groups, influencer posts, spreadsheets and project websites.
+                Opportunity discovery in Web3 is fragmented across social channels, community forums, campaign sites and unofficial aggregators.
+                The result is high signal noise and inconsistent trust standards.
               </p>
               <p>
-                That fragmentation creates risk. Users are asked to connect wallets, complete tasks,
-                bridge funds, sign messages, join communities or interact with contracts before they
-                have enough context to judge whether the opportunity is genuine.
+                Users often make participation decisions with limited context on legitimacy, reward credibility, campaign quality and wallet exposure.
+                This creates operational risk, time loss and avoidable scam incidents.
               </p>
               <p>
-                AirdropGuard was created to turn that scattered information into structured,
-                human-readable intelligence.
+                AirdropGuard addresses this with structured intelligence designed for practical decision-making rather than hype-oriented discovery.
               </p>
             </div>
             <div className="bg-red-950/30 border border-red-900/70 rounded-3xl p-8">
-              <h3 className="text-2xl font-bold mb-5">The trust gap</h3>
+              <h3 className="text-2xl font-bold mb-5">Core market frictions</h3>
               <ul className="space-y-4 text-gray-300">
-                <Bullet>Fake airdrop claim pages and phishing domains.</Bullet>
-                <Bullet>Impersonation accounts on X, Discord and Telegram.</Bullet>
-                <Bullet>Projects with unclear teams, weak documentation or vague rewards.</Bullet>
-                <Bullet>Time wasted farming campaigns with little evidence of future value.</Bullet>
-                <Bullet>Users confusing a trusted project with a confirmed airdrop.</Bullet>
+                <Bullet>Scam airdrop campaigns and phishing domains.</Bullet>
+                <Bullet>Information overload from low-confidence opportunity noise.</Bullet>
+                <Bullet>Fake or manipulated social engagement signals.</Bullet>
+                <Bullet>Wallet security risks from premature interaction and blind signing.</Bullet>
+                <Bullet>Poor discovery quality across high-value ecosystem opportunities.</Bullet>
               </ul>
             </div>
           </div>
         </Section>
 
-        <Section eyebrow="03" title="The AirdropGuard Platform">
+        <Section id="our-solution" eyebrow="03" title="Our Solution">
           <p>
-            AirdropGuard is organised around five strategic pillars. Together, these pillars create
-            a safer research environment for users and a structured data layer for developers and partners.
+            AirdropGuard provides a multi-layer solution that combines AI analysis, human verification and explicit score dimensions.
+            This architecture supports both end-users and developers who need consistent opportunity intelligence.
           </p>
           <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-5 mt-8">
             {pillars.map((pillar) => (
               <Card key={pillar.title} title={pillar.title} text={pillar.text} />
             ))}
           </div>
+          <div className="grid md:grid-cols-2 gap-5 mt-8">
+            <Card title="Trust Scores" text="Trust Scores consolidate legitimacy, safety and verification context into explainable user-facing confidence signals." />
+            <Card title="Opportunity Scores" text="Opportunity Scores assess practical upside relative to effort, timing and available evidence quality." />
+            <Card title="Discovery Engine" text="Opportunity ingestion and enrichment prioritize relevance, deduplication and stateful monitoring across evolving project lifecycles." />
+            <Card title="AI Copilot + API" text="Copilot assists interpretation and action planning while API access enables integration into external products and workflows." />
+          </div>
         </Section>
 
-        <section className="rounded-3xl bg-gradient-to-br from-blue-950/40 via-gray-900 to-purple-950/30 border border-blue-900/40 p-8 md:p-10">
+        <section id="platform-overview" className="rounded-3xl bg-gradient-to-br from-blue-950/40 via-gray-900 to-purple-950/30 border border-blue-900/40 p-8 md:p-10">
           <div className="grid lg:grid-cols-[1fr_0.9fr] gap-10 items-center">
             <div>
-              <p className="text-blue-400 font-semibold mb-3">04 • Proprietary Intelligence Layer</p>
-              <h2 className="text-4xl md:text-5xl font-extrabold mb-6">AirdropGuard Intelligence™</h2>
+              <p className="text-blue-400 font-semibold mb-3">04 • Platform Overview</p>
+              <h2 className="text-4xl md:text-5xl font-extrabold mb-6">Current Product Surface</h2>
               <div className="space-y-4 text-gray-300 text-lg leading-8">
                 <p>
-                  AirdropGuard Intelligence™ combines automated analysis, evidence validation,
-                  threat detection, project signal review and analyst verification to help users
-                  understand both project quality and airdrop certainty.
+                  The platform currently includes verified opportunity listings, speculative opportunity tracking,
+                  scam alert intelligence, read-only wallet analysis, educational research content and AI-assisted copilot workflows.
                 </p>
                 <p>
-                  The system intentionally separates a project's reputation from the certainty of
-                  its airdrop. A mature protocol may be highly reputable while still having no
-                  confirmed token, snapshot or reward allocation. Presenting those signals separately
-                  gives users a clearer basis for decision-making.
+                  Opportunity pages include score context, risk narratives, evidence visibility and recommendation framing.
+                  Analysts can moderate listing status while users can compare outcomes through community result data.
                 </p>
               </div>
             </div>
@@ -231,67 +290,31 @@ export default function Whitepaper() {
           </div>
         </section>
 
-        <Section eyebrow="05" title="The Intelligence Framework">
+        <Section id="ai-intelligence" eyebrow="05" title="AI Intelligence">
           <p>
-            Each listing can be assessed across independent intelligence dimensions. These dimensions
-            are designed to make the final assessment explainable rather than relying on a single
-            opaque number.
+            AI in AirdropGuard is used to accelerate research, summarize complex context and highlight potential risk patterns.
+            AI is an assistant layer, not a fully autonomous publishing authority.
           </p>
-          <div className="grid md:grid-cols-2 gap-5 mt-8">
-            {framework.map(([title, text]) => (
-              <FrameworkCard key={title} title={title} text={text} />
-            ))}
-          </div>
-        </Section>
-
-        <Section eyebrow="06" title="How Intelligence Reports Work">
-          <div className="grid lg:grid-cols-4 gap-5">
-            <ProcessCard step="1" title="Collect Signals" text="Official links, documentation, tasks, team data, funding, security indicators and community signals are gathered where available." />
-            <ProcessCard step="2" title="Separate the Scores" text="Project Reputation, Airdrop Confidence, Security, Evidence and Opportunity are assessed independently." />
-            <ProcessCard step="3" title="Explain the Findings" text="Users see plain-language context such as Project Signals, Evidence Coverage, Threat Intelligence and Final Recommendation." />
-            <ProcessCard step="4" title="Review & Monitor" text="Human analysts review intelligence findings and listings can be updated as new information appears." />
-          </div>
-        </Section>
-
-        <Section eyebrow="07" title="Why AirdropGuard is Different">
-          <div className="overflow-hidden rounded-3xl border border-gray-800 bg-gray-900">
-            <div className="grid md:grid-cols-2 bg-gray-950 text-sm uppercase tracking-wider text-gray-400">
-              <div className="p-5 border-b md:border-b-0 md:border-r border-gray-800">Traditional Airdrop Sites</div>
-              <div className="p-5 border-b border-gray-800 md:border-b-0 text-blue-400">AirdropGuard</div>
-            </div>
-            {comparisonRows.map((row) => (
-              <div key={row.traditional} className="grid md:grid-cols-2 border-t border-gray-800">
-                <div className="p-5 text-gray-400 md:border-r border-gray-800">{row.traditional}</div>
-                <div className="p-5 text-gray-200">{row.airdropGuard}</div>
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        <Section eyebrow="08" title="Human Verification">
           <p>
-            AirdropGuard is not designed to replace human judgement. Automated intelligence can
-            collect signals, detect patterns and structure information, but human review remains
-            central to verification, listing decisions and scam warnings.
+            Model outputs are designed to improve user understanding of project signals, confidence gaps and participation tradeoffs.
+            Internal prompts and implementation details are intentionally not exposed in user-facing documentation.
           </p>
-          <div className="grid md:grid-cols-3 gap-6 mt-8">
-            <Card title="Verified" text="A listing has passed review and can be shown as a stronger opportunity with visible trust indicators." />
-            <Card title="Under Review" text="A listing may be visible with caution while evidence, official links, tasks or reward details are still being checked." />
-            <Card title="Scam Alert" text="Listings can be separated into warning areas when risk signals, impersonation or malicious behaviour are identified." />
-          </div>
+          <p>
+            The objective is practical clarity: faster interpretation, clearer risk framing and higher consistency across large opportunity sets.
+          </p>
         </Section>
 
-        <Section eyebrow="09" title="Security & Privacy Principles">
+        <Section id="security-philosophy" eyebrow="06" title="Security Philosophy">
           <div className="grid md:grid-cols-2 gap-5">
             {[
-              "No seed phrase collection.",
-              "No private key requests.",
-              "Email-only signup available.",
-              "No forced wallet connection to access information.",
-              "Read-only wallet safety tooling focus.",
-              "Official contract required before live token market data is displayed.",
-              "Paid listings do not override risk warnings or analyst review.",
-              "Crypto risk disclosures remain visible and clear.",
+              "No seed phrase collection under any platform workflow.",
+              "No private key handling or wallet custody model.",
+              "Read-only wallet analysis focus for safety diagnostics.",
+              "Human verification remains mandatory for sensitive listing transitions.",
+              "Continuous monitoring supports status updates and risk reclassification.",
+              "Contract-linked market references are shown only with verified identifiers.",
+              "Paid or promoted visibility cannot suppress risk indicators.",
+              "Risk disclosure language remains explicit across user flows.",
             ].map((item) => (
               <div key={item} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 text-gray-300">
                 {item}
@@ -300,32 +323,41 @@ export default function Whitepaper() {
           </div>
         </Section>
 
-        <Section eyebrow="10" title="Community Results">
+        <Section id="opportunity-intelligence" eyebrow="07" title="Opportunity Intelligence">
           <p>
-            Airdrop outcomes are often unclear. Community Results allow users to share whether they
-            received an airdrop, were not eligible, or are still waiting. Over time, these signals can
-            help users understand historical outcomes and compare campaign quality more effectively.
+            Opportunity intelligence follows a lifecycle model: discovery, enrichment, scoring, verification, publication and monitoring.
+            This reduces stale listings and supports timely reclassification when new data appears.
           </p>
+          <div className="grid lg:grid-cols-5 gap-4 mt-8">
+            <ProcessCard step="1" title="Discover" text="Sources are monitored for new opportunities and ecosystem activity." />
+            <ProcessCard step="2" title="Enrich" text="Project, campaign and evidence signals are normalized into structured attributes." />
+            <ProcessCard step="3" title="Score" text="Trust and opportunity dimensions are calculated with uncertainty awareness." />
+            <ProcessCard step="4" title="Review" text="Analysts validate high-impact findings and state transitions." />
+            <ProcessCard step="5" title="Monitor" text="Listings are continuously checked for status drift and new risk signals." />
+          </div>
         </Section>
 
-        <Section eyebrow="11" title="Developer & API Platform">
-          <div className="bg-blue-950/30 border border-blue-900 rounded-3xl p-8 md:p-10">
+        <Section id="api-platform" eyebrow="08" title="API Platform">
+          <p>
+            AirdropGuard API capabilities are designed for developers building wallets, analytics products,
+            automation tools and safety overlays that require structured opportunity intelligence.
+          </p>
+          <div className="bg-blue-950/30 border border-blue-900 rounded-3xl p-8 md:p-10 mt-8">
             <p className="text-gray-300 text-lg leading-8 mb-8">
-              AirdropGuard API access is designed to let other applications use structured airdrop
-              intelligence. Wallets, portfolio trackers, DeFi dashboards, Telegram bots, Discord bots,
-              research tools and future enterprise systems may use AirdropGuard data to improve user safety.
+              API design priorities include stable resource structure, explicit field semantics, practical filtering,
+              and integration-safe metadata that can support both consumer applications and enterprise workflows.
             </p>
             <div className="grid md:grid-cols-3 gap-4">
               {[
-                "Verified listings",
-                "Project reputation",
-                "Airdrop confidence",
-                "Threat indicators",
-                "Opportunity ratings",
-                "Community results",
-                "Evidence coverage",
-                "Scam alerts",
-                "Final recommendations",
+                "Verified listings and states",
+                "Scam alert intelligence",
+                "Speculative opportunity streams",
+                "Trust and opportunity dimensions",
+                "Evidence and confidence fields",
+                "Community outcome context",
+                "Timeline and monitoring metadata",
+                "Risk-facing recommendation signals",
+                "Integration-friendly canonical links",
               ].map((item) => (
                 <div key={item} className="bg-gray-950/50 border border-white/10 rounded-xl p-4 text-gray-200">
                   {item}
@@ -335,23 +367,73 @@ export default function Whitepaper() {
           </div>
         </Section>
 
-        <Section eyebrow="12" title="Enterprise Vision">
+        <Section id="roadmap" eyebrow="09" title="Roadmap">
           <p>
-            AirdropGuard is being built as more than a listing website. The long-term vision is to
-            become an intelligence layer for safer Web3 participation, supporting consumers,
-            builders, communities and partner applications.
+            The roadmap is intentionally realistic and focused on measurable quality improvements rather than speculative expansion claims.
+          </p>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 mt-8">
+            {roadmap.map((item) => (
+              <RoadmapCard key={item.title} phase={item.phase} title={item.title} text={item.text} />
+            ))}
+          </div>
+        </Section>
+
+        <Section id="methodology" eyebrow="10" title="Methodology">
+          <p>
+            Scores are produced through a weighted multi-signal framework that separates legitimacy, confidence, security and opportunity context.
+            This prevents over-reliance on any single signal source.
           </p>
           <p>
-            Future enterprise use cases may include wallet risk overlays, browser extension warnings,
-            portfolio intelligence, airdrop monitoring tools, exchange research integrations,
-            community moderation tools and institutional research dashboards.
+            Methodology design emphasizes explainability, consistent definitions and visible evidence boundaries.
+            When evidence is insufficient, confidence indicators remain conservative.
+          </p>
+          <p>
+            Human analysts can override or escalate states where model output lacks reliability,
+            preserving platform integrity over automation speed.
+          </p>
+          <div className="grid md:grid-cols-2 gap-5 mt-8">
+            {framework.map(([title, text]) => (
+              <FrameworkCard key={title} title={title} text={text} />
+            ))}
+          </div>
+        </Section>
+
+        <Section id="privacy" eyebrow="11" title="Privacy">
+          <p>
+            Privacy design is aligned with a safety-first research model: users can access substantial platform intelligence without surrendering sensitive credentials.
+            Data collection is scoped to product operation, abuse prevention and service quality improvement.
+          </p>
+          <p>
+            Wallet intelligence features are read-only by design and are intended for visible-address interpretation,
+            not custody, key storage or private transaction control.
+          </p>
+          <p>
+            Platform policy commitments are supported through clear user-facing legal and risk documentation.
           </p>
         </Section>
 
-        <Section eyebrow="13" title="Roadmap">
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {roadmap.map((item) => (
-              <RoadmapCard key={item.phase} phase={item.phase} title={item.title} text={item.text} />
+        <Section id="conclusion" eyebrow="12" title="Conclusion">
+          <p>
+            AirdropGuard is building infrastructure for safer Web3 opportunity participation.
+            The platform focus is practical: discover faster, evaluate better and reduce preventable scam exposure.
+          </p>
+          <p>
+            By combining AI assistance, human verification, structured scoring and developer-accessible intelligence,
+            AirdropGuard aims to improve decision quality for both individual users and integrated products.
+          </p>
+        </Section>
+
+        <Section eyebrow="Appendix" title="Positioning Snapshot">
+          <div className="overflow-hidden rounded-3xl border border-gray-800 bg-gray-900">
+            <div className="grid md:grid-cols-2 bg-gray-950 text-sm uppercase tracking-wider text-gray-400">
+              <div className="p-5 border-b md:border-b-0 md:border-r border-gray-800">Conventional Opportunity Aggregators</div>
+              <div className="p-5 border-b border-gray-800 md:border-b-0 text-blue-400">AirdropGuard Intelligence Platform</div>
+            </div>
+            {comparisonRows.map((row) => (
+              <div key={row.traditional} className="grid md:grid-cols-2 border-t border-gray-800">
+                <div className="p-5 text-gray-400 md:border-r border-gray-800">{row.traditional}</div>
+                <div className="p-5 text-gray-200">{row.airdropGuard}</div>
+              </div>
             ))}
           </div>
         </Section>
@@ -370,12 +452,12 @@ export default function Whitepaper() {
       </main>
 
       <footer className="bg-gray-900 border-t border-gray-800 py-16 text-center px-6">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">Check Before You Connect.</h2>
+        <h2 className="text-3xl md:text-4xl font-bold mb-4">Helping Users Discover Opportunities While Avoiding Scams.</h2>
         <p className="text-gray-400 mb-8 max-w-2xl mx-auto">
-          The future of crypto rewards is not about chasing every opportunity. It is about understanding which opportunities deserve your attention.
+          AirdropGuard is focused on long-term intelligence quality, transparent methodology and safer participation infrastructure for Web3 users and builders.
         </p>
         <a href="/" className="inline-block bg-blue-600 hover:bg-blue-700 px-10 py-4 rounded-2xl text-lg font-semibold">
-          Explore Live Airdrops →
+          Explore the Platform →
         </a>
       </footer>
     </div>
@@ -387,16 +469,16 @@ function Hero() {
     <section className="relative overflow-hidden bg-gradient-to-br from-gray-950 via-slate-900 to-gray-900 py-28 px-6 text-center">
       <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.35),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.25),transparent_35%)]" />
       <div className="relative max-w-5xl mx-auto">
-        <p className="text-blue-400 font-semibold mb-4">Whitepaper v2.0 • June 2026</p>
+        <p className="text-blue-400 font-semibold mb-4">Whitepaper v3.0 • July 2026</p>
         <h1 className="text-5xl md:text-7xl font-extrabold mb-6 tracking-tight">
           AirdropGuard Whitepaper
         </h1>
         <p className="text-2xl md:text-3xl text-gray-300 mb-5">
-          Web3 Airdrop Intelligence for Safer Participation
+          AI-Powered Crypto Opportunity Intelligence Platform
         </p>
         <p className="max-w-3xl mx-auto text-gray-400 text-lg leading-8">
-          AirdropGuard helps users discover, evaluate and track crypto airdrops through
-          structured intelligence, analyst verification, safety-first design and community-driven signals.
+          A professional framework for discovering, researching and evaluating verified airdrops,
+          speculative tokens, scam alerts, ecosystem opportunities, wallet intelligence and AI-assisted decisions.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
           <a href="#whitepaper" className="bg-blue-600 hover:bg-blue-700 px-8 py-4 rounded-xl font-semibold">
@@ -412,16 +494,18 @@ function Hero() {
 }
 
 function Section({
+  id,
   eyebrow,
   title,
   children,
 }: {
+  id?: string;
   eyebrow: string;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <section>
+    <section id={id}>
       <p className="text-blue-400 font-semibold mb-3">{eyebrow}</p>
       <h2 className="text-4xl md:text-5xl font-extrabold mb-6 tracking-tight">{title}</h2>
       <div className="text-gray-300 text-lg leading-8 space-y-4">{children}</div>
