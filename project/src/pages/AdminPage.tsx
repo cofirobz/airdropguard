@@ -2054,13 +2054,14 @@ async function awardApprovedScamReportRep(userId: string) {
 // ─── AirdropFormModal (shared Add + Edit) ─────────────────────────────────────
 
 function AirdropFormModal({
-  mode, form, setForm, onClose, onSave, saving,
+  mode, form, setForm, onClose, onSave, onDelete, saving,
 }: {
   mode: 'add' | 'edit';
   form: AirdropFormData;
   setForm: React.Dispatch<React.SetStateAction<AirdropFormData>>;
   onClose: () => void;
   onSave: () => void;
+  onDelete?: () => void;
   saving: boolean;
 }) {
   const inp = 'w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40';
@@ -2110,7 +2111,7 @@ function AirdropFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-3 pt-6 sm:p-4 sm:pt-10 bg-black/70 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-2xl glass-card p-4 sm:p-6 space-y-5 relative mb-12 overflow-x-hidden">
+      <div className="w-full max-w-2xl glass-card p-4 pb-24 sm:p-6 sm:pb-6 space-y-5 relative mb-12 overflow-x-hidden">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-bold text-white">{mode === 'add' ? 'Add New Airdrop' : 'Edit Airdrop'}</h2>
           <button onClick={onClose} aria-label="Close airdrop form" className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
@@ -2566,7 +2567,21 @@ Check eligibility updates`}
           ))}
         </div>
 
-        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-1">
+        <div className="hidden sm:flex sm:flex-row sm:items-center sm:justify-end gap-2 pt-1">
+          {mode === 'edit' && onDelete && (
+            <button
+              onClick={onDelete}
+              className="min-h-[44px] px-4 py-2 rounded-xl text-sm text-rose-200 border border-rose-500/25 bg-rose-500/10 hover:bg-rose-500/20 transition-colors"
+            >
+              Delete
+            </button>
+          )}
+          <button
+            onClick={() => setForm((f) => ({ ...f, published: !f.published }))}
+            className="min-h-[44px] px-4 py-2 rounded-xl text-sm border border-white/15 bg-white/[0.04] text-gray-200 hover:bg-white/[0.09] transition-colors"
+          >
+            {form.published ? 'Unpublish' : 'Publish'}
+          </button>
           <button onClick={onClose} className="w-full sm:w-auto min-h-[44px] px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-white border border-white/10 hover:border-white/20 transition-colors">
             Cancel
           </button>
@@ -2575,6 +2590,39 @@ Check eligibility updates`}
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'add' ? <Plus className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
             {mode === 'add' ? 'Add Airdrop' : 'Save Changes'}
           </button>
+        </div>
+
+        <div className="sm:hidden sticky bottom-0 -mx-4 mt-3 border-t border-white/10 bg-dark-950/95 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] backdrop-blur">
+          <div className="grid grid-cols-3 gap-2">
+            {mode === 'edit' && onDelete ? (
+              <button
+                onClick={onDelete}
+                className="min-h-[42px] rounded-xl border border-rose-500/25 bg-rose-500/10 px-2 text-xs font-semibold text-rose-100"
+              >
+                Delete
+              </button>
+            ) : (
+              <button
+                onClick={onClose}
+                className="min-h-[42px] rounded-xl border border-white/15 bg-white/[0.04] px-2 text-xs font-semibold text-gray-200"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              onClick={() => setForm((f) => ({ ...f, published: !f.published }))}
+              className="min-h-[42px] rounded-xl border border-white/15 bg-white/[0.04] px-2 text-xs font-semibold text-gray-200"
+            >
+              {form.published ? 'Unpublish' : 'Publish'}
+            </button>
+            <button
+              onClick={onSave}
+              disabled={saving || !form.name.trim()}
+              className="min-h-[42px] rounded-xl border border-neon-purple/30 bg-neon-purple/15 px-2 text-xs font-semibold text-neon-purple disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -3170,6 +3218,10 @@ export default function AdminPage() {
   const [airdropCategoryFilter, setAirdropCategoryFilter] = useState<'all' | 'Verified Airdrop' | 'Testnet' | 'Points Program' | 'Ecosystem Campaign' | 'Under Review'>('all');
   const [airdropChainFilter, setAirdropChainFilter] = useState<string>('all');
   const [airdropPublishedFilter, setAirdropPublishedFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [airdropQuickFilter, setAirdropQuickFilter] = useState<'all' | 'needs_classification' | 'conflicts' | 'confirmed' | 'rewards' | 'points' | 'potential' | 'testnet' | 'scam_alerts' | 'completed_distribution'>('all');
+  const [airdropSearch, setAirdropSearch] = useState('');
+  const [selectedAirdropIds, setSelectedAirdropIds] = useState<string[]>([]);
+  const [bulkActionBusy, setBulkActionBusy] = useState(false);
   const [specRiskFilter, setSpecRiskFilter] = useState<'all' | 'Low' | 'Medium' | 'High'>('all');
   const [specChainFilter, setSpecChainFilter] = useState<string>('all');
   const [specPublishedFilter, setSpecPublishedFilter] = useState<'all' | 'published' | 'draft'>('all');
@@ -3607,8 +3659,105 @@ export default function AdminPage() {
     if (airdropChainFilter !== 'all' && !(airdrop.blockchain ?? []).includes(airdropChainFilter as Blockchain)) return false;
     if (airdropPublishedFilter === 'published' && !airdrop.published) return false;
     if (airdropPublishedFilter === 'draft' && airdrop.published) return false;
+
+    const row = airdrop as unknown as Record<string, unknown>;
+    const opportunityType = normalizeOpportunityTypeKey(row.opportunity_type);
+    const pastDistributionStatus = normalizePastDistributionStatusKey(row.past_distribution_status);
+    const pointsName = typeof row.points_name === 'string' ? row.points_name.trim() : '';
+    const riskReasons = Array.isArray(row.risk_reasons)
+      ? row.risk_reasons.map((value) => String(value).trim()).filter(Boolean)
+      : [];
+
+    if (airdropQuickFilter === 'needs_classification' && (!row.opportunity_type || !row.past_distribution_status) === false) return false;
+    if (airdropQuickFilter === 'conflicts') {
+      const auditForm: AirdropFormData = {
+        ...BLANK_FORM,
+        name: airdrop.name ?? '',
+        website_url: airdrop.website_url ?? '',
+        docs_url: typeof row.docs_url === 'string' ? row.docs_url : '',
+        official_safe_url: typeof row.official_safe_url === 'string' ? row.official_safe_url : '',
+        contract_address: airdrop.contract_address ?? '',
+        status: airdrop.status,
+        category: Array.isArray(airdrop.category) ? (airdrop.category as Category[]) : [],
+        blockchain: Array.isArray(airdrop.blockchain) ? (airdrop.blockchain as Blockchain[]) : [],
+        opportunity_type: opportunityType,
+        past_distribution_status: pastDistributionStatus,
+        points_name: pointsName,
+        claim_status: typeof row.claim_status === 'string' ? row.claim_status : '',
+        reward_status: typeof row.reward_status === 'string' ? row.reward_status : '',
+        human_decision: typeof row.human_decision === 'string' ? row.human_decision : '',
+        ai_recommendation_override: row.ai_recommendation_override === 'verify' || row.ai_recommendation_override === 'review_further' || row.ai_recommendation_override === 'blacklist' ? row.ai_recommendation_override : '',
+        risk_reasons: riskReasons.join('\n'),
+      };
+      if (getOpportunityConflicts(auditForm).length === 0) return false;
+    }
+    if (airdropQuickFilter === 'confirmed' && opportunityType !== 'confirmed_airdrop') return false;
+    if (airdropQuickFilter === 'rewards' && opportunityType !== 'rewards_program') return false;
+    if (airdropQuickFilter === 'points' && opportunityType !== 'points_program') return false;
+    if (airdropQuickFilter === 'potential' && opportunityType !== 'potential_airdrop') return false;
+    if (airdropQuickFilter === 'testnet' && opportunityType !== 'testnet') return false;
+    if (airdropQuickFilter === 'scam_alerts' && opportunityType !== 'scam_alert') return false;
+    if (airdropQuickFilter === 'completed_distribution' && pastDistributionStatus !== 'distribution_complete') return false;
+
+    const searchNeedle = airdropSearch.trim().toLowerCase();
+    if (searchNeedle) {
+      const searchHaystack = [
+        airdrop.name,
+        airdrop.slug,
+        airdrop.ticker,
+        (airdrop.blockchain ?? []).join(' '),
+        airdrop.contract_address,
+      ].join(' ').toLowerCase();
+      if (!searchHaystack.includes(searchNeedle)) return false;
+    }
+
     return true;
-  }), [airdropListings, getAdminOpportunityBucket, airdropCategoryFilter, airdropChainFilter, airdropPublishedFilter]);
+  }), [airdropListings, getAdminOpportunityBucket, airdropCategoryFilter, airdropChainFilter, airdropPublishedFilter, airdropQuickFilter, airdropSearch]);
+
+  const airdropQuickFilterCounts = useMemo(() => {
+    const conflictCount = airdropListings.filter((airdrop) => {
+      const row = airdrop as unknown as Record<string, unknown>;
+      const auditForm: AirdropFormData = {
+        ...BLANK_FORM,
+        name: airdrop.name ?? '',
+        website_url: airdrop.website_url ?? '',
+        docs_url: typeof row.docs_url === 'string' ? row.docs_url : '',
+        official_safe_url: typeof row.official_safe_url === 'string' ? row.official_safe_url : '',
+        contract_address: airdrop.contract_address ?? '',
+        status: airdrop.status,
+        category: Array.isArray(airdrop.category) ? (airdrop.category as Category[]) : [],
+        blockchain: Array.isArray(airdrop.blockchain) ? (airdrop.blockchain as Blockchain[]) : [],
+        opportunity_type: normalizeOpportunityTypeKey(row.opportunity_type),
+        past_distribution_status: normalizePastDistributionStatusKey(row.past_distribution_status),
+        points_name: typeof row.points_name === 'string' ? row.points_name : '',
+        claim_status: typeof row.claim_status === 'string' ? row.claim_status : '',
+        reward_status: typeof row.reward_status === 'string' ? row.reward_status : '',
+        human_decision: typeof row.human_decision === 'string' ? row.human_decision : '',
+        ai_recommendation_override: row.ai_recommendation_override === 'verify' || row.ai_recommendation_override === 'review_further' || row.ai_recommendation_override === 'blacklist' ? row.ai_recommendation_override : '',
+        risk_reasons: Array.isArray(row.risk_reasons) ? row.risk_reasons.map((value) => String(value)).join('\n') : '',
+      };
+      return getOpportunityConflicts(auditForm).length > 0;
+    }).length;
+
+    const byType = (key: OpportunityTypeKey) => airdropListings.filter((airdrop) => normalizeOpportunityTypeKey((airdrop as unknown as Record<string, unknown>).opportunity_type) === key).length;
+    const needsClassification = airdropListings.filter((airdrop) => {
+      const row = airdrop as unknown as Record<string, unknown>;
+      return !row.opportunity_type || !row.past_distribution_status;
+    }).length;
+
+    return {
+      all: airdropListings.length,
+      needs_classification: needsClassification,
+      conflicts: conflictCount,
+      confirmed: byType('confirmed_airdrop'),
+      rewards: byType('rewards_program'),
+      points: byType('points_program'),
+      potential: byType('potential_airdrop'),
+      testnet: byType('testnet'),
+      scam_alerts: byType('scam_alert'),
+      completed_distribution: airdropListings.filter((airdrop) => normalizePastDistributionStatusKey((airdrop as unknown as Record<string, unknown>).past_distribution_status) === 'distribution_complete').length,
+    };
+  }, [airdropListings]);
 
   const classificationAuditRows = useMemo<AirdropClassificationAuditRow[]>(() => {
     const asText = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -3742,6 +3891,11 @@ export default function AdminPage() {
     if (specMissingContractFilter === 'present' && !airdrop.contract_address) return false;
     return true;
   }), [speculativeTokenListings, getSpeculativeSecurityScore, specRiskFilter, specChainFilter, specPublishedFilter, specSecurityFilter, specMissingContractFilter]);
+
+  useEffect(() => {
+    const validIds = new Set(airdrops.map((airdrop) => airdrop.id));
+    setSelectedAirdropIds((prev) => prev.filter((id) => validIds.has(id)));
+  }, [airdrops]);
 
   const suppressedProjects = useMemo(() => {
     const grouped = new Map<string, SuppressedProjectGroup>();
@@ -6426,6 +6580,166 @@ export default function AdminPage() {
     setModalMode('edit');
   };
 
+  const openEditById = useCallback(async (airdropId: string) => {
+    const target = airdrops.find((airdrop) => airdrop.id === airdropId);
+    if (!target) {
+      showToast('Airdrop not found for editing.', 'error');
+      return;
+    }
+    await openEdit(target);
+  }, [airdrops, showToast]);
+
+  const applyAiSuggestionToAirdrop = useCallback(async (airdropId: string) => {
+    const target = airdrops.find((airdrop) => airdrop.id === airdropId);
+    if (!target) return;
+
+    const row = target as unknown as Record<string, unknown>;
+    const snapshotForm: AirdropFormData = {
+      ...BLANK_FORM,
+      name: target.name ?? '',
+      website_url: target.website_url ?? '',
+      docs_url: typeof row.docs_url === 'string' ? row.docs_url : '',
+      official_safe_url: typeof row.official_safe_url === 'string' ? row.official_safe_url : '',
+      contract_address: target.contract_address ?? '',
+      status: target.status,
+      category: Array.isArray(target.category) ? (target.category as Category[]) : [],
+      blockchain: Array.isArray(target.blockchain) ? (target.blockchain as Blockchain[]) : [],
+      opportunity_type: normalizeOpportunityTypeKey(row.opportunity_type),
+      past_distribution_status: normalizePastDistributionStatusKey(row.past_distribution_status),
+      points_name: typeof row.points_name === 'string' ? row.points_name : '',
+      season_name: typeof row.season_name === 'string' ? row.season_name : '',
+      claim_status: typeof row.claim_status === 'string' ? row.claim_status : '',
+      reward_status: typeof row.reward_status === 'string' ? row.reward_status : '',
+      human_decision: typeof row.human_decision === 'string' ? row.human_decision : '',
+      ai_recommendation_override: row.ai_recommendation_override === 'verify' || row.ai_recommendation_override === 'review_further' || row.ai_recommendation_override === 'blacklist' ? row.ai_recommendation_override : '',
+      risk_reasons: Array.isArray(row.risk_reasons) ? row.risk_reasons.map((value) => String(value)).join('\n') : '',
+    };
+
+    const suggestion = buildAIClassificationSuggestion(snapshotForm);
+    setForm((prev) => ({
+      ...prev,
+      opportunity_type: suggestion.suggestedOpportunityType,
+      past_distribution_status: suggestion.suggestedPastDistributionStatus,
+      ai_suggested_opportunity_type: suggestion.suggestedOpportunityType,
+      ai_suggested_past_distribution_status: suggestion.suggestedPastDistributionStatus,
+      ai_classification_reason: suggestion.reason,
+      admin_classification_confirmed: false,
+    }));
+    await openEdit(target);
+  }, [airdrops, setForm]);
+
+  const toggleAirdropSelection = useCallback((airdropId: string) => {
+    setSelectedAirdropIds((prev) => prev.includes(airdropId)
+      ? prev.filter((id) => id !== airdropId)
+      : [...prev, airdropId]);
+  }, []);
+
+  const toggleSelectAllVisibleAirdrops = useCallback(() => {
+    const visibleIds = filteredAirdropListings.map((airdrop) => airdrop.id);
+    setSelectedAirdropIds((prev) => {
+      const allSelected = visibleIds.length > 0 && visibleIds.every((id) => prev.includes(id));
+      if (allSelected) return prev.filter((id) => !visibleIds.includes(id));
+      const next = new Set([...prev, ...visibleIds]);
+      return Array.from(next);
+    });
+  }, [filteredAirdropListings]);
+
+  const runBulkAirdropAction = useCallback(async (
+    action: 'ai_classify' | 'publish' | 'unpublish' | 'delete' | 'run_ai_review',
+  ) => {
+    if (selectedAirdropIds.length === 0) {
+      showToast('Select at least one listing first.', 'error');
+      return;
+    }
+
+    const selectedRows = airdrops.filter((airdrop) => selectedAirdropIds.includes(airdrop.id));
+    if (selectedRows.length === 0) {
+      showToast('No valid selected listings found.', 'error');
+      return;
+    }
+
+    const confirmTextMap: Record<typeof action, string> = {
+      ai_classify: `Apply AI classification suggestions to ${selectedRows.length} listing(s)?`,
+      publish: `Publish ${selectedRows.length} listing(s)?`,
+      unpublish: `Unpublish ${selectedRows.length} listing(s)?`,
+      delete: `Delete ${selectedRows.length} listing(s)? This cannot be undone.`,
+      run_ai_review: `Run AI review for ${selectedRows.length} listing(s)?`,
+    };
+
+    if (!window.confirm(confirmTextMap[action])) return;
+
+    setBulkActionBusy(true);
+    let success = 0;
+    let failed = 0;
+
+    try {
+      for (const row of selectedRows) {
+        try {
+          if (action === 'publish' || action === 'unpublish') {
+            const nextPublished = action === 'publish';
+            const { error } = await supabase
+              .from('airdrops')
+              .update({ published: nextPublished, human_verified: nextPublished ? true : row.human_verified })
+              .eq('id', row.id);
+            if (error) throw error;
+          } else if (action === 'run_ai_review') {
+            await runAnalysis(row, true);
+          } else if (action === 'ai_classify') {
+            const source = row as unknown as Record<string, unknown>;
+            const snapshotForm: AirdropFormData = {
+              ...BLANK_FORM,
+              name: row.name ?? '',
+              website_url: row.website_url ?? '',
+              docs_url: typeof source.docs_url === 'string' ? source.docs_url : '',
+              official_safe_url: typeof source.official_safe_url === 'string' ? source.official_safe_url : '',
+              contract_address: row.contract_address ?? '',
+              status: row.status,
+              category: Array.isArray(row.category) ? (row.category as Category[]) : [],
+              blockchain: Array.isArray(row.blockchain) ? (row.blockchain as Blockchain[]) : [],
+              opportunity_type: normalizeOpportunityTypeKey(source.opportunity_type),
+              past_distribution_status: normalizePastDistributionStatusKey(source.past_distribution_status),
+              points_name: typeof source.points_name === 'string' ? source.points_name : '',
+              season_name: typeof source.season_name === 'string' ? source.season_name : '',
+              claim_status: typeof source.claim_status === 'string' ? source.claim_status : '',
+              reward_status: typeof source.reward_status === 'string' ? source.reward_status : '',
+              human_decision: typeof source.human_decision === 'string' ? source.human_decision : '',
+              ai_recommendation_override: source.ai_recommendation_override === 'verify' || source.ai_recommendation_override === 'review_further' || source.ai_recommendation_override === 'blacklist' ? source.ai_recommendation_override : '',
+              risk_reasons: Array.isArray(source.risk_reasons) ? source.risk_reasons.map((value) => String(value)).join('\n') : '',
+            };
+            const suggestion = buildAIClassificationSuggestion(snapshotForm);
+            const { error } = await supabase
+              .from('airdrops')
+              .update({
+                opportunity_type: suggestion.suggestedOpportunityType,
+                past_distribution_status: suggestion.suggestedPastDistributionStatus,
+                ai_suggested_opportunity_type: suggestion.suggestedOpportunityType,
+                ai_suggested_past_distribution_status: suggestion.suggestedPastDistributionStatus,
+                ai_classification_reason: suggestion.reason,
+                admin_classification_confirmed: false,
+              })
+              .eq('id', row.id);
+            if (error) throw error;
+          } else if (action === 'delete') {
+            const { error: taskError } = await supabase.from('airdrop_tasks').delete().eq('airdrop_id', row.id);
+            if (taskError) throw taskError;
+            const { error } = await supabase.from('airdrops').delete().eq('id', row.id);
+            if (error) throw error;
+          }
+          success += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+
+      await fetchAirdrops();
+      await fetchStats();
+      if (action === 'delete') setSelectedAirdropIds([]);
+      showToast(`${success} succeeded${failed > 0 ? `, ${failed} failed` : ''}`, failed > 0 ? 'error' : 'success');
+    } finally {
+      setBulkActionBusy(false);
+    }
+  }, [selectedAirdropIds, airdrops, fetchAirdrops, fetchStats, runAnalysis, showToast]);
+
   const moderateAirdrop = useCallback(async (
     airdrop: Airdrop,
     decision: 'approve' | 'reject' | 'blacklist',
@@ -7998,34 +8312,46 @@ export default function AdminPage() {
         noindex
       />
       <header className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-dark-950/95 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.14em] text-cyan-200">Admin Control Centre</p>
-            <h1 className="truncate text-sm font-semibold text-white sm:text-base">{activeAdminNavItem.label}</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setMobileAdminMenuOpen(true)}
-              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-white lg:hidden"
-            >
-              <Menu className="h-4 w-4" />
-              Admin Menu
-            </button>
-            <div className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs text-gray-300 sm:inline-flex">
-              <Bell className="h-3.5 w-3.5 text-cyan-300" />
-              {notificationsLoading ? 'Loading alerts...' : `${unreadNotificationsCount} unread`}
+        <div className="mx-auto flex h-[62px] max-w-[1600px] items-center justify-between px-3 sm:px-6 lg:px-8">
+          <div className="min-w-0 flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-400/25 bg-cyan-500/10 text-cyan-200">
+              <ShieldCheck className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">AirdropGuard</p>
+              <p className="text-[10px] uppercase tracking-[0.12em] text-cyan-200">Admin Control Centre</p>
             </div>
+          </div>
+
+          <div className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs text-gray-300 sm:inline-flex">
+            <Bell className="h-3.5 w-3.5 text-cyan-300" />
+            {notificationsLoading ? 'Loading alerts...' : `${unreadNotificationsCount} unread`}
           </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24">
+      <button
+        onClick={() => setMobileAdminMenuOpen(true)}
+        className="fixed right-3 top-[12px] z-[81] inline-flex min-h-[38px] items-center gap-1 rounded-full border border-white/15 bg-dark-900/90 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-[0_10px_30px_rgba(0,0,0,0.35)] transition-colors hover:border-cyan-300/40 hover:text-cyan-100 lg:hidden"
+        aria-label="Open admin navigation menu"
+      >
+        <Menu className="h-4 w-4" />
+        Menu
+      </button>
+
+      <div className="mx-auto max-w-[1600px] px-3 sm:px-6 lg:px-8 pt-[72px] sm:pt-[78px]">
+
+      <div className="mb-3 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-cyan-200">Current Section</p>
+        <h1 className="mt-0.5 text-base font-semibold text-white">{activeAdminNavItem.label}</h1>
+        <p className="mt-0.5 text-[11px] text-gray-400">{activeAdminNavItem.blurb}</p>
+      </div>
 
       {/* Header */}
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-white">Admin Panel</h1>
-          <p className="text-gray-400 text-sm mt-1">{airdrops.length} airdrops total</p>
+          <h2 className="text-xl font-bold text-white">Admin Panel</h2>
+          <p className="text-gray-400 text-xs mt-1">{airdrops.length} airdrops total</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={openAdd}
@@ -8099,22 +8425,6 @@ export default function AdminPage() {
         </aside>
 
         <main className="space-y-8 rounded-2xl border border-white/10 bg-dark-950/55 p-3 sm:p-4 lg:p-5 pb-24 lg:pb-6">
-          <div className="sticky top-16 z-30 -mx-3 mb-2 border-b border-white/10 bg-dark-950/95 px-3 py-2 backdrop-blur lg:hidden">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.13em] text-cyan-200">Current Section</p>
-                <h2 className="text-sm font-semibold text-white">{activeAdminNavItem.label}</h2>
-              </div>
-              {mobilePrimaryAction && (
-                <button
-                  onClick={mobilePrimaryAction.onClick}
-                  className="min-h-[40px] rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100"
-                >
-                  {mobilePrimaryAction.label}
-                </button>
-              )}
-            </div>
-          </div>
 
           <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-4 space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -9215,7 +9525,7 @@ export default function AdminPage() {
             <h2 className="text-sm font-bold text-fuchsia-200 flex items-center gap-2"><Radar className="w-4 h-4" /> Competitor Watch Discovery Queue</h2>
             <p className="text-xs text-gray-400 mt-1">Modular source discovery for blogs, feeds, docs, GitHub, campaign hubs and news sites. New opportunities are queued here for admin review.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 overflow-x-hidden">
             <label className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-2.5 py-1 text-xs text-gray-300">
               <input
                 type="checkbox"
@@ -10306,6 +10616,60 @@ export default function AdminPage() {
           </select>
         </div>
 
+        <div className="mb-3 rounded-2xl border border-white/10 bg-white/[0.02] p-3 space-y-3">
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-dark-900/60 px-3 py-2">
+            <Search className="h-4 w-4 text-gray-400" />
+            <input
+              value={airdropSearch}
+              onChange={(e) => setAirdropSearch(e.target.value)}
+              placeholder="Search name, slug, ticker, blockchain, contract"
+              className="w-full bg-transparent text-sm text-white placeholder:text-gray-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {([
+              ['all', 'All', airdropQuickFilterCounts.all],
+              ['needs_classification', 'Needs Classification', airdropQuickFilterCounts.needs_classification],
+              ['conflicts', 'Conflicts', airdropQuickFilterCounts.conflicts],
+              ['confirmed', 'Confirmed', airdropQuickFilterCounts.confirmed],
+              ['rewards', 'Rewards', airdropQuickFilterCounts.rewards],
+              ['points', 'Points', airdropQuickFilterCounts.points],
+              ['potential', 'Potential', airdropQuickFilterCounts.potential],
+              ['testnet', 'Testnet', airdropQuickFilterCounts.testnet],
+              ['scam_alerts', 'Scam Alerts', airdropQuickFilterCounts.scam_alerts],
+              ['completed_distribution', 'Completed Distribution', airdropQuickFilterCounts.completed_distribution],
+            ] as Array<[typeof airdropQuickFilter, string, number]>).map(([key, label, count]) => {
+              const active = airdropQuickFilter === key;
+              return (
+                <button
+                  key={`quick-filter-${key}`}
+                  onClick={() => setAirdropQuickFilter(key)}
+                  className={`inline-flex min-h-[40px] items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${active ? 'border-cyan-400/45 bg-cyan-500/14 text-cyan-100' : 'border-white/15 bg-white/[0.03] text-gray-300 hover:bg-white/[0.06]'}`}
+                >
+                  <span>{label}</span>
+                  <span className="rounded-full border border-white/20 px-1.5 py-0.5 text-[10px]">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-2">
+            <button
+              onClick={toggleSelectAllVisibleAirdrops}
+              className="min-h-[38px] rounded-lg border border-white/15 bg-white/[0.03] px-2.5 py-1 text-[11px] text-gray-200 hover:bg-white/[0.08]"
+            >
+              {filteredAirdropListings.length > 0 && filteredAirdropListings.every((row) => selectedAirdropIds.includes(row.id)) ? 'Clear visible' : 'Select visible'}
+            </button>
+            <span className="text-[11px] text-gray-400">{selectedAirdropIds.length} selected</span>
+            <button onClick={() => void runBulkAirdropAction('ai_classify')} disabled={bulkActionBusy || selectedAirdropIds.length === 0} className="min-h-[38px] rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-100 disabled:opacity-50">AI Classify</button>
+            <button onClick={() => void runBulkAirdropAction('publish')} disabled={bulkActionBusy || selectedAirdropIds.length === 0} className="min-h-[38px] rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-100 disabled:opacity-50">Publish</button>
+            <button onClick={() => void runBulkAirdropAction('unpublish')} disabled={bulkActionBusy || selectedAirdropIds.length === 0} className="min-h-[38px] rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-100 disabled:opacity-50">Unpublish</button>
+            <button onClick={() => void runBulkAirdropAction('delete')} disabled={bulkActionBusy || selectedAirdropIds.length === 0} className="min-h-[38px] rounded-lg border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[11px] text-rose-100 disabled:opacity-50">Delete</button>
+            <button onClick={() => void runBulkAirdropAction('run_ai_review')} disabled={bulkActionBusy || selectedAirdropIds.length === 0} className="min-h-[38px] rounded-lg border border-neon-purple/25 bg-neon-purple/10 px-2.5 py-1 text-[11px] text-neon-purple disabled:opacity-50">Run AI Review</button>
+          </div>
+        </div>
+
         <div className="mb-4 rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.05] p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -10349,11 +10713,11 @@ export default function AdminPage() {
                 <tbody className="divide-y divide-white/5">
                   {classificationAuditIssueRows.map((row) => {
                     const checklistFlags = [
-                      row.missingClassification ? 'Missing classification' : null,
-                      row.conflictingFields ? 'Conflicting fields' : null,
-                      row.missingContractForLiveToken ? 'Missing contract for live token' : null,
-                      row.pointsNameMissing ? 'Points name missing for points_program' : null,
-                      row.riskReasonsMissing ? 'Risk reasons missing for scam_alert' : null,
+                      row.missingClassification ? '⚠ Needs Classification' : null,
+                      row.conflictingFields ? 'Conflicting Fields' : null,
+                      row.missingContractForLiveToken ? 'Live Token Missing Contract' : null,
+                      row.pointsNameMissing ? 'Points Program Missing Name' : null,
+                      row.riskReasonsMissing ? 'Scam Alert Missing Reasons' : null,
                     ].filter(Boolean) as string[];
 
                     return (
@@ -10364,12 +10728,37 @@ export default function AdminPage() {
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex flex-wrap gap-1.5">
-                            {checklistFlags.map((flag) => (
+                            {checklistFlags.map((flag) => flag === '⚠ Needs Classification' ? (
+                              <button
+                                key={`${row.id}-${flag}`}
+                                onClick={() => void openEditById(row.id)}
+                                className="rounded-full border border-amber-500/30 bg-amber-500/12 px-2 py-0.5 text-[10px] font-semibold text-amber-100 hover:bg-amber-500/20"
+                              >
+                                {flag}
+                              </button>
+                            ) : (
                               <span key={`${row.id}-${flag}`} className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-100">{flag}</span>
                             ))}
                           </div>
-                          {row.conflictMessages.length > 0 ? (
-                            <p className="mt-1.5 text-[10px] leading-relaxed text-gray-400">{row.conflictMessages[0]}</p>
+                          {row.conflictingFields && row.conflictMessages.length > 0 ? (
+                            <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/[0.08] p-2">
+                              <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-100">⚠ Classification Conflict</p>
+                              <p className="mt-1 text-[10px] leading-relaxed text-amber-50/90">Reason: {row.conflictMessages[0]}</p>
+                              <div className="mt-2 flex items-center gap-1.5">
+                                <button
+                                  onClick={() => void applyAiSuggestionToAirdrop(row.id)}
+                                  className="rounded-md border border-cyan-400/30 bg-cyan-500/10 px-2 py-1 text-[10px] font-semibold text-cyan-100"
+                                >
+                                  Fix Automatically (AI Suggestion)
+                                </button>
+                                <button
+                                  onClick={() => void openEditById(row.id)}
+                                  className="rounded-md border border-white/20 bg-white/[0.04] px-2 py-1 text-[10px] font-semibold text-gray-100"
+                                >
+                                  Edit Manually
+                                </button>
+                              </div>
+                            </div>
                           ) : null}
                         </td>
                         <td className="px-3 py-2 text-gray-300">
@@ -10389,7 +10778,7 @@ export default function AdminPage() {
                         <td className="px-3 py-2">
                           <div className="flex items-center justify-end gap-1">
                             <button
-                              onClick={() => void openEdit(airdrops.find((entry) => entry.id === row.id) || null)}
+                              onClick={() => void openEditById(row.id)}
                               className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[11px] text-sky-100 hover:bg-sky-500/20"
                             >
                               Review
@@ -10414,71 +10803,41 @@ export default function AdminPage() {
 
         <div className="space-y-3 md:hidden mb-3">
           {filteredAirdropListings.map((a) => {
-            const isOpen = expandedAirdropIds.includes(a.id);
             const opportunityType = getOpportunityType(a);
-            const riskCls = a.risk_level === 'Low' ? 'text-emerald-400' : a.risk_level === 'High' ? 'text-rose-400' : 'text-amber-400';
-            const scoreCls = a.trust_score == null ? 'text-gray-500' : a.trust_score >= 75 ? 'text-emerald-400' : a.trust_score >= 50 ? 'text-amber-400' : 'text-rose-400';
+            const row = a as unknown as Record<string, unknown>;
+            const needsClassification = !row.opportunity_type || !row.past_distribution_status;
             return (
-              <article key={a.id} className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
-                <div className="flex items-start justify-between gap-3">
+              <article key={a.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-2.5">
+                <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white truncate">{a.name}</p>
                     <span className={`mt-1 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getOpportunityTypeTone(opportunityType)}`}>
                       {opportunityType}
                     </span>
-                    <p className="text-[11px] text-gray-500 mt-1">State: {a.listing_state} · {a.published ? 'Published' : 'Draft'}</p>
-                    <div className="mt-1 flex items-center gap-2 text-[11px]">
-                      <span className={scoreCls}>Trust {a.trust_score ?? '—'}</span>
-                      <span className={riskCls}>Risk {a.risk_level}</span>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-gray-300">
+                      <span>Trust <span className="font-semibold text-white">{a.trust_score ?? '—'}</span></span>
+                      <span>Risk <span className="font-semibold text-white">{a.risk_level}</span></span>
+                      <span>State <span className="font-semibold text-white">{a.listing_state}</span></span>
                     </div>
                   </div>
-                  <button onClick={() => toggleAirdropForm(a.id)} className="min-h-[40px] px-3 rounded-lg border border-white/10 text-xs text-gray-300">
-                    {isOpen ? 'Hide' : 'Open'}
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedAirdropIds.includes(a.id)}
+                      onChange={() => toggleAirdropSelection(a.id)}
+                      className="h-4 w-4 rounded border-white/20 bg-dark-900/70"
+                      aria-label={`Select ${a.name}`}
+                    />
+                    <button onClick={() => void openEdit(a)} className="min-h-[36px] rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 text-[11px] text-sky-100">Open</button>
+                  </div>
                 </div>
-
-                {isOpen && (
-                  <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
-                    <p className="text-xs text-gray-400 leading-relaxed">{a.ai_summary || 'No AI summary yet. Run AI analysis to populate.'}</p>
-                    {typeof (a.opportunity_intelligence as Record<string, unknown> | null | undefined)?.explanation === 'string' && (
-                      <p className="text-[11px] text-gray-500 leading-relaxed">
-                        Why score: {((a.opportunity_intelligence as Record<string, unknown>).explanation as string).slice(0, 220)}
-                      </p>
-                    )}
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">AI analysis: {hasLastAnalyzedAt(a) ? 'Available' : 'Not run'}</div>
-                      <div className="rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-gray-300">Reviewer notes: {a.blacklist_reason ? 'Available' : 'None'}</div>
-                    </div>
-                    {a.blacklist_reason && <p className="text-[11px] text-amber-300">Notes: {a.blacklist_reason}</p>}
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => void openEdit(a)} className="min-h-[42px] rounded-xl border border-sky-500/25 bg-sky-500/10 text-xs text-sky-200">Edit</button>
-                      <button onClick={() => runAnalysis(a, true)} className="min-h-[42px] rounded-xl border border-neon-purple/25 bg-neon-purple/10 text-xs text-neon-purple">Run AI</button>
-                      <button onClick={() => void moderateAirdrop(a, 'approve')} className="min-h-[42px] rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-xs text-emerald-200">Approve</button>
-                      <button onClick={() => void moderateAirdrop(a, 'reject')} className="min-h-[42px] rounded-xl border border-amber-500/25 bg-amber-500/10 text-xs text-amber-200">Reject</button>
-                      <button onClick={() => void moderateAirdrop(a, 'blacklist')} className="min-h-[42px] rounded-xl border border-rose-500/25 bg-rose-500/10 text-xs text-rose-200">Blacklist</button>
-                      <button onClick={() => setDeletingAirdrop(a)} className="min-h-[42px] rounded-xl border border-rose-500/25 bg-rose-500/10 text-xs text-rose-200">Delete</button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={async () => {
-                          const patch = { published: !a.published, human_verified: !a.published ? true : a.human_verified };
-                          const { error } = await supabase.from('airdrops').update(patch).eq('id', a.id);
-                          if (error) {
-                            showToast(`Unable to ${a.published ? 'unpublish' : 'publish'}: ${describeError(error)}`, 'error');
-                            return;
-                          }
-                          setAirdrops(prev => prev.map(x => x.id === a.id ? { ...x, ...patch } : x));
-                          fetchStats();
-                          showToast(a.published ? 'Airdrop unpublished' : 'Airdrop published');
-                        }}
-                        className="min-h-[42px] rounded-xl border border-white/20 bg-white/[0.04] text-xs text-gray-200"
-                      >
-                        {a.published ? 'Unpublish' : 'Publish'}
-                      </button>
-                      <button onClick={() => window.open(`/airdrop/${a.slug}`, '_blank', 'noopener,noreferrer')} className="min-h-[42px] rounded-xl border border-white/20 bg-white/[0.04] text-xs text-gray-200">Open Listing</button>
-                    </div>
-                  </div>
+                {needsClassification && (
+                  <button
+                    onClick={() => void openEditById(a.id)}
+                    className="mt-2 inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/12 px-2 py-0.5 text-[10px] font-semibold text-amber-100"
+                  >
+                    ⚠ Needs Classification
+                  </button>
                 )}
               </article>
             );
@@ -10486,16 +10845,25 @@ export default function AdminPage() {
         </div>
 
         <div className="glass-card overflow-x-auto hidden md:block">
-          <table className="w-full text-sm min-w-[680px]">
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="border-b border-white/5">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Name</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden sm:table-cell">Category</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Risk</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Score</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Expiry</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                <th className="text-center px-2 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider w-10">
+                  <input
+                    type="checkbox"
+                    checked={filteredAirdropListings.length > 0 && filteredAirdropListings.every((row) => selectedAirdropIds.includes(row.id))}
+                    onChange={toggleSelectAllVisibleAirdrops}
+                    className="h-4 w-4 rounded border-white/20 bg-dark-900/70"
+                    aria-label="Select visible listings"
+                  />
+                </th>
+                <th className="text-left px-2 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Name</th>
+                <th className="text-left px-2 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider hidden sm:table-cell">Type</th>
+                <th className="text-left px-2 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">State</th>
+                <th className="text-left px-2 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider hidden md:table-cell">Risk</th>
+                <th className="text-center px-2 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Score</th>
+                <th className="text-left px-2 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider hidden lg:table-cell">Expiry</th>
+                <th className="text-right px-2 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -10506,44 +10874,57 @@ export default function AdminPage() {
                 const opportunityType = getOpportunityType(a);
                 const riskCls = a.risk_level === 'Low' ? 'text-emerald-400' : a.risk_level === 'High' ? 'text-rose-400' : 'text-amber-400';
                 const scoreCls = a.trust_score == null ? 'text-gray-600' : a.trust_score >= 75 ? 'text-emerald-400' : a.trust_score >= 50 ? 'text-amber-400' : 'text-rose-400';
+                const needsClassification = !(a as unknown as Record<string, unknown>).opportunity_type || !(a as unknown as Record<string, unknown>).past_distribution_status;
                 return (
                   <tr key={a.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-lg bg-dark-700 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                    <td className="px-2 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedAirdropIds.includes(a.id)}
+                        onChange={() => toggleAirdropSelection(a.id)}
+                        className="h-4 w-4 rounded border-white/20 bg-dark-900/70"
+                        aria-label={`Select ${a.name}`}
+                      />
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-md bg-dark-700 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
                           {a.logo_url
                             ? <img src={a.logo_url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                            : <span className="text-xs font-bold gradient-text">{a.name[0]}</span>}
+                            : <span className="text-[10px] font-bold gradient-text">{a.name[0]}</span>}
                         </div>
-                        <div>
-                          <div className="font-medium text-white text-sm leading-tight">{a.name}</div>
-                          {a.ticker && <div className="text-[10px] text-gray-500 font-mono">{a.ticker}</div>}
+                        <div className="min-w-0">
+                          <div className="truncate text-xs font-medium leading-tight text-white">{a.name}</div>
+                          <div className="mt-0.5 flex items-center gap-1.5">
+                            {a.ticker && <span className="text-[10px] text-gray-500 font-mono">{a.ticker}</span>}
+                            {needsClassification && <span className="rounded-full border border-amber-500/30 bg-amber-500/12 px-1.5 py-0.5 text-[9px] font-semibold text-amber-100">⚠ Needs Classification</span>}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 hidden sm:table-cell">
+                    <td className="px-2 py-2 hidden sm:table-cell">
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getOpportunityTypeTone(opportunityType)}`}>
                         {opportunityType}
                       </span>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      <span className={`text-xs font-medium ${
+                    <td className="px-2 py-2 hidden md:table-cell">
+                      <span className={`text-[11px] font-medium ${
                         a.status === 'Active' ? 'text-emerald-400' :
                         a.status === 'Ending Soon' ? 'text-amber-400' : 'text-gray-500'
                       }`}>{a.status}</span>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      <span className={`text-xs font-medium ${riskCls}`}>{a.risk_level}</span>
+                    <td className="px-2 py-2 hidden md:table-cell">
+                      <span className={`text-[11px] font-medium ${riskCls}`}>{a.risk_level}</span>
                     </td>
-                    <td className="px-4 py-3 text-center hidden lg:table-cell">
-                      <span className={`text-xs font-bold tabular-nums ${scoreCls}`}>
+                    <td className="px-2 py-2 text-center hidden lg:table-cell">
+                      <span className={`text-[11px] font-bold tabular-nums ${scoreCls}`}>
                         {a.trust_score != null ? a.trust_score : '—'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell">
-                      <span className="text-xs text-gray-400">{expiry ?? '—'}</span>
+                    <td className="px-2 py-2 hidden lg:table-cell">
+                      <span className="text-[11px] text-gray-400">{expiry ?? '—'}</span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-2">
                       <div className="flex items-center justify-end gap-1">
                         {/* Publish toggle */}
                         <button
@@ -11240,57 +11621,67 @@ export default function AdminPage() {
       </div>
 
       {mobileAdminMenuOpen && (
-        <div className="fixed inset-0 z-[80] bg-dark-950/97 backdrop-blur-sm lg:hidden">
-          <div className="flex h-full flex-col px-4 py-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-white">Admin Menu</p>
+        <div className="fixed inset-0 z-[82] lg:hidden">
+          <button
+            onClick={() => setMobileAdminMenuOpen(false)}
+            className="absolute inset-0 bg-black/55 backdrop-blur-[1px]"
+            aria-label="Close navigation drawer"
+          />
+
+          <aside className="absolute right-0 top-0 h-full w-[86vw] max-w-sm border-l border-white/10 bg-[linear-gradient(145deg,rgba(10,16,34,0.97),rgba(8,13,28,0.98))] shadow-[0_24px_80px_rgba(0,0,0,0.55)] animate-slide-up">
+            <div className="flex h-full flex-col px-3 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.12em] text-cyan-200">Admin Navigation</p>
+                  <p className="text-sm font-semibold text-white">Menu</p>
+                </div>
+                <button
+                  onClick={() => setMobileAdminMenuOpen(false)}
+                  className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg border border-white/20 bg-white/[0.04] text-gray-200"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2">
+                <Search className="h-4 w-4 text-gray-400" />
+                <input
+                  value={mobileAdminMenuQuery}
+                  onChange={(e) => setMobileAdminMenuQuery(e.target.value)}
+                  placeholder="Search sections"
+                  className="w-full bg-transparent text-sm text-white placeholder:text-gray-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="mt-3 flex-1 space-y-2 overflow-y-auto pb-4">
+                {filteredMobileAdminMenuItems.map((item) => {
+                  const active = adminView === item.id;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={`mobile-admin-menu-${item.key}`}
+                      onClick={() => openAdminSection(item.id, item.sectionId)}
+                      className={`flex min-h-[48px] w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-sm font-medium transition-all ${active ? 'border-cyan-400/45 bg-cyan-500/15 text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.15)]' : 'border-white/10 bg-white/[0.02] text-gray-100 hover:bg-white/[0.05]'}`}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+                {filteredMobileAdminMenuItems.length === 0 && (
+                  <p className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-4 text-center text-xs text-gray-400">No section matches your search.</p>
+                )}
+              </div>
+
               <button
-                onClick={() => setMobileAdminMenuOpen(false)}
-                className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-white/20 bg-white/[0.04] px-3 py-2 text-xs text-gray-200"
+                onClick={async () => { await signOut(); navigate('/'); }}
+                className="mt-auto inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm font-semibold text-rose-100"
               >
-                <X className="h-4 w-4" />
-                Close
+                <LogOut className="h-4 w-4" />
+                Logout
               </button>
             </div>
-
-            <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2">
-              <Search className="h-4 w-4 text-gray-400" />
-              <input
-                value={mobileAdminMenuQuery}
-                onChange={(e) => setMobileAdminMenuQuery(e.target.value)}
-                placeholder="Search sections"
-                className="w-full bg-transparent text-sm text-white placeholder:text-gray-500 focus:outline-none"
-              />
-            </div>
-
-            <div className="mt-3 flex-1 space-y-2 overflow-y-auto pb-4">
-              {filteredMobileAdminMenuItems.map((item) => {
-                const active = adminView === item.id;
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={`mobile-admin-menu-${item.key}`}
-                    onClick={() => openAdminSection(item.id, item.sectionId)}
-                    className={`flex min-h-[52px] w-full items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${active ? 'border-cyan-400/40 bg-cyan-500/12 text-cyan-100' : 'border-white/10 bg-white/[0.02] text-gray-100 hover:bg-white/[0.05]'}`}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-              {filteredMobileAdminMenuItems.length === 0 && (
-                <p className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-4 text-center text-xs text-gray-400">No section matches your search.</p>
-              )}
-            </div>
-
-            <button
-              onClick={async () => { await signOut(); navigate('/'); }}
-              className="mt-auto inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </button>
-          </div>
+          </aside>
         </div>
       )}
 
@@ -11313,6 +11704,12 @@ export default function AdminPage() {
           setForm={setForm}
           onClose={() => setModalMode(null)}
           onSave={saveForm}
+          onDelete={modalMode === 'edit' ? () => {
+            const current = airdrops.find((entry) => entry.id === editingId) ?? null;
+            if (!current) return;
+            setModalMode(null);
+            setDeletingAirdrop(current);
+          } : undefined}
           saving={saving}
         />
       )}
