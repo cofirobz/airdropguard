@@ -1,1 +1,0 @@
-function t(e){return e.toLowerCase().trim().replace(/[^a-z0-9-\s_]/g,"").replace(/[\s_]+/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"")}function c(e,n){const o=e.toLowerCase().trim();if(!n)return`/go/${encodeURIComponent(o)}`;const r=t(n);return r?`/go/${encodeURIComponent(o)}?source=${encodeURIComponent(r)}`:`/go/${encodeURIComponent(o)}`}export{c as b};
