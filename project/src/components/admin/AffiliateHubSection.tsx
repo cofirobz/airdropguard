@@ -34,6 +34,8 @@ interface AffiliateLinkRow {
   notes: string | null;
   commission_rate: string | null;
   payment_threshold: string | null;
+  manual_conversions: number | null;
+  manual_estimated_revenue: number | null;
   tags: string[] | null;
   priority_order: number;
   created_at: string;
@@ -75,6 +77,8 @@ interface AffiliateFormState {
   seo_title: string;
   meta_description: string;
   notes: string;
+  manual_conversions: string;
+  manual_estimated_revenue: string;
   priority_order: string;
   is_featured: boolean;
   is_active: boolean;
@@ -106,6 +110,8 @@ const BLANK_FORM: AffiliateFormState = {
   disclosure_text: DEFAULT_DISCLOSURE,
   commission_rate: '',
   payment_threshold: '',
+  manual_conversions: '0',
+  manual_estimated_revenue: '0',
   tags: '',
   seo_title: '',
   meta_description: '',
@@ -234,7 +240,7 @@ export function AffiliateHubSection({
       const [linksRes, clicksRes] = await Promise.all([
         supabase
           .from('affiliate_links')
-          .select('id, name, slug, category, destination_url, logo_url, banner_image_url, description, full_description, why_we_recommend, best_for, pros, cons, security_benefits, things_to_consider, disclosure_text, official_website, button_text, seo_title, meta_description, is_active, is_featured, show_on_recommended_tools, show_on_homepage, show_on_learn_articles, show_on_scam_alerts, notes, commission_rate, payment_threshold, tags, priority_order, created_at, updated_at, last_click_at')
+          .select('id, name, slug, category, destination_url, logo_url, banner_image_url, description, full_description, why_we_recommend, best_for, pros, cons, security_benefits, things_to_consider, disclosure_text, official_website, button_text, seo_title, meta_description, is_active, is_featured, show_on_recommended_tools, show_on_homepage, show_on_learn_articles, show_on_scam_alerts, notes, commission_rate, payment_threshold, manual_conversions, manual_estimated_revenue, tags, priority_order, created_at, updated_at, last_click_at')
           .order('updated_at', { ascending: false }),
         supabase
           .from('affiliate_clicks')
@@ -299,6 +305,8 @@ export function AffiliateHubSection({
       disclosure_text: row.disclosure_text || DEFAULT_DISCLOSURE,
       commission_rate: row.commission_rate || '',
       payment_threshold: row.payment_threshold || '',
+      manual_conversions: String(Math.max(0, Number(row.manual_conversions ?? 0))),
+      manual_estimated_revenue: String(Math.max(0, Number(row.manual_estimated_revenue ?? 0))),
       tags: (row.tags || []).join(', '),
       seo_title: row.seo_title || '',
       meta_description: row.meta_description || '',
@@ -366,6 +374,28 @@ export function AffiliateHubSection({
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 12);
   }, [recentClicks]);
 
+  const clickBreakdownById = useMemo(() => {
+    const byId = new Map<string, { placements: Map<string, number>; sources: Map<string, number> }>();
+
+    recentClicks.forEach((click) => {
+      const key = click.affiliate_link_id;
+      const current = byId.get(key) || { placements: new Map<string, number>(), sources: new Map<string, number>() };
+
+      const placement = click.placement_name || 'unknown';
+      const source = click.tracker_value || click.referrer || 'direct';
+
+      current.placements.set(placement, (current.placements.get(placement) || 0) + 1);
+      current.sources.set(source, (current.sources.get(source) || 0) + 1);
+      byId.set(key, current);
+    });
+
+    return byId;
+  }, [recentClicks]);
+
+  const formatRevenue = useCallback((value: number) => {
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
+  }, []);
+
   const categoryOptions = useMemo(() => Array.from(new Set(rows.map((row) => row.category || 'Uncategorized'))).sort(), [rows]);
 
   const filteredRows = useMemo(() => {
@@ -386,10 +416,14 @@ export function AffiliateHubSection({
     const normalizedLogoUrl = normalizeOptionalHttpUrl(form.logo_url);
     const normalizedBannerUrl = normalizeOptionalHttpUrl(form.banner_image_url);
     const normalizedOfficialWebsite = normalizeOptionalHttpUrl(form.official_website);
+    const manualConversions = Math.max(0, Number(form.manual_conversions || '0'));
+    const manualEstimatedRevenue = Math.max(0, Number(form.manual_estimated_revenue || '0'));
 
     if (!form.name.trim()) return showToast('Partner name is required.', 'error');
     if (!slug) return showToast('Slug is required.', 'error');
     if (!/^https?:\/\//i.test(destination)) return showToast('Destination URL must start with http:// or https://', 'error');
+    if (!Number.isFinite(manualConversions)) return showToast('Manual conversions must be a valid number.', 'error');
+    if (!Number.isFinite(manualEstimatedRevenue)) return showToast('Estimated revenue must be a valid number.', 'error');
     if (form.logo_url.trim() && !normalizedLogoUrl) return showToast('Logo URL must be a valid http(s) URL.', 'error');
     if (form.banner_image_url.trim() && !normalizedBannerUrl) return showToast('Banner URL must be a valid http(s) URL.', 'error');
     if (form.official_website.trim() && !normalizedOfficialWebsite) return showToast('Official Website must be a valid http(s) URL.', 'error');
@@ -416,6 +450,8 @@ export function AffiliateHubSection({
         disclosure_text: form.disclosure_text.trim() || null,
         commission_rate: form.commission_rate.trim() || null,
         payment_threshold: form.payment_threshold.trim() || null,
+        manual_conversions: Math.round(manualConversions),
+        manual_estimated_revenue: Number(manualEstimatedRevenue.toFixed(2)),
         tags: parseTags(form.tags),
         seo_title: form.seo_title.trim() || null,
         meta_description: form.meta_description.trim() || null,
@@ -526,11 +562,14 @@ export function AffiliateHubSection({
           <input value={form.destination_url} onChange={(e) => setForm((p) => ({ ...p, destination_url: e.target.value }))} placeholder="Base Affiliate URL *" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.logo_url} onChange={(e) => setForm((p) => ({ ...p, logo_url: e.target.value }))} placeholder="Logo URL" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.button_text} onChange={(e) => setForm((p) => ({ ...p, button_text: e.target.value }))} placeholder="Button Text" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
+          <input value={form.manual_conversions} onChange={(e) => setForm((p) => ({ ...p, manual_conversions: e.target.value }))} placeholder="Manual buys/conversions" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
+          <input value={form.manual_estimated_revenue} onChange={(e) => setForm((p) => ({ ...p, manual_estimated_revenue: e.target.value }))} placeholder="Estimated revenue (manual)" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.priority_order} onChange={(e) => setForm((p) => ({ ...p, priority_order: e.target.value }))} placeholder="Display order" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
         </div>
 
         <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="Short Description (cards)" rows={2} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
         <textarea value={form.why_we_recommend} onChange={(e) => setForm((p) => ({ ...p, why_we_recommend: e.target.value }))} placeholder="Why We Recommend This" rows={2} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
+        <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Payout and affiliate dashboard notes" rows={2} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 text-xs text-gray-200">
           <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={form.is_featured} onChange={(e) => setForm((p) => ({ ...p, is_featured: e.target.checked }))} className="h-3.5 w-3.5" />Featured</label>
@@ -564,6 +603,16 @@ export function AffiliateHubSection({
         <div className="space-y-2 md:hidden">
           {filteredRows.map((row) => {
             const stats = clickStatsById.get(row.id) || { total: 0, today: 0, d7: 0, d30: 0, lastClick: null };
+            const manualBuys = Math.max(0, Number(row.manual_conversions ?? 0));
+            const manualRevenue = Math.max(0, Number(row.manual_estimated_revenue ?? 0));
+            const conversionRate = stats.total > 0 ? (manualBuys / stats.total) * 100 : 0;
+            const breakdown = clickBreakdownById.get(row.id);
+            const topPlacement = breakdown
+              ? Array.from(breakdown.placements.entries()).sort((a, b) => b[1] - a[1])[0]
+              : null;
+            const topSource = breakdown
+              ? Array.from(breakdown.sources.entries()).sort((a, b) => b[1] - a[1])[0]
+              : null;
             return (
               <article key={`affiliate-mobile-${row.id}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
                 <div className="flex items-start justify-between gap-2">
@@ -578,8 +627,17 @@ export function AffiliateHubSection({
                 </div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-gray-300">
                   <div>Total: {stats.total}</div>
+                  <div>Today: {stats.today}</div>
                   <div>7d: {stats.d7}</div>
                   <div>30d: {stats.d30}</div>
+                </div>
+                <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1.5 text-[11px] text-gray-300">
+                  <p>Last click: {formatWhen(stats.lastClick)}</p>
+                  <p className="mt-1">Placement: {topPlacement ? `${topPlacement[0]} (${topPlacement[1]})` : 'No clicks yet'}</p>
+                  <p className="mt-1">Source: {topSource ? `${topSource[0]} (${topSource[1]})` : 'No clicks yet'}</p>
+                  <p className="mt-1">Manual buys: {manualBuys}</p>
+                  <p className="mt-1">Conversion rate: {conversionRate.toFixed(2)}%</p>
+                  <p className="mt-1">Est. revenue: {formatRevenue(manualRevenue)}</p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   <button onClick={() => void copyInternalUrl(row.slug)} className="rounded-md border border-white/15 bg-white/[0.03] px-2 py-1 text-[11px] text-gray-200">Copy URL</button>
@@ -613,6 +671,10 @@ export function AffiliateHubSection({
                 <th className="px-2 py-2">Total</th>
                 <th className="px-2 py-2">7d</th>
                 <th className="px-2 py-2">30d</th>
+                <th className="px-2 py-2">Manual Buys</th>
+                <th className="px-2 py-2">Conversion Rate</th>
+                <th className="px-2 py-2">Estimated Revenue</th>
+                <th className="px-2 py-2">Placement / Source</th>
                 <th className="px-2 py-2">Actions</th>
               </tr>
             </thead>
@@ -620,6 +682,16 @@ export function AffiliateHubSection({
               {filteredRows.map((row) => {
                 const stats = clickStatsById.get(row.id) || { total: 0, today: 0, d7: 0, d30: 0, lastClick: null };
                 const internalUrl = `${safeHost()}/go/${row.slug}`;
+                const manualBuys = Math.max(0, Number(row.manual_conversions ?? 0));
+                const manualRevenue = Math.max(0, Number(row.manual_estimated_revenue ?? 0));
+                const conversionRate = stats.total > 0 ? (manualBuys / stats.total) * 100 : 0;
+                const breakdown = clickBreakdownById.get(row.id);
+                const topPlacement = breakdown
+                  ? Array.from(breakdown.placements.entries()).sort((a, b) => b[1] - a[1])[0]
+                  : null;
+                const topSource = breakdown
+                  ? Array.from(breakdown.sources.entries()).sort((a, b) => b[1] - a[1])[0]
+                  : null;
                 return (
                   <tr key={row.id} className="border-t border-white/10">
                     <td className="px-2 py-2">
@@ -645,9 +717,20 @@ export function AffiliateHubSection({
                         /go/{row.slug}
                       </button>
                     </td>
-                    <td className="px-2 py-2">{stats.total}</td>
+                    <td className="px-2 py-2">
+                      <p>{stats.total}</p>
+                      <p className="text-[10px] text-gray-500">Today {stats.today}</p>
+                      <p className="text-[10px] text-gray-500">Last {formatWhen(stats.lastClick)}</p>
+                    </td>
                     <td className="px-2 py-2">{stats.d7}</td>
                     <td className="px-2 py-2">{stats.d30}</td>
+                    <td className="px-2 py-2">{manualBuys}</td>
+                    <td className="px-2 py-2">{conversionRate.toFixed(2)}%</td>
+                    <td className="px-2 py-2">{formatRevenue(manualRevenue)}</td>
+                    <td className="px-2 py-2 text-[11px] text-gray-300">
+                      <p>{topPlacement ? `${topPlacement[0]} (${topPlacement[1]})` : 'No placement clicks yet'}</p>
+                      <p className="mt-1 text-gray-500">{topSource ? `${topSource[0]} (${topSource[1]})` : 'No source clicks yet'}</p>
+                    </td>
                     <td className="px-2 py-2">
                       <div className="flex flex-wrap gap-1">
                         <button onClick={() => startEdit(row)} className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-100">Edit</button>
@@ -669,7 +752,7 @@ export function AffiliateHubSection({
               })}
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-2 py-4 text-center text-xs text-gray-400">No affiliate records match the current filters.</td>
+                  <td colSpan={13} className="px-2 py-4 text-center text-xs text-gray-400">No affiliate records match the current filters.</td>
                 </tr>
               ) : null}
             </tbody>

@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Inbox, CheckCheck, XCircle, ChevronDown, ChevronUp, ExternalLink,
   FileText, Plus, X, Pencil, Trash2, AlertTriangle, LogOut, ShieldCheck, Gift,
-  ImagePlus, Monitor, CalendarClock, BadgeCheck, Bell, Newspaper, Radar, Sparkles,
+  ImagePlus, Monitor, CalendarClock, BadgeCheck, Bell, Newspaper, Radar, Sparkles, Menu, Search,
 } from 'lucide-react';
 import type { Airdrop, Blockchain, Category } from '../lib/types';
 import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
@@ -323,7 +323,7 @@ type BannerDbRow = {
 };
 
 type ContentView = 'airdrops' | 'articles' | 'hero' | 'featured' | 'trending' | 'learn' | 'sections';
-type AdminView = 'overview' | 'airdrops' | 'speculative-tokens' | 'submissions' | 'competitor-watch' | 'ignored-deleted-projects' | 'articles' | 'social-admin' | 'affiliate-hub' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
+type AdminView = 'overview' | 'airdrops' | 'speculative-tokens' | 'submissions' | 'competitor-watch' | 'ignored-deleted-projects' | 'articles' | 'social-admin' | 'affiliate-hub' | 'advertise-admin' | 'api-subscriptions' | 'users' | 'audit-logs' | 'system-tools';
 
 interface ControlArticle {
   id: string;
@@ -2589,6 +2589,8 @@ export default function AdminPage() {
   const [bannerStatusFilter, setBannerStatusFilter] = useState<'all' | BannerStatus>('all');
 
   const [adminView, setAdminView] = useState<AdminView>('overview');
+  const [mobileAdminMenuOpen, setMobileAdminMenuOpen] = useState(false);
+  const [mobileAdminMenuQuery, setMobileAdminMenuQuery] = useState('');
   const [contentView, setContentView] = useState<ContentView>('airdrops');
   const [controlArticles, setControlArticles] = useState<ControlArticle[]>([
     {
@@ -3084,22 +3086,69 @@ export default function AdminPage() {
     { id: 'advertise-admin', label: 'Banners', blurb: 'Placement inventory and campaign lifecycle' },
     { id: 'affiliate-hub', label: 'Affiliate Hub', blurb: 'Partners, links and click analytics' },
     { id: 'competitor-watch', label: 'Analytics', blurb: 'Discovery monitoring and source insights' },
-    { id: 'articles', label: 'Articles / SEO', blurb: 'Content workflow and SEO controls' },
+    { id: 'articles', label: 'Articles & SEO', blurb: 'Content workflow and SEO controls' },
+    { id: 'api-subscriptions', label: 'API & Subscriptions', blurb: 'Subscriber plans, keys and API usage operations' },
     { id: 'social-admin', label: 'Settings', blurb: 'Operational and social publishing settings' },
     { id: 'audit-logs', label: 'Audit Log', blurb: 'Human decisions and admin action trail' },
   ], []);
+
+  const mobileAdminMenuItems = useMemo(() => [
+    { key: 'overview', id: 'overview' as AdminView, label: 'Overview', icon: Sparkles, sectionId: 'admin-overview' },
+    { key: 'airdrops', id: 'airdrops' as AdminView, label: 'Airdrops', icon: Gift, sectionId: 'admin-airdrops' },
+    { key: 'submissions', id: 'submissions' as AdminView, label: 'Submissions', icon: Inbox, sectionId: 'admin-submissions' },
+    { key: 'scam-alerts', id: 'speculative-tokens' as AdminView, label: 'Scam Alerts', icon: ShieldCheck, sectionId: 'admin-speculative-tokens' },
+    { key: 'users', id: 'users' as AdminView, label: 'Users', icon: Bell, sectionId: 'admin-users' },
+    { key: 'banners', id: 'advertise-admin' as AdminView, label: 'Banners', icon: ImagePlus, sectionId: 'admin-advertising' },
+    { key: 'affiliate-hub', id: 'affiliate-hub' as AdminView, label: 'Affiliate Hub', icon: Radar, sectionId: 'admin-affiliate-hub' },
+    { key: 'analytics', id: 'competitor-watch' as AdminView, label: 'Analytics', icon: Brain, sectionId: 'admin-competitor-watch' },
+    { key: 'articles-seo', id: 'articles' as AdminView, label: 'Articles & SEO', icon: Newspaper, sectionId: 'admin-content' },
+    { key: 'api-subscriptions', id: 'api-subscriptions' as AdminView, label: 'API & Subscriptions', icon: Monitor, sectionId: 'admin-revenue' },
+    { key: 'settings', id: 'social-admin' as AdminView, label: 'Settings', icon: RefreshCw, sectionId: 'admin-social-admin' },
+    { key: 'audit-log', id: 'audit-logs' as AdminView, label: 'Audit Log', icon: FileText, sectionId: 'admin-audit-logs' },
+  ], []);
+
+  const filteredMobileAdminMenuItems = useMemo(() => {
+    const needle = mobileAdminMenuQuery.trim().toLowerCase();
+    if (!needle) return mobileAdminMenuItems;
+    return mobileAdminMenuItems.filter((item) => item.label.toLowerCase().includes(needle));
+  }, [mobileAdminMenuItems, mobileAdminMenuQuery]);
 
   const activeAdminNavItem = useMemo(
     () => adminNavItems.find((item) => item.id === adminView) ?? adminNavItems[0],
     [adminNavItems, adminView]
   );
 
-  const canShowSection = useCallback((section: AdminView) => adminView === section, [adminView]);
+  const canShowSection = useCallback((section: AdminView) => {
+    if (section === 'advertise-admin') return adminView === 'advertise-admin';
+    if (section === 'api-subscriptions') return adminView === 'api-subscriptions';
+    return adminView === section;
+  }, [adminView]);
 
   const jumpToSection = (id: string) => {
     const section = document.getElementById(id);
     section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  const openAdminSection = useCallback((view: AdminView, sectionId?: string) => {
+    setAdminView(view);
+    setMobileAdminMenuOpen(false);
+    if (sectionId) {
+      setTimeout(() => jumpToSection(sectionId), 0);
+    }
+  }, []);
+
+  const refreshAdminData = useCallback(() => {
+    setExpandedAdminPanels({});
+    runSectionLoad('airdrops', fetchAirdrops);
+    runSectionLoad('stats', fetchStats);
+    runSectionLoad('submissions', fetchSubmissions);
+    runSectionLoad('scamReports', fetchScamReports);
+    runSectionLoad('auditLogs', fetchAuditLogs);
+    runSectionLoad('aiDrafts', fetchAIDrafts);
+    runSectionLoad('competitorWatch', fetchCompetitorWatchData);
+    runSectionLoad('notifications', fetchAdminNotifications);
+    runSectionLoad('discordSocialOps', fetchDiscordSocialOps);
+  }, [fetchAIDrafts, fetchAdminNotifications, fetchAirdrops, fetchAuditLogs, fetchCompetitorWatchData, fetchDiscordSocialOps, fetchScamReports, fetchStats, fetchSubmissions, runSectionLoad]);
 
   const resolveNotificationAction = useCallback((notification: AdminNotification) => {
     const type = notification.notification_type;
@@ -5416,6 +5465,15 @@ export default function AdminPage() {
     setBannerModalMode('edit');
   };
 
+  const mobilePrimaryAction = useMemo(() => {
+    if (adminView === 'overview') return { label: 'Refresh', onClick: refreshAdminData };
+    if (adminView === 'airdrops') return { label: 'Add Airdrop', onClick: openAdd };
+    if (adminView === 'submissions') return { label: 'Pending', onClick: () => jumpToSection('admin-submissions') };
+    if (adminView === 'advertise-admin') return { label: 'Create Banner', onClick: openAddBanner };
+    if (adminView === 'api-subscriptions') return { label: 'Revenue', onClick: () => jumpToSection('admin-revenue') };
+    return null;
+  }, [adminView, openAdd, openAddBanner, refreshAdminData]);
+
   const saveBannerForm = async () => {
     const destinationUrlError = validateBannerDestinationUrl(bannerForm.destinationUrl);
     if (destinationUrlError) {
@@ -7165,9 +7223,18 @@ export default function AdminPage() {
             <p className="text-[10px] uppercase tracking-[0.14em] text-cyan-200">Admin Control Centre</p>
             <h1 className="truncate text-sm font-semibold text-white sm:text-base">{activeAdminNavItem.label}</h1>
           </div>
-          <div className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs text-gray-300 sm:inline-flex">
-            <Bell className="h-3.5 w-3.5 text-cyan-300" />
-            {notificationsLoading ? 'Loading alerts...' : `${unreadNotificationsCount} unread`}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMobileAdminMenuOpen(true)}
+              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2 text-xs font-semibold text-white lg:hidden"
+            >
+              <Menu className="h-4 w-4" />
+              Admin Menu
+            </button>
+            <div className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs text-gray-300 sm:inline-flex">
+              <Bell className="h-3.5 w-3.5 text-cyan-300" />
+              {notificationsLoading ? 'Loading alerts...' : `${unreadNotificationsCount} unread`}
+            </div>
           </div>
         </div>
       </header>
@@ -7196,18 +7263,7 @@ export default function AdminPage() {
               : <Brain className="w-4 h-4" />}
             {refreshingAll ? 'Analyzing…' : 'Refresh All AI'}
           </button>
-          <button onClick={() => {
-            setExpandedAdminPanels({});
-            runSectionLoad('airdrops', fetchAirdrops);
-            runSectionLoad('stats', fetchStats);
-            runSectionLoad('submissions', fetchSubmissions);
-            runSectionLoad('scamReports', fetchScamReports);
-            runSectionLoad('auditLogs', fetchAuditLogs);
-            runSectionLoad('aiDrafts', fetchAIDrafts);
-            runSectionLoad('competitorWatch', fetchCompetitorWatchData);
-            runSectionLoad('notifications', fetchAdminNotifications);
-            runSectionLoad('discordSocialOps', fetchDiscordSocialOps);
-          }}
+          <button onClick={refreshAdminData}
             aria-label="Refresh admin data"
             className="min-h-[44px] px-3 py-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
@@ -7263,6 +7319,23 @@ export default function AdminPage() {
         </aside>
 
         <main className="space-y-8 rounded-2xl border border-white/10 bg-dark-950/55 p-3 sm:p-4 lg:p-5 pb-24 lg:pb-6">
+          <div className="sticky top-16 z-30 -mx-3 mb-2 border-b border-white/10 bg-dark-950/95 px-3 py-2 backdrop-blur lg:hidden">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.13em] text-cyan-200">Current Section</p>
+                <h2 className="text-sm font-semibold text-white">{activeAdminNavItem.label}</h2>
+              </div>
+              {mobilePrimaryAction && (
+                <button
+                  onClick={mobilePrimaryAction.onClick}
+                  className="min-h-[40px] rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100"
+                >
+                  {mobilePrimaryAction.label}
+                </button>
+              )}
+            </div>
+          </div>
+
           <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-4 space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
@@ -8959,7 +9032,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section id="admin-revenue" className={`rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.05] p-4 space-y-3 ${canShowSection('advertise-admin') ? '' : 'hidden'}`}>
+      <section id="admin-revenue" className={`rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.05] p-4 space-y-3 ${canShowSection('api-subscriptions') ? '' : 'hidden'}`}>
         <h2 className="text-sm font-bold text-emerald-200">REVENUE</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
           <div className="rounded-xl border border-emerald-500/20 px-3 py-2"><p className="text-emerald-100/80">Banner enquiries</p><p className="text-white font-semibold">{pendingBannerEnquiries}</p></div>
@@ -10279,21 +10352,60 @@ export default function AdminPage() {
         </main>
       </div>
 
-      <div className="lg:hidden fixed bottom-3 inset-x-3 z-40">
-        <div className="rounded-2xl border border-white/10 bg-dark-900/95 p-2 shadow-xl backdrop-blur-md">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {adminNavItems.map((item) => (
+      {mobileAdminMenuOpen && (
+        <div className="fixed inset-0 z-[80] bg-dark-950/97 backdrop-blur-sm lg:hidden">
+          <div className="flex h-full flex-col px-4 py-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-white">Admin Menu</p>
               <button
-                key={`mobile-nav-${item.id}`}
-                onClick={() => setAdminView(item.id)}
-                className={`min-h-[42px] shrink-0 rounded-xl border px-3 py-2 text-[11px] font-semibold transition-colors ${adminView === item.id ? 'border-cyan-400/40 bg-cyan-500/12 text-cyan-100' : 'border-white/10 bg-dark-900/60 text-gray-300 hover:border-white/20 hover:text-white'}`}
+                onClick={() => setMobileAdminMenuOpen(false)}
+                className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-white/20 bg-white/[0.04] px-3 py-2 text-xs text-gray-200"
               >
-                {item.label}
+                <X className="h-4 w-4" />
+                Close
               </button>
-            ))}
+            </div>
+
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] px-3 py-2">
+              <Search className="h-4 w-4 text-gray-400" />
+              <input
+                value={mobileAdminMenuQuery}
+                onChange={(e) => setMobileAdminMenuQuery(e.target.value)}
+                placeholder="Search sections"
+                className="w-full bg-transparent text-sm text-white placeholder:text-gray-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="mt-3 flex-1 space-y-2 overflow-y-auto pb-4">
+              {filteredMobileAdminMenuItems.map((item) => {
+                const active = adminView === item.id;
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={`mobile-admin-menu-${item.key}`}
+                    onClick={() => openAdminSection(item.id, item.sectionId)}
+                    className={`flex min-h-[52px] w-full items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition-colors ${active ? 'border-cyan-400/40 bg-cyan-500/12 text-cyan-100' : 'border-white/10 bg-white/[0.02] text-gray-100 hover:bg-white/[0.05]'}`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+              {filteredMobileAdminMenuItems.length === 0 && (
+                <p className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-4 text-center text-xs text-gray-400">No section matches your search.</p>
+              )}
+            </div>
+
+            <button
+              onClick={async () => { await signOut(); navigate('/'); }}
+              className="mt-auto inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-100"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </button>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
       {bannerModalMode && (
