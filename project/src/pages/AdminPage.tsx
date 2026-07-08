@@ -3137,7 +3137,7 @@ export default function AdminPage() {
     }
   }, []);
 
-  const refreshAdminData = useCallback(() => {
+  function refreshAdminData() {
     setExpandedAdminPanels({});
     runSectionLoad('airdrops', fetchAirdrops);
     runSectionLoad('stats', fetchStats);
@@ -3148,7 +3148,7 @@ export default function AdminPage() {
     runSectionLoad('competitorWatch', fetchCompetitorWatchData);
     runSectionLoad('notifications', fetchAdminNotifications);
     runSectionLoad('discordSocialOps', fetchDiscordSocialOps);
-  }, [fetchAIDrafts, fetchAdminNotifications, fetchAirdrops, fetchAuditLogs, fetchCompetitorWatchData, fetchDiscordSocialOps, fetchScamReports, fetchStats, fetchSubmissions, runSectionLoad]);
+  }
 
   const resolveNotificationAction = useCallback((notification: AdminNotification) => {
     const type = notification.notification_type;

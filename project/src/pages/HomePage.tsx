@@ -1917,6 +1917,31 @@ export default function HomePage() {
     { key: 'featured', label: 'Featured', icon: <Layers3 className="w-3.5 h-3.5" /> },
   ];
 
+  const trustScoreValue = typeof trustCounters[4]?.value === 'number'
+    ? Math.max(0, Math.min(100, trustCounters[4].value))
+    : 98;
+  const trustScoreBand = trustScoreValue >= 85 ? 'Excellent' : trustScoreValue >= 70 ? 'Strong' : trustScoreValue >= 50 ? 'Moderate' : 'Watchlist';
+  const trustScoreTextTone = trustScoreValue >= 85
+    ? 'text-emerald-300'
+    : trustScoreValue >= 70
+      ? 'text-cyan-300'
+      : trustScoreValue >= 50
+        ? 'text-amber-300'
+        : 'text-rose-300';
+  const trustScoreBarTone = trustScoreValue >= 85
+    ? 'bg-[linear-gradient(90deg,#22c55e_0%,#34d399_48%,#2dd4bf_100%)]'
+    : trustScoreValue >= 70
+      ? 'bg-[linear-gradient(90deg,#06b6d4_0%,#22d3ee_45%,#60a5fa_100%)]'
+      : trustScoreValue >= 50
+        ? 'bg-[linear-gradient(90deg,#f59e0b_0%,#fbbf24_45%,#f97316_100%)]'
+        : 'bg-[linear-gradient(90deg,#ef4444_0%,#fb7185_45%,#f97316_100%)]';
+  const lowRiskPool = opportunityAirdrops.filter(item => {
+    const risk = String(item.risk_level ?? '').toLowerCase();
+    return risk === 'low' || risk === 'very low';
+  }).length;
+  const trendingNow = opportunityAirdrops.filter(item => item.is_trending).length;
+  const topProjectName = (topVerified[0]?.name || featured?.name || 'Curated watchlist').trim();
+
   return (
     <>
       <SEO
@@ -1926,77 +1951,166 @@ export default function HomePage() {
         schema={homepageSchema}
       />
 
-      <section className="relative overflow-hidden border-b border-cyan-500/10 bg-[radial-gradient(circle_at_8%_8%,rgba(34,211,238,0.18),transparent_24%),radial-gradient(circle_at_88%_14%,rgba(59,130,246,0.2),transparent_22%),linear-gradient(180deg,#030712_0%,#061025_52%,#040a17_100%)]">
+      <section className="relative overflow-hidden border-b border-cyan-500/20 bg-[radial-gradient(circle_at_8%_8%,rgba(34,211,238,0.22),transparent_24%),radial-gradient(circle_at_92%_12%,rgba(59,130,246,0.25),transparent_24%),radial-gradient(circle_at_44%_78%,rgba(16,185,129,0.13),transparent_30%),linear-gradient(180deg,#010612_0%,#04102a_52%,#020913_100%)]">
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-24 top-8 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl" />
-          <div className="absolute -right-20 top-20 h-72 w-72 rounded-full bg-blue-500/25 blur-3xl" />
+          <div className="absolute -left-24 top-8 h-64 w-64 rounded-full bg-cyan-400/25 blur-3xl" />
+          <div className="absolute -right-20 top-20 h-72 w-72 rounded-full bg-blue-500/30 blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 h-40 w-40 rounded-full bg-emerald-400/10 blur-3xl" />
         </div>
 
-        <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 pt-6 sm:px-6 sm:pb-14 sm:pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:px-8 lg:pb-20">
-          <div className="relative z-10">
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100 sm:text-xs">
-              <AiOrb className="h-3.5 w-3.5" />
-              AI Mission Control for crypto airdrops
-            </div>
+        <div className="mx-auto max-w-7xl px-3 pb-7 pt-5 sm:px-6 sm:pb-14 sm:pt-12 lg:px-8 lg:pb-20">
+          <div className="relative z-10 overflow-hidden rounded-[24px] border border-cyan-300/45 bg-[linear-gradient(150deg,rgba(4,14,38,0.97),rgba(2,9,20,0.97))] p-3.5 shadow-[0_0_0_1px_rgba(34,211,238,0.15),0_22px_60px_rgba(3,10,28,0.75)] sm:p-6">
+            <div className="absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_20%_0%,rgba(34,211,238,0.2),transparent_55%)]" />
+            <div className="absolute left-4 top-3 h-px w-24 bg-gradient-to-r from-transparent via-cyan-300/80 to-transparent" />
+            <div className="absolute right-4 top-3 h-px w-24 bg-gradient-to-r from-transparent via-blue-300/80 to-transparent" />
 
-            <h1 className="mt-4 max-w-3xl text-[2rem] font-black leading-[0.95] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-6xl">
-              Stop wasting time on scam airdrops.
-            </h1>
-
-            <p className="mt-3 max-w-xl text-sm font-medium text-gray-200 sm:mt-5 sm:text-lg">
-              Find high-quality crypto opportunities in seconds with AI analysis, human verification and wallet safety intelligence.
-            </p>
-
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:mt-6 sm:flex sm:flex-wrap sm:gap-2.5">
-              {['AI + Human Verified', 'Estimated Reward Forecasts', 'Updated Daily', 'Check Before You Connect'].map((label) => (
-                <ConversionBadge key={label}>{label}</ConversionBadge>
-              ))}
-            </div>
-
-            <div className="mt-5 flex flex-col gap-2.5 sm:mt-7 sm:flex-row">
-              <Link
-                to="/auth"
-                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-cyan-300 px-6 py-3 text-sm font-black text-slate-950 shadow-[0_12px_26px_rgba(34,211,238,0.26)] transition-colors hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100 focus-visible:ring-offset-2 focus-visible:ring-offset-[#040a17]"
-              >
-                Start Free
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                to="/recommended-tools"
-                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-emerald-400/25 bg-emerald-500/12 px-6 py-3 text-sm font-bold text-emerald-100 backdrop-blur transition-colors hover:bg-emerald-500/20"
-              >
-                <Star className="h-4 w-4" />
-                Recommended Tools
-              </Link>
-              <a
-                href="#live-opportunities"
-                className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] px-6 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/[0.1]"
-              >
-                Explore Today&apos;s Opportunities
-              </a>
-            </div>
-
-            <SocialLinksStrip
-              variant="pills"
-              className="mt-4 sm:mt-5 lg:flex-nowrap"
-              label="Active on"
-            />
-
-            <div className="mt-5 grid gap-2 sm:mt-6 sm:grid-cols-3">
-              {[
-                { label: 'AI Online', tone: 'text-cyan-200' },
-                { label: 'Human Reviewed', tone: 'text-emerald-200' },
-                { label: 'Read-Only Wallet Checks', tone: 'text-violet-200' },
-              ].map(item => (
-                <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] font-semibold text-white">
-                  <span className={item.tone}>{item.label}</span>
+            <div className="relative grid gap-4 sm:gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-cyan-100 sm:text-xs">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  AI + Human Verified
                 </div>
-              ))}
-            </div>
-          </div>
 
-          <div className="relative z-10">
-            <HeroMockup item={topVerified[0] ?? featured ?? null} />
+                <h1 className="mt-3.5 max-w-3xl text-[2.15rem] font-black leading-[0.92] tracking-tight text-white sm:mt-4 sm:text-5xl lg:text-[3.65rem]">
+                  Check Before
+                  <span className="block bg-[linear-gradient(95deg,#34d399_2%,#22d3ee_35%,#3b82f6_68%,#8b5cf6_100%)] bg-clip-text text-transparent">
+                    You Connect.
+                  </span>
+                </h1>
+
+                <p className="mt-2.5 max-w-2xl text-[15px] font-medium leading-relaxed text-cyan-50 sm:mt-3 sm:text-lg">
+                  AI analysed. Human reviewed. Trust the airdrops that are actually worth your time.
+                </p>
+
+                <div className="mt-3 grid grid-cols-1 gap-2 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(180deg,rgba(6,17,40,0.88),rgba(4,11,26,0.8))] p-2.5 sm:hidden">
+                  <div className="flex items-center justify-between rounded-xl border border-cyan-300/20 bg-cyan-400/8 px-3 py-2">
+                    <p className="text-[11px] font-semibold text-cyan-100">Trust momentum</p>
+                    <p className={`text-xs font-black ${trustScoreTextTone}`}>{trustScoreValue}%</p>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-800/85">
+                    <div className={`trust-bar-glow h-full rounded-full ${trustScoreBarTone}`} style={{ width: `${trustScoreValue}%` }} />
+                  </div>
+                  <div className="flex gap-1.5 text-[10px] font-semibold text-cyan-100/90">
+                    <span className="inline-flex items-center rounded-full border border-emerald-300/35 bg-emerald-500/10 px-2 py-1">Low-risk picks</span>
+                    <span className="inline-flex items-center rounded-full border border-amber-300/35 bg-amber-500/10 px-2 py-1">Hot now</span>
+                    <span className="inline-flex items-center rounded-full border border-fuchsia-300/35 bg-fuchsia-500/10 px-2 py-1">AI watched</span>
+                  </div>
+                </div>
+
+                <div className="mt-3.5 grid gap-2 border-y border-white/10 py-3 sm:grid-cols-3">
+                  <div className="flex items-center gap-2 rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-2">
+                    <Brain className="h-4 w-4 text-cyan-300" />
+                    <div>
+                      <p className="text-xs font-semibold text-white">AI Analysed</p>
+                      <p className="text-[11px] text-cyan-100/70">Advanced risk scoring</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl border border-violet-300/35 bg-violet-400/10 px-2.5 py-2">
+                    <Users className="h-4 w-4 text-violet-300" />
+                    <div>
+                      <p className="text-xs font-semibold text-white">Human Reviewed</p>
+                      <p className="text-[11px] text-violet-100/70">Expert verification</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 rounded-xl border border-emerald-300/35 bg-emerald-400/10 px-2.5 py-2">
+                    <Shield className="h-4 w-4 text-emerald-300" />
+                    <div>
+                      <p className="text-xs font-semibold text-white">Scam Detection</p>
+                      <p className="text-[11px] text-emerald-100/70">Filter out bad actors</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-xl border border-cyan-300/20 bg-[linear-gradient(170deg,rgba(14,32,58,0.55),rgba(9,20,40,0.35))] px-2 py-2 text-center">
+                    <p className="text-[1.45rem] font-black leading-none text-white sm:text-[1.55rem]">{safeDisplayCount(opportunityAirdrops.length, '+')}</p>
+                    <p className="mt-1 text-[11px] text-cyan-100/70">Airdrops analysed</p>
+                  </div>
+                  <div className="rounded-xl border border-blue-300/20 bg-[linear-gradient(170deg,rgba(20,34,66,0.55),rgba(11,18,37,0.38))] px-2 py-2 text-center">
+                    <p className="text-[1.45rem] font-black leading-none text-white sm:text-[1.55rem]">{safeDisplayCount(communityCount, '+')}</p>
+                    <p className="mt-1 text-[11px] text-blue-100/70">Users protected</p>
+                  </div>
+                  <div className="rounded-xl border border-cyan-300/30 bg-[linear-gradient(160deg,rgba(8,28,52,0.72),rgba(3,16,36,0.82))] px-2 py-2 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                    <p className={`text-[1.45rem] font-black leading-none sm:text-[1.55rem] ${trustScoreTextTone}`}>{trustScoreValue}%</p>
+                    <p className="mt-1 text-[11px] text-cyan-100/80">Trust score trend</p>
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-800/85">
+                      <div
+                        className={`trust-bar-glow h-full rounded-full ${trustScoreBarTone} transition-all duration-700 ease-out`}
+                        style={{ width: `${trustScoreValue}%` }}
+                      />
+                    </div>
+                    <p className={`mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${trustScoreTextTone}`}>{trustScoreBand}</p>
+                  </div>
+                  <div className="rounded-xl border border-fuchsia-300/20 bg-[linear-gradient(170deg,rgba(60,26,68,0.45),rgba(18,13,31,0.35))] px-2 py-2 text-center">
+                    <p className="text-[1.45rem] font-black leading-none text-white sm:text-[1.55rem]">24/7</p>
+                    <p className="mt-1 text-[11px] text-fuchsia-100/70">Monitoring</p>
+                  </div>
+                </div>
+
+                <div className="mt-3.5 grid gap-2 sm:grid-cols-2">
+                  <a
+                    href="#live-opportunities"
+                    className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(98deg,#1fb6ff_0%,#4f8dfb_42%,#7c4dff_100%)] px-5 py-3 text-sm font-black text-white shadow-[0_14px_26px_rgba(59,130,246,0.35)] transition-transform hover:translate-y-[-1px]"
+                  >
+                    Explore Airdrops
+                    <ArrowRight className="h-4 w-4" />
+                  </a>
+                  <CopilotCta
+                    prompt="Review current airdrop opportunities and rank my safest next action."
+                    context="homepage-hero-primary"
+                    className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/[0.1]"
+                  >
+                    <Sparkles className="h-4 w-4 text-cyan-300" />
+                    Ask AI
+                  </CopilotCta>
+                </div>
+
+                <div className="mt-3.5 space-y-2.5">
+                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-100/85">
+                    <Activity className="h-3.5 w-3.5 text-cyan-300" />
+                    Live confidence pulse
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div className="attention-card hero-stagger min-w-[148px] rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(6,182,212,0.16)]" style={{ ['--stagger-delay' as string]: '80ms' }}>
+                      <p className="text-[1rem] font-black leading-none text-cyan-100">{safeDisplayCount(verifiedProjects.length, '+')}</p>
+                      <p className="mt-1 text-[11px] text-cyan-200/85">Trusted right now</p>
+                    </div>
+                    <div className="attention-card hero-stagger min-w-[148px] rounded-xl border border-emerald-300/35 bg-emerald-500/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(16,185,129,0.15)]" style={{ ['--stagger-delay' as string]: '150ms' }}>
+                      <p className="text-[1rem] font-black leading-none text-emerald-100">{safeDisplayCount(lowRiskPool, '+')}</p>
+                      <p className="mt-1 text-[11px] text-emerald-200/85">Low-risk pool</p>
+                    </div>
+                    <div className="attention-card hero-stagger min-w-[148px] rounded-xl border border-amber-300/35 bg-amber-500/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(245,158,11,0.16)]" style={{ ['--stagger-delay' as string]: '220ms' }}>
+                      <p className="text-[1rem] font-black leading-none text-amber-100">{safeDisplayCount(trendingNow, '+')}</p>
+                      <p className="mt-1 text-[11px] text-amber-200/85">Trending this cycle</p>
+                    </div>
+                    <div className="attention-card hero-stagger min-w-[178px] rounded-xl border border-fuchsia-300/35 bg-fuchsia-500/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(217,70,239,0.16)]" style={{ ['--stagger-delay' as string]: '290ms' }}>
+                      <p className="truncate text-[1rem] font-black leading-none text-fuchsia-100">{topProjectName}</p>
+                      <p className="mt-1 text-[11px] text-fuchsia-200/85">Top confidence pick</p>
+                    </div>
+                  </div>
+                  <p className="text-xs leading-relaxed text-cyan-100/85">
+                    Stay for 30 seconds and you get a clearer picture than most users get in 30 minutes of random scrolling.
+                  </p>
+                </div>
+              </div>
+
+              <div className="relative pt-2 sm:pt-2">
+                <div className="mx-auto flex h-[210px] w-[210px] items-center justify-center rounded-full border border-cyan-400/35 bg-[radial-gradient(circle,rgba(34,211,238,0.26),rgba(8,18,42,0.16)_46%,rgba(2,8,20,0.72)_78%)] shadow-[0_0_0_1px_rgba(34,211,238,0.2),0_28px_48px_rgba(3,8,28,0.68)] sm:h-[280px] sm:w-[280px]">
+                  <div className="absolute h-[68%] w-[68%] rounded-full border border-cyan-400/20" />
+                  <div className="absolute h-[86%] w-[86%] rounded-full border border-blue-500/20" />
+                  <ShieldCheck className="h-24 w-24 text-cyan-200 drop-shadow-[0_0_24px_rgba(34,211,238,0.68)] sm:h-28 sm:w-28" />
+                </div>
+                <div className="absolute left-0 top-7 rounded-lg border border-cyan-300/30 bg-cyan-400/15 px-2 py-1 text-[10px] font-semibold text-cyan-100 backdrop-blur sm:left-2">
+                  AI guard active
+                </div>
+                <div className="absolute right-0 top-14 rounded-lg border border-emerald-300/30 bg-emerald-500/15 px-2 py-1 text-[10px] font-semibold text-emerald-100 backdrop-blur sm:right-2">
+                  Threat filter on
+                </div>
+                <div className="mt-4 hidden lg:block">
+                  <HeroMockup item={topVerified[0] ?? featured ?? null} />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

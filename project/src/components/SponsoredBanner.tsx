@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 type SponsorshipLabel = 'Sponsored' | 'Advertisement';
 
 export interface SponsoredBannerData {
@@ -19,6 +21,12 @@ interface SponsoredBannerProps {
 const PLACEHOLDER_BG = 'bg-[linear-gradient(145deg,rgba(8,145,178,0.18),rgba(8,14,26,0.95))]';
 
 export function SponsoredBanner({ banner, compact = false, className = '' }: SponsoredBannerProps) {
+	const [imageFailed, setImageFailed] = useState(false);
+
+	useEffect(() => {
+		setImageFailed(false);
+	}, [banner.imageUrl]);
+
 	if (!banner.active) return null;
 
 	return (
@@ -31,8 +39,13 @@ export function SponsoredBanner({ banner, compact = false, className = '' }: Spo
 			</div>
 
 			<div className={`overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] ${compact ? 'h-16' : 'h-24 sm:h-28'}`}>
-				{banner.imageUrl ? (
-					<img src={banner.imageUrl} alt={banner.altText || `${banner.advertiserName} banner`} className="h-full w-full object-cover" />
+				{banner.imageUrl && !imageFailed ? (
+					<img
+						src={banner.imageUrl}
+						alt={banner.altText || `${banner.advertiserName} banner`}
+						className="h-full w-full object-cover"
+						onError={() => setImageFailed(true)}
+					/>
 				) : (
 					<div className="h-full w-full flex items-center justify-center text-[11px] text-gray-400">Banner visual placeholder</div>
 				)}

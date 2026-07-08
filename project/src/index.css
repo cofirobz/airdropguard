@@ -280,6 +280,51 @@
   .ai-orb-core {
     animation: ai-orb-core 5.4s ease-in-out infinite;
   }
+
+  .hero-stagger {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: hero-stagger-in 0.5s ease-out forwards;
+    animation-delay: var(--stagger-delay, 0ms);
+  }
+
+  .attention-card {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  .attention-card::after {
+    content: "";
+    position: absolute;
+    inset: -140% auto -140% -36%;
+    width: 38%;
+    transform: rotate(18deg) translateX(-140%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
+    animation: attention-sweep 4.8s ease-in-out infinite;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  .attention-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .trust-bar-glow {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .trust-bar-glow::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    width: 24%;
+    transform: translateX(-140%);
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0));
+    animation: trust-bar-sweep 2.8s ease-in-out infinite;
+    pointer-events: none;
+  }
 }
 
 @keyframes flow-pan {
@@ -385,6 +430,43 @@
   }
 }
 
+@keyframes hero-stagger-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes attention-sweep {
+  0%,
+  65% {
+    transform: rotate(18deg) translateX(-140%);
+    opacity: 0;
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: rotate(18deg) translateX(420%);
+    opacity: 0;
+  }
+}
+
+@keyframes trust-bar-sweep {
+  0%,
+  68% {
+    transform: translateX(-140%);
+    opacity: 0;
+  }
+  82% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(460%);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mission-grid::before,
   .mission-network,
@@ -392,8 +474,16 @@
   .mission-orb-pulse,
   .ai-orb-halo,
   .ai-orb-gyro,
-  .ai-orb-core {
+  .ai-orb-core,
+  .hero-stagger,
+  .attention-card::after,
+  .trust-bar-glow::after {
     animation: none !important;
+  }
+
+  .hero-stagger {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 
