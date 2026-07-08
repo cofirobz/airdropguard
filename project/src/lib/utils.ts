@@ -1,13 +1,82 @@
-import type { RiskLevel, RewardPotential, Difficulty, AirdropStatus, Airdrop } from './types';
+import type { RiskLevel, RewardPotential, Difficulty, AirdropStatus, Airdrop, OpportunityTypeKey } from './types';
 
 export type OpportunityType =
-  | 'Verified Airdrop'
-  | 'Testnet'
+  | 'Confirmed Airdrop'
+  | 'Potential Airdrop'
   | 'Points Program'
+  | 'Rewards Program'
+  | 'Testnet'
   | 'Speculative Token'
   | 'Scam Alert';
 
-type ListingClassificationInput = Pick<Airdrop, 'category' | 'listing_state' | 'human_verified'>;
+type ListingClassificationInput = Pick<Airdrop, 'category' | 'listing_state' | 'human_verified' | 'opportunity_type'>;
+
+const OPPORTUNITY_TYPE_LABELS: Record<OpportunityTypeKey, OpportunityType> = {
+  confirmed_airdrop: 'Confirmed Airdrop',
+  potential_airdrop: 'Potential Airdrop',
+  points_program: 'Points Program',
+  rewards_program: 'Rewards Program',
+  testnet: 'Testnet',
+  scam_alert: 'Scam Alert',
+};
+
+const OPPORTUNITY_TYPE_BANNERS: Record<OpportunityType, string> = {
+  'Confirmed Airdrop': 'Token or airdrop has been officially confirmed. Verify contract details before interacting.',
+  'Potential Airdrop': 'No token or claim may exist yet. This is based on ecosystem activity and community expectations.',
+  'Points Program': 'Users currently earn points or credits that may or may not convert into future rewards.',
+  'Rewards Program': 'This is an ongoing rewards or incentives programme, not necessarily a new airdrop.',
+  Testnet: 'This opportunity is based on testnet activity. Rewards are not guaranteed.',
+  'Scam Alert': 'This listing has been flagged as suspicious or dangerous. Do not connect your main wallet.',
+  'Speculative Token': 'This is a speculative token listing. Review token risk, liquidity and contract details carefully.',
+};
+
+function normalizeOpportunityTypeValue(value: unknown): OpportunityType | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+
+  if (normalized in OPPORTUNITY_TYPE_LABELS) {
+    return OPPORTUNITY_TYPE_LABELS[normalized as OpportunityTypeKey];
+  }
+
+  switch (normalized) {
+    case 'Confirmed Airdrop':
+    case 'Potential Airdrop':
+    case 'Points Program':
+    case 'Rewards Program':
+    case 'Testnet':
+    case 'Speculative Token':
+    case 'Scam Alert':
+      return normalized as OpportunityType;
+    case 'Verified Airdrop':
+      return 'Confirmed Airdrop';
+    default:
+      return null;
+  }
+}
+
+export function getOpportunityTypeKey(a: ListingClassificationInput): OpportunityTypeKey | null {
+  const rawType = normalizeOpportunityTypeValue(a.opportunity_type);
+  if (rawType) {
+    switch (rawType) {
+      case 'Confirmed Airdrop': return 'confirmed_airdrop';
+      case 'Potential Airdrop': return 'potential_airdrop';
+      case 'Points Program': return 'points_program';
+      case 'Rewards Program': return 'rewards_program';
+      case 'Testnet': return 'testnet';
+      case 'Scam Alert': return 'scam_alert';
+      case 'Speculative Token': return null;
+    }
+  }
+
+  const categories = Array.isArray(a.category) ? a.category : [];
+
+  if (a.listing_state === 'scam_alert' || categories.includes('Scam Alert')) return 'scam_alert';
+  if (categories.includes('Points Program')) return 'points_program';
+  if (categories.includes('Testnet')) return 'testnet';
+  if (categories.includes('Verified Airdrop')) return 'confirmed_airdrop';
+  return null;
+}
 
 export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
@@ -64,13 +133,13 @@ export function getOpportunityType(
 ): OpportunityType {
   const categories = Array.isArray(a.category) ? a.category : [];
 
-  if (a.listing_state === 'scam_alert' || categories.includes('Scam Alert')) return 'Scam Alert';
   if (categories.includes('Speculative Token')) return 'Speculative Token';
-  if (categories.includes('Points Program')) return 'Points Program';
-  if (categories.includes('Testnet')) return 'Testnet';
-  if (categories.includes('Verified Airdrop')) return 'Verified Airdrop';
-  if (a.listing_state === 'verified' || a.human_verified) return 'Verified Airdrop';
-  return 'Verified Airdrop';
+
+  const key = getOpportunityTypeKey(a);
+  if (key) return OPPORTUNITY_TYPE_LABELS[key];
+
+  if (a.listing_state === 'verified' || a.human_verified) return 'Confirmed Airdrop';
+  return 'Potential Airdrop';
 }
 
 export function isScamAlertListing(a: ListingClassificationInput): boolean {
@@ -93,17 +162,39 @@ export function resolveListingStateFromCategory(a: ListingClassificationInput): 
 }
 
 export function getOpportunityTypeTone(opportunityType: OpportunityType): string {
-  switch (opportunityType) {
-    case 'Verified Airdrop':
+  const normalized = normalizeOpportunityTypeValue(opportunityType) ?? opportunityType;
+
+  switch (normalized) {
+    case 'Confirmed Airdrop':
       return 'text-emerald-200 bg-emerald-500/10 border-emerald-500/30';
+    case 'Potential Airdrop':
+      return 'text-amber-100 bg-amber-500/10 border-amber-500/30';
     case 'Testnet':
-      return 'text-sky-200 bg-sky-500/10 border-sky-500/30';
+      return 'text-cyan-100 bg-cyan-500/10 border-cyan-500/30';
     case 'Points Program':
-      return 'text-amber-200 bg-amber-500/10 border-amber-500/30';
-    case 'Speculative Token':
-      return 'text-rose-100 bg-rose-500/14 border-rose-500/35';
+      return 'text-sky-100 bg-sky-500/10 border-sky-500/30';
+    case 'Rewards Program':
+      return 'text-violet-100 bg-violet-500/10 border-violet-500/30';
     case 'Scam Alert':
       return 'text-rose-100 bg-rose-600/18 border-rose-400/45';
+    case 'Speculative Token':
+      return 'text-rose-100 bg-rose-500/14 border-rose-500/35';
+  }
+}
+
+export function getOpportunityTypeBannerCopy(opportunityType: OpportunityType): string {
+  return OPPORTUNITY_TYPE_BANNERS[normalizeOpportunityTypeValue(opportunityType) ?? opportunityType] ?? OPPORTUNITY_TYPE_BANNERS['Potential Airdrop'];
+}
+
+export function getOpportunityScoreLabel(opportunityType: OpportunityType): string {
+  switch (normalizeOpportunityTypeValue(opportunityType) ?? opportunityType) {
+    case 'Confirmed Airdrop': return 'Trust Score';
+    case 'Potential Airdrop': return 'Confidence Score';
+    case 'Points Program': return 'Reward Confidence';
+    case 'Rewards Program': return 'Programme Confidence';
+    case 'Testnet': return 'Testnet Confidence';
+    case 'Scam Alert': return 'Risk Score';
+    case 'Speculative Token': return 'Risk Score';
   }
 }
 

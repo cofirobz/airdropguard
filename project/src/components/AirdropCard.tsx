@@ -17,6 +17,7 @@ import {
   getRecommendationMeta,
   getOpportunityType,
   getOpportunityTypeTone,
+  getOpportunityScoreLabel,
 } from '../lib/utils';
 
 interface Props {
@@ -50,6 +51,16 @@ export default function AirdropCard({ airdrop, priority = false, nextAirdropSlug
   const isSpeculativeToken = opportunityType === 'Speculative Token';
   const isScamAlert = opportunityType === 'Scam Alert';
   const isRiskOnlyOpportunity = isSpeculativeToken || isScamAlert;
+  const scoreLabel = getOpportunityScoreLabel(opportunityType);
+  const tokenStatusLabel = (() => {
+    if (opportunityType === 'Confirmed Airdrop') return airdrop.contract_address ? 'Token confirmed' : 'Claim details pending';
+    if (opportunityType === 'Potential Airdrop') return 'Token not launched yet';
+    if (opportunityType === 'Points Program') return airdrop.season_name || 'Points season live';
+    if (opportunityType === 'Rewards Program') return airdrop.reward_status || 'Rewards programme active';
+    if (opportunityType === 'Testnet') return airdrop.network_name || 'Testnet activity';
+    if (opportunityType === 'Scam Alert') return 'Risk flagged';
+    return 'Unclassified';
+  })();
   const communityProfile = !airdrop.team_info || /anon/i.test(airdrop.team_info)
     ? 'Community Funded / Anonymous'
     : 'Known Team / Public';
@@ -214,10 +225,10 @@ export default function AirdropCard({ airdrop, priority = false, nextAirdropSlug
             <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
               <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
                 <Clock className="h-3 w-3" />
-                Trading since
+                Time required
               </div>
               <span className="inline-flex text-[11px] font-semibold text-white">
-                {tradingSince}
+                {airdrop.time_required || tradingSince}
               </span>
             </div>
           </>
@@ -226,10 +237,10 @@ export default function AirdropCard({ airdrop, priority = false, nextAirdropSlug
             <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
               <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
                 <Zap className="h-3 w-3" />
-                Reward estimate
+                Token status
               </div>
-              <span className="inline-flex text-[11px] font-semibold text-neon-green">
-                {airdrop.estimated_reward || airdrop.reward_potential}
+              <span className="inline-flex text-[11px] font-semibold text-white">
+                {tokenStatusLabel}
               </span>
             </div>
 
@@ -256,7 +267,7 @@ export default function AirdropCard({ airdrop, priority = false, nextAirdropSlug
             <div className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2">
               <div className="mb-1 flex items-center gap-1.5 text-[10px] text-gray-600">
                 <ShieldCheck className="h-3 w-3" />
-                Trust score
+                {scoreLabel}
               </div>
               <div>
                 <LightweightTrustScoreBadge score={airdrop.trust_score ?? null} />
@@ -299,9 +310,16 @@ export default function AirdropCard({ airdrop, priority = false, nextAirdropSlug
               </span>
             ))}
           </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-3">
+            <div className="text-[10px] uppercase tracking-wider text-gray-600">Token Status</div>
+            <div className="mt-1 text-sm font-semibold text-white">{tokenStatusLabel}</div>
+            {!isScamAlert && airdrop.estimated_reward && (
+              <div className="mt-1 text-xs text-gray-500">Reward: {airdrop.estimated_reward}</div>
+            )}
+          </div>
           <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-3">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <span className="text-[10px] uppercase tracking-wider text-gray-600">Opportunity</span>
+              <span className="text-[10px] uppercase tracking-wider text-gray-600">{scoreLabel}</span>
               <span className={cn('text-sm font-black tabular-nums', oppScore >= 68 ? 'text-emerald-400' : oppScore >= 45 ? 'text-amber-400' : 'text-rose-400')}>
                 {oppScore}
                 <span className="text-[10px] font-normal text-gray-600">/100</span>

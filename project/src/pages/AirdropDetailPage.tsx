@@ -16,8 +16,9 @@ import {
   getDifficultyColor, getStatusColor, isBookmarked, toggleBookmark,
   getCompletions, toggleCompletion, getCompletionPercent,
   getOpportunityScore, getAirdropRecommendation, getRecommendationMeta,
-  getShouldIBotherSummary, getWhyWeLikeIt, getThingsToConsider,
-  getOpportunityType, getOpportunityTypeTone,
+  getWhyWeLikeIt, getThingsToConsider,
+  getOpportunityType, getOpportunityTypeTone, getOpportunityTypeBannerCopy,
+  getOpportunityTypeKey, getOpportunityScoreLabel,
 } from '../lib/utils';
 import { TrustScoreBadge } from '../components/TrustScoreSection';
 import CommunityResults from '../components/CommunityResults';
@@ -32,6 +33,18 @@ type AirdropNavigationItem = {
   name: string;
   status: string;
   created_at: string | null;
+};
+
+type RelatedOpportunityItem = {
+  id: string;
+  slug: string;
+  name: string;
+  logo_url: string | null;
+  blockchain: string[] | null;
+  opportunity_type: string | null;
+  risk_level: string | null;
+  reward_potential: string | null;
+  trust_score: number | null;
 };
 
 // ── CoinGecko market data ─────────────────────────────────────────────────────
@@ -117,6 +130,62 @@ function formatSince(timestampMs: number | null): string {
   if (months < 12) return `${months}mo`;
   const years = Math.floor(months / 12);
   return `${years}y`;
+}
+
+function formatRelativeTime(isoString: string | null): string {
+  return formatSince(parseTimestamp(isoString));
+}
+
+function formatMaybeText(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function getPrimaryCtaLabel(opportunityTypeKey: string): string {
+  switch (opportunityTypeKey) {
+    case 'confirmed_airdrop': return 'Claim Guide';
+    case 'potential_airdrop': return 'Start Farming';
+    case 'points_program': return 'Earn Points';
+    case 'rewards_program': return 'Continue Earning';
+    case 'testnet': return 'Join Testnet';
+    case 'scam_alert': return 'Learn Why It\'s Unsafe';
+    default: return 'Review Details';
+  }
+}
+
+function getTaskSectionLabel(opportunityTypeKey: string): string {
+  switch (opportunityTypeKey) {
+    case 'confirmed_airdrop': return 'Claim Tasks';
+    case 'potential_airdrop': return 'Farming Tasks';
+    case 'points_program': return 'Points Tasks';
+    case 'rewards_program': return 'Reward Tasks';
+    case 'testnet': return 'Testnet Tasks';
+    case 'scam_alert': return 'Safety Information';
+    default: return 'Tasks';
+  }
+}
+
+function getTokenStatusLabel(airdrop: AirdropWithTasks, opportunityType: string): string {
+  if (opportunityType === 'Scam Alert') return 'Unsafe';
+  if (airdrop.contract_address) return 'Token Verified';
+  if (opportunityType === 'Potential Airdrop') return 'Not Launched Yet';
+  if (opportunityType === 'Testnet') return 'Testnet Activity';
+  return 'Unverified';
+}
+
+function getCurrentTimelineStage(airdrop: AirdropWithTasks, opportunityType: string): { label: string; stage: string; step: number } {
+  if (opportunityType === 'Scam Alert') return { label: 'Safety Review', stage: 'Completed', step: 6 };
+  if (opportunityType === 'Potential Airdrop') return { label: 'Campaign Planned', stage: 'Announced', step: 1 };
+  if (opportunityType === 'Points Program') return { label: 'Points Farming', stage: 'Campaign Active', step: 2 };
+  if (opportunityType === 'Rewards Program') return { label: 'Ongoing Rewards', stage: 'Campaign Active', step: 2 };
+  if (opportunityType === 'Testnet') return { label: 'Testnet Participation', stage: 'Campaign Active', step: 2 };
+
+  if (airdrop.claim_status) return { label: airdrop.claim_status, stage: 'Claim', step: 4 };
+  if (airdrop.snapshot_date) return { label: formatDate(airdrop.snapshot_date), stage: 'Snapshot', step: 3 };
+  if (airdrop.status === 'Expired') return { label: 'Completed', stage: 'Completed', step: 6 };
+  if (airdrop.status === 'Ending Soon') return { label: 'Distribution Pending', stage: 'Distribution', step: 5 };
+  return { label: 'Live Campaign', stage: 'Campaign Active', step: 2 };
 }
 
 function formatCount(value: number | null): string {
@@ -429,19 +498,19 @@ function splitReasonList(reason: string, prefix: string): string[] {
   return reason
     .slice(prefix.length)
     .split(/;|\|/)
-    .map(x => x.trim())
+    .map((x: string) => x.trim())
     .filter(Boolean)
     .slice(0, 6);
 }
 
 function getAgieInsight(airdrop: AirdropWithTasks): AgieInsight {
   const anyAirdrop = airdrop as AnyAirdrop;
-  const reasons = airdrop.score_reasons ?? [];
+  const reasons = (airdrop.score_reasons ?? []) as string[];
   const missingRaw = anyAirdrop.missing_information;
   const missing = Array.isArray(missingRaw)
     ? missingRaw.map(String).filter(Boolean)
     : typeof missingRaw === 'string'
-    ? missingRaw.split(/;|\n/).map(x => x.trim()).filter(Boolean)
+    ? missingRaw.split(/;|\n/).map((x: string) => x.trim()).filter(Boolean)
     : [];
 
   const strengths = reasons.flatMap(r => splitReasonList(r, 'Key strengths:')).slice(0, 6);
@@ -583,49 +652,67 @@ function EvidencePanel({ airdrop }: { airdrop: AirdropWithTasks }) {
 
 function ProjectTimelinePanel({ airdrop }: { airdrop: AirdropWithTasks }) {
   const agie = getAgieInsight(airdrop);
-  const hasTimelineData = agie.timeline !== null || agie.timelineHighlights.length > 0 || agie.timelineEvents !== null;
-  if (!hasTimelineData) return null;
-
-  const highlightItems = agie.timelineHighlights.length > 0
-    ? agie.timelineHighlights
-    : [
-        agie.confirmedEvents !== null ? `${agie.confirmedEvents} high-confidence milestone${agie.confirmedEvents !== 1 ? 's' : ''} detected` : '',
-        agie.timelineEvents !== null ? `${agie.timelineEvents} total timeline event${agie.timelineEvents !== 1 ? 's' : ''} found` : '',
-        agie.watchItems !== null ? `${agie.watchItems} watch item${agie.watchItems !== 1 ? 's' : ''}` : '',
-      ].filter(Boolean);
+  const opportunityType = getOpportunityType(airdrop);
+  const current = getCurrentTimelineStage(airdrop, opportunityType);
+  const stages = [
+    { key: 'announced', label: 'Announced' },
+    { key: 'active', label: 'Campaign Active' },
+    { key: 'snapshot', label: 'Snapshot' },
+    { key: 'claim', label: 'Claim' },
+    { key: 'distribution', label: 'Distribution' },
+    { key: 'completed', label: 'Completed' },
+  ];
 
   return (
     <div className="glass-card p-5">
-      <div className="flex items-center justify-between gap-4 mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Timer className="w-4 h-4 text-orange-400" />
-          <h2 className="text-sm font-semibold text-white">Project Intelligence Timeline</h2>
+          <Timer className="w-4 h-4 text-cyan-300" />
+          <h2 className="text-sm font-semibold text-white">Opportunity Timeline</h2>
         </div>
-        {agie.timeline !== null && <span className={cn('text-sm font-bold tabular-nums', scoreClass(agie.timeline))}>{agie.timeline}/100</span>}
+        <span className="inline-flex rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-300">
+          Current Stage: {current.stage}
+        </span>
       </div>
 
-      <div className="space-y-3">
-        {highlightItems.slice(0, 5).map((item, i) => (
-          <div key={`${item}-${i}`} className="flex items-start gap-3">
-            <div className="w-6 h-6 rounded-full bg-neon-purple/10 border border-neon-purple/25 text-neon-purple flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
-              {i + 1}
-            </div>
-            <p className="text-xs text-gray-400 leading-relaxed">{item}</p>
+      <div className="overflow-x-auto pb-2">
+        <div className="grid min-w-[680px] grid-cols-6 gap-3">
+          {stages.map((stage, index) => {
+            const active = index + 1 === current.step;
+            return (
+              <div key={stage.key} className={cn('rounded-2xl border p-3 transition-colors', active ? 'border-cyan-400/35 bg-cyan-500/12' : 'border-white/5 bg-white/[0.03]')}>
+                <div className={cn('text-[10px] font-semibold uppercase tracking-[0.12em]', active ? 'text-cyan-100' : 'text-gray-500')}>{stage.label}</div>
+                <div className={cn('mt-2 h-2 rounded-full', active ? 'bg-cyan-400 shadow-[0_0_0_1px_rgba(34,211,238,0.2)]' : 'bg-white/10')} />
+                <p className={cn('mt-2 text-xs leading-relaxed', active ? 'text-cyan-50' : 'text-gray-500')}>
+                  {active ? current.label : 'TBA'}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {(agie.timelineHighlights.length > 0 || agie.timelineWatchItems.length > 0) && (
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">Timeline Notes</p>
+            <ul className="mt-2 space-y-1.5">
+              {(agie.timelineHighlights.length > 0 ? agie.timelineHighlights : [`${agie.timelineEvents ?? 0} timeline event(s) detected`]).slice(0, 3).map((item) => (
+                <li key={item} className="text-xs leading-relaxed text-gray-300">{item}</li>
+              ))}
+            </ul>
           </div>
-        ))}
-      </div>
-
-      {agie.timelineWatchItems.length > 0 && (
-        <div className="mt-4 border-t border-white/5 pt-4">
-          <p className="text-[10px] text-amber-400 uppercase tracking-wider font-semibold mb-2">Watch Items</p>
-          <ul className="space-y-1.5">
-            {agie.timelineWatchItems.map(item => (
-              <li key={item} className="flex items-start gap-2 text-xs text-gray-500">
-                <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
-                {item}
-              </li>
-            ))}
-          </ul>
+          <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">Watch Items</p>
+            <ul className="mt-2 space-y-1.5">
+              {(agie.timelineWatchItems.length > 0 ? agie.timelineWatchItems : ['No additional watch items surfaced yet.']).slice(0, 3).map((item) => (
+                <li key={item} className="flex items-start gap-2 text-xs leading-relaxed text-gray-300">
+                  <AlertTriangle className="mt-0.5 h-3 h-3 w-3 shrink-0 text-amber-400" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
     </div>
@@ -1026,31 +1113,31 @@ function AgieCommandCenter({ airdrop, opportunityScore, recommendationLabel }: {
 function IntelligenceRadar({ airdrop }: { airdrop: AirdropWithTasks }) {
   const metrics = getDisplayAgieMetrics(airdrop);
   const rows = [
-    { label: 'Project Reputation', score: metrics.reputation },
-    { label: 'Airdrop Confidence', score: metrics.airdropConfidence },
-    { label: 'Security', score: metrics.security },
-    { label: 'Evidence Depth', score: metrics.evidence },
-    { label: 'Community', score: metrics.community },
-    { label: 'Timeline Momentum', score: metrics.timeline },
+    { label: 'Why this score?', score: metrics.reputation, detail: metrics.reputation >= 80 ? 'Strong reputation signals' : 'Mixed reputation signals' },
+    { label: 'Biggest risk', score: metrics.security, detail: airdrop.risk_level === 'High' ? 'High-scrutiny listing' : 'Review links carefully' },
+    { label: 'Best reason to participate', score: metrics.airdropConfidence, detail: metrics.airdropConfidence >= 65 ? 'Good opportunity signal' : 'Wait for stronger evidence' },
+    { label: 'Who should avoid this?', score: metrics.overall, detail: airdrop.risk_level === 'High' || airdrop.risk_level === 'Medium' ? 'Conservative users' : 'Few restrictions' },
+    { label: 'Estimated effort', score: metrics.timeline, detail: airdrop.time_required || 'TBA' },
+    { label: 'Reward confidence', score: metrics.community, detail: airdrop.estimated_reward || 'TBA' },
   ];
 
   return (
     <div className="glass-card p-5">
       <div className="flex items-center gap-2 mb-4">
-        <BarChart3 className="w-4 h-4 text-neon-blue" />
-        <h2 className="text-sm font-semibold text-white">Project Signals</h2>
+        <Sparkles className="w-4 h-4 text-cyan-300" />
+        <h2 className="text-sm font-semibold text-white">AI Insights</h2>
       </div>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {rows.map(row => {
           const tone = scoreTone(row.score);
           return (
-            <div key={row.label}>
-              <div className="flex items-center justify-between gap-3 mb-1.5">
+            <div key={row.label} className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <span className="text-xs text-gray-500">{row.label}</span>
-                  <div className="mt-0.5"><StarRating score={row.score} /></div>
+                  <span className="text-xs font-semibold text-white">{row.label}</span>
+                  <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{row.detail}</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <span className={cn('text-xs font-bold tabular-nums', scoreClass(row.score))}>{row.score}/100</span>
                   <div className={cn('text-[10px] font-semibold', tone.cls.split(' ')[0])}>{tone.label}</div>
                 </div>
@@ -1075,6 +1162,13 @@ function ProfessionalVerdictPanel({ airdrop, opportunityScore, recLabel }: {
   const beginnerSafe = metrics.reputation >= 80 && metrics.security >= 70 && airdrop.risk_level !== 'High';
   const airdropReady = metrics.airdropConfidence >= 65;
   const farmerSafe = opportunityScore >= 55 && airdrop.status !== 'Expired';
+  const recommendationTone = recLabel.toLowerCase().includes('avoid')
+    ? 'rose'
+    : recLabel.toLowerCase().includes('wait')
+      ? 'amber'
+      : recLabel.toLowerCase().includes('experienced')
+        ? 'sky'
+        : 'emerald';
 
   const verdict = beginnerSafe && airdropReady
     ? 'Strong project and strong airdrop profile. Users can consider participating after checking official task links.'
@@ -1100,22 +1194,30 @@ function ProfessionalVerdictPanel({ airdrop, opportunityScore, recLabel }: {
     <div className="glass-card p-6 border-neon-blue/15">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <Target className="w-5 h-5 text-neon-blue" />
-          <h2 className="text-base font-semibold text-white">Final Recommendation</h2>
+          <Target className="w-5 h-5 text-cyan-300" />
+          <h2 className="text-base font-semibold text-white">Should I do this?</h2>
         </div>
         <StarRating score={metrics.overall} label="Overall Rating" />
       </div>
+      <div className={cn('mb-5 inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold',
+        recommendationTone === 'emerald' ? 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100'
+          : recommendationTone === 'sky' ? 'border-sky-400/25 bg-sky-500/10 text-sky-100'
+          : recommendationTone === 'amber' ? 'border-amber-400/25 bg-amber-500/10 text-amber-100'
+          : 'border-rose-400/25 bg-rose-500/10 text-rose-100')}
+      >
+        AI Recommendation: {recLabel}
+      </div>
       <p className="text-sm text-gray-400 leading-relaxed mb-5">{verdict}</p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="rounded-xl bg-dark-700/40 border border-white/5 p-3">
+        <div className="rounded-2xl bg-dark-700/40 border border-white/5 p-3">
           <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Best For</div>
           <div className="text-sm font-semibold text-white">{bestFor}</div>
         </div>
-        <div className="rounded-xl bg-dark-700/40 border border-white/5 p-3">
+        <div className="rounded-2xl bg-dark-700/40 border border-white/5 p-3">
           <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Recommended Action</div>
           <div className="text-sm font-semibold text-white">{action}</div>
         </div>
-        <div className="rounded-xl bg-dark-700/40 border border-white/5 p-3">
+        <div className="rounded-2xl bg-dark-700/40 border border-white/5 p-3">
           <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Airdrop Confidence</div>
           <div className={cn('text-sm font-semibold', scoreClass(metrics.airdropConfidence))}>{metrics.airdropConfidence}/100</div>
           <div className="mt-1"><StarRating score={metrics.airdropConfidence} /></div>
@@ -1126,30 +1228,38 @@ function ProfessionalVerdictPanel({ airdrop, opportunityScore, recLabel }: {
 }
 
 function IntelligenceSourcePanel({ airdrop }: { airdrop: AirdropWithTasks }) {
-  const agie = getAgieInsight(airdrop);
-  const items = [
-    { label: 'Official Website', value: airdrop.website_url ? 'Verified Link Present' : 'Missing', ok: !!airdrop.website_url },
-    { label: 'Documentation', value: airdrop.docs_url ? 'Docs Present' : 'Not Confirmed', ok: !!airdrop.docs_url || !!scoreFrom(airdrop, 'docs') },
-    { label: 'Development', value: airdrop.github_url ? 'GitHub Present' : 'Not Confirmed', ok: !!airdrop.github_url || !!scoreFrom(airdrop, 'github_active') },
-    { label: 'Human Review', value: airdrop.human_verified ? 'Verified by AirdropGuard' : 'Pending', ok: !!airdrop.human_verified },
-    { label: 'Timeline Events', value: agie.timelineEvents !== null ? `${agie.timelineEvents} detected` : 'Pending re-analysis', ok: (agie.timelineEvents ?? 0) > 0 },
-    { label: 'Threat Watch', value: agie.risks.length > 0 ? `${agie.risks.length} item(s)` : 'No displayed alerts', ok: agie.risks.length === 0 },
-  ];
+  const opportunityType = getOpportunityType(airdrop);
+  const fields = [
+    { label: 'Funding', value: formatMaybeText(airdrop.funding_info) },
+    { label: 'Investors', value: formatMaybeText(airdrop.investors) },
+    { label: 'Team', value: formatMaybeText(airdrop.team_info) },
+    { label: 'Official Website', value: formatMaybeText(airdrop.website_url) },
+    { label: 'Documentation', value: formatMaybeText(airdrop.docs_url) },
+    { label: 'GitHub', value: formatMaybeText(airdrop.github_url) },
+    { label: 'Discord', value: formatMaybeText(airdrop.discord_url) },
+    { label: 'X', value: formatMaybeText(airdrop.twitter_url) },
+    { label: 'Contract Address', value: formatMaybeText(airdrop.contract_address) },
+    { label: 'Token Status', value: getTokenStatusLabel(airdrop, opportunityType) },
+    { label: 'Opportunity Type', value: opportunityType },
+  ].filter((item) => item.value);
 
   return (
     <div className="glass-card p-5">
       <div className="flex items-center gap-2 mb-4">
-        <FileText className="w-4 h-4 text-violet-400" />
+        <FileText className="w-4 h-4 text-violet-300" />
         <h2 className="text-sm font-semibold text-white">Intelligence Sources</h2>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {items.map(item => (
-          <div key={item.label} className="rounded-xl bg-dark-700/40 border border-white/5 p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <span className={cn('w-2 h-2 rounded-full', item.ok ? 'bg-emerald-400' : 'bg-amber-400')} />
-              <span className="text-[10px] text-gray-600 uppercase tracking-wider">{item.label}</span>
-            </div>
-            <div className="text-xs text-gray-300">{item.value}</div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {fields.map((item) => (
+          <div key={item.label} className="rounded-2xl bg-dark-700/40 border border-white/5 p-3">
+            <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{item.label}</div>
+            {item.label === 'Official Website' || item.label === 'Documentation' || item.label === 'GitHub' || item.label === 'Discord' || item.label === 'X' ? (
+              <a href={String(item.value)} target="_blank" rel="noopener noreferrer nofollow" className="text-xs text-cyan-200 underline decoration-cyan-300/30 underline-offset-4 break-all">
+                {String(item.value)}
+              </a>
+            ) : (
+              <div className="text-xs text-gray-200 break-words">{String(item.value)}</div>
+            )}
           </div>
         ))}
       </div>
@@ -1157,31 +1267,48 @@ function IntelligenceSourcePanel({ airdrop }: { airdrop: AirdropWithTasks }) {
   );
 }
 
-function AnalystNextSteps({ airdrop }: { airdrop: AirdropWithTasks }) {
-  const agie = getAgieInsight(airdrop);
-  const actions = [
-    ...agie.timelineWatchItems,
-    ...agie.missing.slice(0, 3).map(m => `Verify missing intelligence: ${m}`),
-    ...(airdrop.tasks.length === 0 ? ['Add verified task steps before users start farming.'] : []),
-    ...(airdrop.risk_level !== 'Low' ? ['Re-check official links before users connect wallets.'] : []),
-  ].filter(Boolean).slice(0, 5);
+function AnalystNextSteps({ airdrop, relatedOpportunities = [] }: { airdrop: AirdropWithTasks; relatedOpportunities?: RelatedOpportunityItem[] }) {
+  const opportunityType = getOpportunityType(airdrop);
+  const sameBlockchain = relatedOpportunities.filter((item) => (item.blockchain ?? []).some((chain) => (airdrop.blockchain ?? []).includes(chain))).slice(0, 3);
+  const sameType = relatedOpportunities.filter((item) => item.opportunity_type === airdrop.opportunity_type).slice(0, 3);
+  const similarRisk = relatedOpportunities.filter((item) => item.risk_level === airdrop.risk_level).slice(0, 3);
+  const similarReward = relatedOpportunities.filter((item) => item.reward_potential === airdrop.reward_potential).slice(0, 3);
 
-  if (actions.length === 0) return null;
+  const groups = [
+    { label: 'Same blockchain', items: sameBlockchain },
+    { label: 'Same opportunity type', items: sameType },
+    { label: 'Similar risk', items: similarRisk },
+    { label: 'Similar reward', items: similarReward },
+  ].filter((group) => group.items.length > 0);
+
+  if (groups.length === 0) return null;
 
   return (
-    <div className="glass-card p-5 border-amber-500/10">
+    <div className="glass-card p-5 border-cyan-500/10">
       <div className="flex items-center gap-2 mb-4">
-        <AlertTriangle className="w-4 h-4 text-amber-400" />
-        <h2 className="text-sm font-semibold text-white">Analyst Next Steps</h2>
+        <Sparkles className="w-4 h-4 text-cyan-300" />
+        <h2 className="text-sm font-semibold text-white">Related Opportunities</h2>
       </div>
-      <ul className="space-y-2">
-        {actions.map(action => (
-          <li key={action} className="flex items-start gap-2 text-xs text-gray-400 leading-relaxed">
-            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-            {action}
-          </li>
+      <div className="space-y-4">
+        {groups.slice(0, 4).map((group) => (
+          <div key={group.label} className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">{group.label}</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {group.items.slice(0, 3).map((item) => (
+                <Link key={item.id} to={`/airdrop/${item.slug}`} className="flex items-center gap-3 rounded-2xl border border-white/5 bg-dark-700/35 px-3 py-2.5 transition-colors hover:border-cyan-400/25 hover:bg-cyan-500/10">
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.04]">
+                    {item.logo_url ? <img src={item.logo_url} alt={`${item.name} logo`} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xs font-bold text-gray-500">{item.name.charAt(0)}</div>}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-white">{item.name}</div>
+                    <div className="truncate text-[11px] text-gray-500">{item.opportunity_type || opportunityType}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
@@ -1726,7 +1853,7 @@ function KeyFactsBar({
       ...baseFacts.slice(0, 4),
       { label: 'Reward', value: airdrop.estimated_reward || 'TBA', tone: 'text-neon-green', sub: airdrop.reward_potential },
       ...baseFacts.slice(4, 5),
-      { label: 'Task Progress', value: `${completionPct}%`, tone: completionPct === 100 ? 'text-emerald-400' : 'text-neon-purple', sub: `${airdrop.tasks.length} task${airdrop.tasks.length !== 1 ? 's' : ''}` },
+      { label: 'Overall Progress', value: `${completionPct}%`, tone: completionPct === 100 ? 'text-emerald-400' : 'text-neon-purple', sub: `${airdrop.tasks.length} task${airdrop.tasks.length !== 1 ? 's' : ''}` },
       ...baseFacts.slice(5),
     ];
 
@@ -1848,8 +1975,9 @@ function MobileAirdropActionBar({
   oppScore,
   bookmarked,
   onBookmark,
-  onTasksClick,
+  onPrimaryAction,
   isSpeculativeToken,
+  isScamAlert,
   externalPrimaryUrl,
 }: {
   airdrop: AirdropWithTasks;
@@ -1857,8 +1985,9 @@ function MobileAirdropActionBar({
   oppScore: number;
   bookmarked: boolean;
   onBookmark: () => void;
-  onTasksClick: () => void;
+  onPrimaryAction: () => void;
   isSpeculativeToken: boolean;
+  isScamAlert: boolean;
   externalPrimaryUrl: string | null;
 }) {
   const scoreTone = oppScore >= 68 ? 'text-emerald-400' : oppScore >= 45 ? 'text-amber-400' : 'text-rose-400';
@@ -1870,10 +1999,18 @@ function MobileAirdropActionBar({
       <div className="mx-auto grid max-w-lg grid-cols-[auto_1fr_1fr_auto] items-center gap-2">
         <div className="min-w-[68px] shrink-0 rounded-2xl border border-white/10 bg-white/[0.04] px-2.5 py-2 text-center">
           <div className={cn('text-lg font-black tabular-nums leading-none', scoreTone)}>{oppScore}</div>
-          <div className="mt-0.5 text-[9px] uppercase tracking-wider text-gray-600">Score</div>
+          <div className="mt-0.5 text-[9px] uppercase tracking-wider text-gray-600">Risk</div>
         </div>
 
-        {isSpeculativeToken ? (
+        {isScamAlert ? (
+          <div className="col-span-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-3 py-2">
+            <div className="flex items-center gap-2 text-rose-100">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-bold">Do not connect wallet</span>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-rose-100/90">This listing is flagged as suspicious or dangerous. Review the risk reasons before taking any action.</p>
+          </div>
+        ) : isSpeculativeToken ? (
           <a
             href={safePrimaryUrl}
             target="_blank"
@@ -1886,16 +2023,26 @@ function MobileAirdropActionBar({
         ) : (
           <button
             type="button"
-            onClick={onTasksClick}
+            onClick={onPrimaryAction}
             className="flex min-h-[48px] min-w-0 w-full items-center justify-center gap-2 rounded-2xl bg-neon-purple px-2.5 py-3 text-sm font-bold text-white shadow-lg shadow-neon-purple/15"
           >
             <ListChecks className="h-4 w-4" />
-            Tasks
+            {getPrimaryCtaLabel(getOpportunityTypeKey(airdrop) ?? 'potential_airdrop')}
             {airdrop.tasks.length > 0 && <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px]">{airdrop.tasks.length}</span>}
           </button>
         )}
 
-        {airdrop.website_url ? (
+        {isScamAlert ? (
+          <a
+            href={safeExternalUrl(airdrop.official_safe_url || airdrop.website_url, 'https://airdropguard.com')}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="flex min-h-[48px] min-w-0 w-full items-center justify-center gap-2 rounded-2xl border border-rose-500/25 bg-rose-500/10 px-2.5 py-3 text-sm font-bold text-rose-200"
+          >
+            <ShieldAlert className="h-4 w-4" />
+            Safe Link
+          </a>
+        ) : airdrop.website_url ? (
           <a
             href={airdrop.website_url}
             target="_blank"
@@ -2127,7 +2274,7 @@ function SpeculativeTokenIntelligenceDashboard({
     : securityScore >= 50
     ? 'Medium'
     : 'Low';
-  const lastUpdated = airdrop.last_analyzed_at || airdrop.updated_at || airdrop.created_at || null;
+  const lastUpdated = (anyAirdrop.last_analyzed_at as string | null | undefined) || airdrop.updated_at || airdrop.created_at || null;
   const chain = (airdrop.blockchain?.[0] ?? '').toLowerCase();
   const explorerBase =
     chain.includes('solana') ? 'https://solscan.io/token/' :
@@ -2342,11 +2489,11 @@ function SpeculativeTokenIntelligenceDashboard({
           <div className="mt-4 space-y-3">
             <div className="rounded-xl border border-white/10 bg-dark-700/35 p-3">
               <div className="text-[10px] uppercase tracking-wider text-gray-600">Contract Address</div>
-              <div className="mt-1 break-all font-mono text-xs text-gray-200">{contractAddress || 'Currently unavailable.'}</div>
+                  <div className="mt-1 break-all font-mono text-xs text-gray-200">{formatMaybeText(airdrop.contract_address) || 'Currently unavailable.'}</div>
               <button
                 type="button"
                 onClick={handleCopyContract}
-                disabled={!contractAddress}
+                disabled={!formatMaybeText(airdrop.contract_address)}
                 className="mt-2 rounded-lg border border-white/15 bg-white/[0.04] px-2.5 py-1 text-[11px] font-semibold text-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {copied ? 'Copied' : 'Copy'}
@@ -2551,6 +2698,7 @@ export default function AirdropDetailPage() {
   const [navigationItems, setNavigationItems] = useState<AirdropNavigationItem[]>([]);
   const [navigationLoading, setNavigationLoading] = useState(true);
   const [hideStickyMobileNav, setHideStickyMobileNav] = useState(false);
+  const [relatedOpportunities, setRelatedOpportunities] = useState<RelatedOpportunityItem[]>([]);
   const bottomNavigationRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -2597,6 +2745,26 @@ export default function AirdropDetailPage() {
         setBookmarked(isBookmarked(data.id));
         setCompletions(getCompletions(data.id));
         document.title = `${data.name} Airdrop — Airdrop Guard`;
+
+        const relatedQuery = supabase
+          .from('airdrops')
+          .select('id, slug, name, logo_url, blockchain, opportunity_type, risk_level, reward_potential, trust_score')
+          .eq('published', true)
+          .eq('review_status', 'approved')
+          .eq('is_demo', false)
+          .neq('id', data.id)
+          .limit(60);
+
+        const { data: relatedData } = await relatedQuery;
+        const relatedRows = (relatedData ?? []) as RelatedOpportunityItem[];
+        const sameBlockchain = relatedRows.filter((item) => (item.blockchain ?? []).some((chain) => (sorted.blockchain ?? []).includes(chain))).slice(0, 4);
+        const sameType = relatedRows.filter((item) => item.opportunity_type === sorted.opportunity_type).slice(0, 4);
+        const similarRisk = relatedRows.filter((item) => item.risk_level === sorted.risk_level).slice(0, 4);
+        const similarReward = relatedRows.filter((item) => item.reward_potential === sorted.reward_potential).slice(0, 4);
+        const merged = [...sameBlockchain, ...sameType, ...similarRisk, ...similarReward]
+          .filter((item, index, array) => array.findIndex((candidate) => candidate.id === item.id) === index)
+          .slice(0, 6);
+        setRelatedOpportunities(merged);
       }
       setLoading(false);
     }
@@ -2715,10 +2883,12 @@ export default function AirdropDetailPage() {
   const oppScore  = getOpportunityScore(airdrop);
   const rec       = getAirdropRecommendation(airdrop);
   const recMeta   = getRecommendationMeta(rec);
-  const shouldSummary = getShouldIBotherSummary(airdrop, rec);
   const pros      = getWhyWeLikeIt(airdrop);
   const cons      = getThingsToConsider(airdrop);
   const opportunityType = getOpportunityType(airdrop);
+  const opportunityBannerCopy = getOpportunityTypeBannerCopy(opportunityType);
+  const opportunityTypeKey = getOpportunityTypeKey(airdrop) ?? (airdrop.opportunity_type ?? 'potential_airdrop');
+  const scoreLabel = getOpportunityScoreLabel(opportunityType);
   const isSpeculativeToken = isSpeculativeTokenProject(airdrop);
   const isScamAlert = opportunityType === 'Scam Alert';
   const isRiskOnlyOpportunity = isSpeculativeToken || isScamAlert;
@@ -2728,10 +2898,20 @@ export default function AirdropDetailPage() {
   const safeDexScreenerUrl = safeExternalUrl(dexScreenerUrl, 'https://dexscreener.com');
   const safeRugCheckUrl = safeExternalUrl(rugCheckUrl, 'https://rugcheck.xyz');
   const safeSolscanUrl = safeExternalUrl(solscanUrl, 'https://solscan.io');
+  const decisionIconTone = isScamAlert ? 'text-rose-200 bg-rose-500/10 border-rose-500/25' : opportunityType === 'Potential Airdrop' ? 'text-amber-100 bg-amber-500/10 border-amber-500/25' : opportunityType === 'Testnet' ? 'text-cyan-100 bg-cyan-500/10 border-cyan-500/25' : 'text-emerald-100 bg-emerald-500/10 border-emerald-500/25';
+  const primaryCtaLabel = getPrimaryCtaLabel(opportunityTypeKey);
+  const primaryCtaTarget = isScamAlert ? 'analysis' : 'tasks';
+  const timelineState = getCurrentTimelineStage(airdrop, opportunityType);
+  const tokenStatusLabel = getTokenStatusLabel(airdrop, opportunityType);
+  const quickCommunityLabel = `${airdrop.is_trending ? 'Community momentum is active.' : 'Community momentum is quiet.'}`;
 
   const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'overview', label: 'Overview', icon: <FileText className="w-3.5 h-3.5" /> },
-    ...(!isRiskOnlyOpportunity ? [{ key: 'tasks' as const, label: `Tasks (${airdrop.tasks.length})`, icon: <ListChecks className="w-3.5 h-3.5" /> }] : []),
+    ...(!isRiskOnlyOpportunity ? [{
+      key: 'tasks' as const,
+      label: `${getTaskSectionLabel(opportunityTypeKey)} (${airdrop.tasks.length})`,
+      icon: <ListChecks className="w-3.5 h-3.5" />,
+    }] : []),
     { key: 'analysis', label: 'AI Analysis', icon: <BarChart3 className="w-3.5 h-3.5" /> },
   ];
   const pageUrl = `https://airdropguard.com/airdrop/${airdrop.slug}`;
@@ -2753,6 +2933,105 @@ export default function AirdropDetailPage() {
     : isSpeculativeToken
       ? { name: 'Speculative Tokens', item: 'https://airdropguard.com/#speculative-tokens' }
       : { name: 'Airdrops', item: 'https://airdropguard.com/' };
+
+  const typeSpotlight = (() => {
+    switch (opportunityTypeKey) {
+      case 'confirmed_airdrop':
+        return (
+          <section className="mb-6 rounded-[30px] border border-emerald-500/20 bg-emerald-500/[0.06] p-5 sm:p-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">Confirmed Airdrop</p>
+                <p className="mt-2 text-sm leading-relaxed text-emerald-50/90">Token or airdrop has been officially confirmed. Verify contract address before claiming.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-100/70">Contract Address</div>
+                  <div className="mt-1 break-all font-mono text-xs text-white">{formatMaybeText(airdrop.contract_address) || 'Currently unavailable.'}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-100/70">Claim Status</div>
+                  <div className="mt-1 text-xs font-semibold text-white">{(airdrop.claim_status ?? '').trim() || 'Currently unavailable.'}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3">
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-100/70">Snapshot Date</div>
+                  <div className="mt-1 text-xs font-semibold text-white">{airdrop.snapshot_date ? formatDate(airdrop.snapshot_date) : 'Currently unavailable.'}</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      case 'potential_airdrop':
+        return (
+          <section className="mb-6 rounded-[30px] border border-amber-500/20 bg-amber-500/[0.06] p-5 sm:p-6">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100">Potential Airdrop</p>
+            <p className="mt-2 text-sm leading-relaxed text-amber-50/90">No token or claim may exist yet. This is based on ecosystem activity and community expectations.</p>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm text-white">Token not launched yet</div>
+          </section>
+        );
+      case 'points_program':
+        return (
+          <section className="mb-6 rounded-[30px] border border-sky-500/20 bg-sky-500/[0.06] p-5 sm:p-6">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-100">Points Program</p>
+            <p className="mt-2 text-sm leading-relaxed text-sky-50/90">Users currently earn points or credits that may or may not convert into future rewards.</p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-white">Points Name: {(airdrop.points_name ?? '').trim() || 'Currently unavailable.'}</div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-white">Season: {(airdrop.season_name ?? '').trim() || 'Currently unavailable.'}</div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-white">Reward Status: {(airdrop.reward_status ?? '').trim() || 'Currently unavailable.'}</div>
+            </div>
+          </section>
+        );
+      case 'rewards_program':
+        return (
+          <section className="mb-6 rounded-[30px] border border-violet-500/20 bg-violet-500/[0.06] p-5 sm:p-6">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-100">Rewards Program</p>
+            <p className="mt-2 text-sm leading-relaxed text-violet-50/90">This is an ongoing rewards or incentives programme, not necessarily a new airdrop.</p>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-sm text-white">Original airdrop may already be complete.</div>
+          </section>
+        );
+      case 'testnet':
+        return (
+          <section className="mb-6 rounded-[30px] border border-cyan-500/20 bg-cyan-500/[0.06] p-5 sm:p-6">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100">Testnet</p>
+            <p className="mt-2 text-sm leading-relaxed text-cyan-50/90">This opportunity is based on testnet activity. Rewards are not guaranteed.</p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-white">Network: {(airdrop.network_name ?? '').trim() || (airdrop.blockchain?.[0] ?? 'Currently unavailable.')}</div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-white">Faucet: {airdrop.faucet_url ? 'Available' : 'Currently unavailable.'}</div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-3 text-white">Tasks: {airdrop.tasks.length > 0 ? `${airdrop.tasks.length} listed` : 'Currently unavailable.'}</div>
+            </div>
+          </section>
+        );
+      case 'scam_alert':
+        return (
+          <section className="mb-6 rounded-[30px] border border-rose-500/30 bg-rose-600/[0.16] p-5 sm:p-6 shadow-[0_16px_50px_rgba(225,29,72,0.12)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-100">Scam Alert</p>
+            <p className="mt-2 text-sm leading-relaxed text-rose-50">This listing has been flagged as suspicious or dangerous. Do not connect your main wallet.</p>
+            <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-white">
+                <div className="text-[10px] uppercase tracking-wider text-rose-100/80">Risk Reasons</div>
+                <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-rose-50">
+                  {((airdrop.risk_reasons ?? []).length > 0 ? airdrop.risk_reasons ?? [] : ['No structured risk reasons provided.']).map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-white">
+                <div className="text-[10px] uppercase tracking-wider text-rose-100/80">Safe Links</div>
+                <div className="mt-2 text-xs leading-relaxed text-rose-50">
+                  {airdrop.official_safe_url ? (
+                    <a href={airdrop.official_safe_url} target="_blank" rel="noopener noreferrer nofollow" className="underline decoration-rose-200/50 underline-offset-4">Open official safe link</a>
+                  ) : (
+                    'No safe link provided yet.'
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      default:
+        return null;
+    }
+  })();
 
   const airdropSchema = {
     '@context': 'https://schema.org',
@@ -2820,19 +3099,6 @@ export default function AirdropDetailPage() {
       ? speculativeSeoTitle(airdrop.name)
       : airdropSeoTitle(airdrop.name);
 
-  const relatedLearnLinks = [
-    { to: '/learn', label: 'Airdrop Safety Guides' },
-    { to: '/articles/how-to-verify-crypto-airdrops-safely-2026', label: 'How to Verify Crypto Airdrops Safely in 2026' },
-    { to: '/articles/best-ai-airdrop-scanner-tools', label: 'Best AI Airdrop Scanner Tools' },
-  ];
-  const relatedScamLinks = [
-    { to: '/scam-alerts', label: 'Latest Scam Alerts' },
-    { to: '/articles/crypto-airdrop-scam-detection-guide', label: 'Crypto Airdrop Scam Detection Guide' },
-  ];
-  const relatedSpeculativeLinks = [
-    { to: '/#speculative-tokens', label: 'Explore Speculative Tokens' },
-    { to: '/articles/layer-2-airdrops-2026', label: 'Layer 2 Risk and Opportunity Framework' },
-  ];
   return (
   <>
     <SEO
@@ -2862,6 +3128,8 @@ export default function AirdropDetailPage() {
         />
       </div>
 
+      {typeSpotlight}
+
       {/* Hero card */}
       <div className="glass-card mb-6 overflow-hidden p-4 sm:mb-8 sm:p-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:gap-6">
@@ -2889,7 +3157,12 @@ export default function AirdropDetailPage() {
                     </span>
                   )}
                   {airdrop.trust_score !== null && (
-                    <TrustScoreBadge score={airdrop.trust_score} size="lg" />
+                    <div className="flex items-center gap-2">
+                      <TrustScoreBadge score={airdrop.trust_score} size="lg" />
+                      <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-300">
+                        {scoreLabel}
+                      </span>
+                    </div>
                   )}
                   {airdrop.human_verified && (
                     <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5">
@@ -2951,6 +3224,97 @@ export default function AirdropDetailPage() {
               </div>
             )}
 
+            <div className={cn(
+              'mb-5 rounded-[28px] border p-4 sm:p-5 shadow-[0_16px_45px_rgba(2,6,23,0.18)]',
+              opportunityType === 'Confirmed Airdrop'
+                ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-50'
+                : opportunityType === 'Potential Airdrop'
+                  ? 'border-amber-500/25 bg-amber-500/10 text-amber-50'
+                  : opportunityType === 'Points Program'
+                    ? 'border-sky-500/25 bg-sky-500/10 text-sky-50'
+                    : opportunityType === 'Rewards Program'
+                      ? 'border-violet-500/25 bg-violet-500/10 text-violet-50'
+                      : opportunityType === 'Testnet'
+                        ? 'border-cyan-500/25 bg-cyan-500/10 text-cyan-50'
+                        : 'border-rose-500/25 bg-rose-600/15 text-rose-50'
+            )}>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-3xl">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">Decision Summary</p>
+                  <p className="mt-2 text-sm leading-relaxed">{opportunityBannerCopy}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(primaryCtaTarget)}
+                  className={cn(
+                    'inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold transition-colors',
+                    isScamAlert
+                      ? 'border border-rose-400/30 bg-rose-500/15 text-rose-50 hover:bg-rose-500/22'
+                      : 'border border-cyan-400/30 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/22'
+                  )}
+                >
+                  <ShieldAlert className="h-4 w-4" />
+                  {primaryCtaLabel}
+                </button>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-white/70">AI Trust Score</div>
+                  <div className="mt-1 flex items-end gap-2">
+                    <span className="text-2xl font-black tabular-nums">{airdrop.trust_score ?? oppScore}</span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-80">{scoreLabel}</span>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-white/70">Risk Level</div>
+                  <div className="mt-1 text-lg font-bold">{airdrop.risk_level}</div>
+                </div>
+                {formatMaybeText(airdrop.estimated_reward) ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                    <div className="text-[10px] uppercase tracking-wider text-white/70">Estimated Reward</div>
+                    <div className="mt-1 text-lg font-bold text-neon-green">{airdrop.estimated_reward}</div>
+                  </div>
+                ) : null}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-white/70">Difficulty</div>
+                  <div className="mt-1 text-lg font-bold">{airdrop.difficulty}</div>
+                </div>
+                {formatMaybeText(airdrop.time_required) ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                    <div className="text-[10px] uppercase tracking-wider text-white/70">Time Required</div>
+                    <div className="mt-1 text-lg font-bold">{airdrop.time_required}</div>
+                  </div>
+                ) : null}
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-white/70">Blockchain</div>
+                  <div className="mt-1 text-lg font-bold">{airdrop.blockchain.length > 0 ? airdrop.blockchain.join(' · ') : 'TBA'}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-white/70">Token Status</div>
+                  <div className="mt-1 text-lg font-bold">{tokenStatusLabel}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-white/70">Current Stage</div>
+                  <div className="mt-1 text-lg font-bold">{timelineState.stage}</div>
+                  <div className="text-[11px] text-white/60">{timelineState.label}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-white/70">Community Results</div>
+                  <div className="mt-1 text-lg font-bold">{quickCommunityLabel}</div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+                <span className={cn('inline-flex items-center rounded-full border px-3 py-1.5', decisionIconTone)}>Human Reviewed</span>
+                <span className={cn('inline-flex items-center rounded-full border px-3 py-1.5', decisionIconTone)}>AI Analysed</span>
+                <span className={cn('inline-flex items-center rounded-full border px-3 py-1.5', decisionIconTone)}>Scam Detection</span>
+                {airdrop.human_verified ? (
+                  <span className="inline-flex items-center rounded-full border border-emerald-400/30 bg-emerald-500/15 px-3 py-1.5 text-emerald-100">Human Verified</span>
+                ) : null}
+              </div>
+            </div>
+
             {/* Metric pills */}
             <div className="flex flex-wrap gap-3 mb-5">
               {!isRiskOnlyOpportunity && (
@@ -2997,6 +3361,12 @@ export default function AirdropDetailPage() {
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-gray-500">Est. Reward</span>
                   <span className="text-xs font-semibold text-neon-green">{airdrop.estimated_reward}</span>
+                </div>
+              )}
+              {!isRiskOnlyOpportunity && airdrop.claim_status && opportunityTypeKey === 'confirmed_airdrop' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-500">Claim</span>
+                  <span className="text-xs font-semibold text-cyan-200">{airdrop.claim_status}</span>
                 </div>
               )}
               {days !== null && days > 0 && (
@@ -3098,33 +3468,6 @@ export default function AirdropDetailPage() {
         ) : (
         <div className="space-y-6 animate-slide-up">
 
-          {!isRiskOnlyOpportunity && (
-            <div className="glass-card p-6 border-neon-purple/15">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-neon-purple" />
-                <h2 className="text-base font-semibold text-white">Should I Bother?</h2>
-              </div>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="text-center">
-                    <div className={cn('text-4xl font-bold tabular-nums leading-none',
-                      oppScore >= 68 ? 'text-emerald-400' : oppScore >= 45 ? 'text-amber-400' : 'text-rose-400'
-                    )}>
-                      {oppScore}
-                    </div>
-                    <div className="text-[10px] text-gray-600 mt-0.5 uppercase tracking-wider">Opportunity</div>
-                  </div>
-                  <div className="w-px h-10 bg-white/10" />
-                  <span className={cn('text-sm font-bold border rounded-xl px-3 py-1.5 flex items-center gap-1.5', recMeta.cls)}>
-                    <span className={cn('w-2 h-2 rounded-full inline-block', recMeta.dot)} />
-                    {recMeta.label}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-400 leading-relaxed capitalize-first">{shouldSummary}</p>
-              </div>
-            </div>
-          )}
-
           {isSpeculativeToken && (
             <div className="glass-card border-rose-500/20 bg-rose-500/5 p-6">
               <div className="flex items-center gap-2 mb-3">
@@ -3208,29 +3551,14 @@ export default function AirdropDetailPage() {
               <p className="text-sm text-gray-400 leading-relaxed whitespace-pre-wrap">{airdrop.why_airdrop}</p>
             </div>
           )}
-          <div className="glass-card p-6">
-            <h2 className="text-base font-semibold text-white mb-4">Quick Facts</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                { label: 'Time Required', value: airdrop.time_required || 'N/A' },
-                { label: 'Expiry', value: formatDate(airdrop.expiry_date) },
-                ...(isSpeculativeToken
-                  ? [
-                    { label: 'Contract Address', value: airdrop.contract_address || 'Unavailable' },
-                  ]
-                  : [
-                    { label: 'Est. Reward', value: airdrop.estimated_reward || 'TBA' },
-                  ]),
-              ].map(item => (
-                <div key={item.label} className="bg-dark-700/40 rounded-xl p-3">
-                  <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">{item.label}</div>
-                  <div className="text-sm font-semibold text-white">{item.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <IntelligenceSourcePanel airdrop={airdrop} />
 
-          <CommunityResults airdropId={airdrop.id} />
+          <CommunityResults
+            airdropId={airdrop.id}
+            reportedRewardsLabel={formatMaybeText(airdrop.estimated_reward) || undefined}
+            latestAiUpdateLabel={formatRelativeTime(airdrop.updated_at)}
+            latestHumanReviewLabel={airdrop.human_verified ? `Reviewed ${formatRelativeTime(airdrop.updated_at)}` : 'Pending review'}
+          />
 
           {/* Wallet Safety Snapshot */}
           <div className="glass-card p-6">
@@ -3243,41 +3571,7 @@ export default function AirdropDetailPage() {
 
           <TrustProofPanel airdrop={airdrop} />
 
-          <div className="glass-card p-6">
-            <h2 className="text-base font-semibold text-white mb-4">Related Research</h2>
-            <div className="grid gap-4 md:grid-cols-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.12em] text-cyan-200 mb-2">Related Learn Guides</p>
-                <div className="flex flex-col gap-2">
-                  {relatedLearnLinks.map((item) => (
-                    <Link key={item.to} to={item.to} className="text-xs text-gray-300 hover:text-white transition-colors">
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.12em] text-rose-200 mb-2">Related Scam Alerts</p>
-                <div className="flex flex-col gap-2">
-                  {relatedScamLinks.map((item) => (
-                    <Link key={item.to} to={item.to} className="text-xs text-gray-300 hover:text-white transition-colors">
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.12em] text-amber-200 mb-2">Related Speculative Tokens</p>
-                <div className="flex flex-col gap-2">
-                  {relatedSpeculativeLinks.map((item) => (
-                    <Link key={item.to} to={item.to} className="text-xs text-gray-300 hover:text-white transition-colors">
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          <AnalystNextSteps airdrop={airdrop} relatedOpportunities={relatedOpportunities} />
 
           <div ref={bottomNavigationRef} className="pt-1 sm:pt-2">
             <AirdropNavigationControls
@@ -3297,7 +3591,9 @@ export default function AirdropDetailPage() {
           {airdrop.tasks.length > 0 && (
             <div className="glass-card p-5">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-white">Your Progress</h2>
+                <h2 className="text-sm font-semibold text-white">
+                  {opportunityTypeKey === 'points_program' ? 'Points Farming Progress' : opportunityTypeKey === 'rewards_program' ? 'Reward Progress' : 'Your Progress'}
+                </h2>
                 <span className="text-sm font-bold text-neon-purple">{completionPct}%</span>
               </div>
               <div className="h-2 rounded-full bg-dark-700 overflow-hidden">
@@ -3314,7 +3610,9 @@ export default function AirdropDetailPage() {
 
           {airdrop.tasks.length === 0 ? (
             <div className="glass-card p-8 text-center">
-              <p className="text-gray-500 text-sm">No tasks added yet.</p>
+              <p className="text-gray-500 text-sm">
+                {opportunityTypeKey === 'points_program' ? 'No points farming tasks added yet.' : opportunityTypeKey === 'rewards_program' ? 'No reward tasks added yet.' : 'No tasks added yet.'}
+              </p>
             </div>
           ) : (
             airdrop.tasks.map((task, index) => {
@@ -3395,8 +3693,9 @@ export default function AirdropDetailPage() {
       oppScore={oppScore}
       bookmarked={bookmarked}
       onBookmark={handleBookmark}
-      onTasksClick={() => setActiveTab('tasks')}
+      onPrimaryAction={() => setActiveTab(isScamAlert ? 'analysis' : 'tasks')}
       isSpeculativeToken={isSpeculativeToken}
+      isScamAlert={isScamAlert}
       externalPrimaryUrl={dexScreenerUrl}
     />
     </>

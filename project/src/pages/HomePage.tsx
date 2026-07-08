@@ -28,7 +28,7 @@ import {
 import AiOrb from '../components/AiOrb';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import type { Airdrop } from '../lib/types';
+import type { Airdrop, OpportunityTypeKey } from '../lib/types';
 import AirdropCard from '../components/AirdropCard';
 import CommunityResults from '../components/CommunityResults';
 import FeaturedSpotlight from '../components/FeaturedSpotlight';
@@ -39,7 +39,7 @@ import SocialLinksStrip from '../components/SocialLinksStrip';
 import AffiliatePlacementCta from '../components/AffiliatePlacementCta';
 import { openCopilotWithPrompt } from '../lib/copilot';
 import { canonicalFromPath, homeSeoTitle } from '../lib/seo';
-import { daysUntil, isMainAirdropListing, isSpeculativeTokenListing } from '../lib/utils';
+import { daysUntil, isMainAirdropListing, isSpeculativeTokenListing, getOpportunityTypeKey } from '../lib/utils';
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
@@ -48,10 +48,65 @@ const DEFAULT_FILTERS: Filters = {
   reward: '',
   risk: '',
   difficulty: '',
+  opportunityType: '',
+  sortBy: 'highest_score',
 };
 
 const INITIAL_VISIBLE_AIRDROPS = 6;
 const LOAD_MORE_AIRDROPS = 6;
+
+type OpportunitySectionConfig = {
+  key: OpportunityTypeKey;
+  label: string;
+  description: string;
+  sectionClassName: string;
+  badgeClassName: string;
+};
+
+const OPPORTUNITY_SECTION_CONFIGS: OpportunitySectionConfig[] = [
+  {
+    key: 'confirmed_airdrop',
+    label: 'Confirmed Airdrops',
+    description: 'Officially confirmed token or claim opportunities that users can actively work on now.',
+    sectionClassName: 'border-emerald-500/20 bg-emerald-500/[0.04]',
+    badgeClassName: 'border-emerald-400/35 bg-emerald-500/12 text-emerald-100',
+  },
+  {
+    key: 'potential_airdrop',
+    label: 'Potential Airdrops',
+    description: 'Not officially confirmed yet. These are watchlist opportunities with early positioning potential.',
+    sectionClassName: 'border-amber-500/20 bg-amber-500/[0.04]',
+    badgeClassName: 'border-amber-400/35 bg-amber-500/12 text-amber-100',
+  },
+  {
+    key: 'points_program',
+    label: 'Points Programs',
+    description: 'Campaigns focused on points or credits that may convert into rewards later.',
+    sectionClassName: 'border-sky-500/20 bg-sky-500/[0.04]',
+    badgeClassName: 'border-sky-400/35 bg-sky-500/12 text-sky-100',
+  },
+  {
+    key: 'rewards_program',
+    label: 'Rewards Programs',
+    description: 'Live incentive programs where users can earn ongoing rewards.',
+    sectionClassName: 'border-violet-500/20 bg-violet-500/[0.04]',
+    badgeClassName: 'border-violet-400/35 bg-violet-500/12 text-violet-100',
+  },
+  {
+    key: 'testnet',
+    label: 'Testnet Opportunities',
+    description: 'Testnet-focused tasks and campaigns where rewards are possible but never guaranteed.',
+    sectionClassName: 'border-cyan-500/20 bg-cyan-500/[0.04]',
+    badgeClassName: 'border-cyan-400/35 bg-cyan-500/12 text-cyan-100',
+  },
+  {
+    key: 'scam_alert',
+    label: 'Scam Alerts',
+    description: 'Flagged high-risk listings. Review for awareness only and do not connect wallets.',
+    sectionClassName: 'border-rose-500/35 bg-rose-500/[0.08]',
+    badgeClassName: 'border-rose-400/45 bg-rose-600/20 text-rose-100',
+  },
+];
 
 type Tab = 'all' | 'trending' | 'ending' | 'featured';
 type ShowcaseTab = 'dashboard' | 'wallet' | 'copilot';
@@ -1594,6 +1649,7 @@ export default function HomePage() {
   const [communityCount, setCommunityCount] = useState(0);
   const [walletCount, setWalletCount] = useState(0);
   const [homepageBanners, setHomepageBanners] = useState<HomepageBanner[]>([]);
+  const [showOpportunityTypeGuide, setShowOpportunityTypeGuide] = useState(false);
 
   const tab = (searchParams.get('filter') as Tab) ?? 'all';
 
@@ -1602,7 +1658,7 @@ export default function HomePage() {
   }, [tab, filters]);
 
   useEffect(() => {
-    const activeFilters = [filters.blockchain, filters.category, filters.reward, filters.risk, filters.difficulty]
+    const activeFilters = [filters.blockchain, filters.category, filters.reward, filters.risk, filters.difficulty, filters.opportunityType]
       .filter(Boolean)
       .join(', ') || 'none';
 
@@ -1625,7 +1681,6 @@ export default function HomePage() {
           .eq('published', true)
           .eq('review_status', 'approved')
           .eq('is_demo', false)
-          .neq('listing_state', 'scam_alert')
           .order('sort_order', { ascending: true })
           .order('created_at', { ascending: true }),
         supabase.from('airdrop_results').select('*', { count: 'exact', head: true }),
@@ -1688,6 +1743,11 @@ export default function HomePage() {
     [airdrops],
   );
 
+  const opportunityAndScamListings = useMemo(
+    () => airdrops.filter(item => !isSpeculativeTokenListing(item)),
+    [airdrops],
+  );
+
   const speculativeTokens = useMemo(
     () => [...airdrops.filter(item => isSpeculativeTokenListing(item))].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()),
     [airdrops],
@@ -1723,7 +1783,7 @@ export default function HomePage() {
   );
 
   const filtered = useMemo(() => {
-    let list = opportunityAirdrops;
+    let list = opportunityAndScamListings;
 
     if (tab === 'trending') list = list.filter(a => a.is_trending);
     else if (tab === 'ending') list = list.filter(a => a.status === 'Ending Soon');
@@ -1743,14 +1803,88 @@ export default function HomePage() {
     if (filters.reward) list = list.filter(a => a.reward_potential === filters.reward);
     if (filters.risk) list = list.filter(a => a.risk_level === filters.risk);
     if (filters.difficulty) list = list.filter(a => a.difficulty === filters.difficulty);
+    if (filters.opportunityType) {
+      list = list.filter((item) => getOpportunityTypeKey(item) === filters.opportunityType);
+    }
+
+    const riskRank: Record<string, number> = { Low: 0, Medium: 1, High: 2 };
+    const scoreRank = (item: Airdrop) => item.trust_score ?? 0;
+    const activeRank = (item: Airdrop) => {
+      const trendWeight = item.is_trending ? 1000 : 0;
+      const updatedAt = new Date(item.updated_at ?? item.created_at ?? 0).getTime() || 0;
+      return trendWeight + updatedAt;
+    };
+
+    list = [...list].sort((a, b) => {
+      switch (filters.sortBy) {
+        case 'newest':
+          return new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+        case 'lowest_risk':
+          return riskRank[a.risk_level] - riskRank[b.risk_level] || scoreRank(b) - scoreRank(a);
+        case 'most_active':
+          return activeRank(b) - activeRank(a) || scoreRank(b) - scoreRank(a);
+        case 'ending_soon':
+          return new Date(a.expiry_date ?? '9999-12-31').getTime() - new Date(b.expiry_date ?? '9999-12-31').getTime();
+        case 'highest_score':
+        default:
+          return scoreRank(b) - scoreRank(a) || new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+      }
+    });
 
     return list;
-  }, [opportunityAirdrops, tab, filters]);
+  }, [opportunityAndScamListings, tab, filters]);
 
   const visibleAirdrops = useMemo(
     () => filtered.slice(0, visibleCount),
     [filtered, visibleCount],
   );
+
+  const visibleAirdropIndexes = useMemo(() => {
+    const indexes = new Map<string, number>();
+    visibleAirdrops.forEach((item, index) => indexes.set(item.id, index));
+    return indexes;
+  }, [visibleAirdrops]);
+
+  const groupedVisibleAirdrops = useMemo(() => {
+    const groups: Record<OpportunityTypeKey, Airdrop[]> = {
+      confirmed_airdrop: [],
+      potential_airdrop: [],
+      points_program: [],
+      rewards_program: [],
+      testnet: [],
+      scam_alert: [],
+    };
+
+    visibleAirdrops.forEach((item) => {
+      const key = getOpportunityTypeKey(item);
+      if (key) groups[key].push(item);
+    });
+
+    return groups;
+  }, [visibleAirdrops]);
+
+  const listingSections = useMemo(() => {
+    const selectedType = filters.opportunityType;
+
+    if (selectedType) {
+      const selectedConfig = OPPORTUNITY_SECTION_CONFIGS.find(section => section.key === selectedType);
+      if (!selectedConfig) return [];
+
+      return [
+        {
+          ...selectedConfig,
+          items: groupedVisibleAirdrops[selectedConfig.key],
+        },
+      ];
+    }
+
+    return OPPORTUNITY_SECTION_CONFIGS
+      .map(section => ({
+        ...section,
+        items: groupedVisibleAirdrops[section.key],
+      }))
+      .filter(section => section.items.length > 0);
+  }, [filters.opportunityType, groupedVisibleAirdrops]);
 
   const getNextAirdropSlug = useCallback((list: Airdrop[], index: number) => {
     const nextItem = list[index + 1] ?? null;
@@ -2158,7 +2292,7 @@ export default function HomePage() {
       <AffiliatePlacementCta
         source="homepage"
         title="Homepage security partner"
-        subtitle="This button is placement-tracked and automatically routes through the active affiliate record."
+        subtitle="Secure your crypto with a vetted partner chosen for quality, trust and relevance."
       />
 
       {activeRecommendedToolsBanner && (
@@ -2176,13 +2310,8 @@ export default function HomePage() {
             <h2 className="mt-3 text-2xl font-black text-white sm:text-4xl">
               Explore the projects users can actually act on
             </h2>
-            <div className="mt-3">
-              <span className="inline-flex rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-200">
-                Opportunity Type: Verified Airdrop
-              </span>
-            </div>
             <p className="mt-3 max-w-2xl text-xs leading-relaxed text-gray-400 sm:text-base">
-              Browse live opportunities, filter by chain and risk, and open the full research page for trust signals, rewards, tasks and supporting evidence.
+              Opportunity Type is the source of truth for classification. Browse by type, then open any listing for full trust, risk and action context.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -2224,6 +2353,49 @@ export default function HomePage() {
           </div>
         </div>
 
+        <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.03] p-3 sm:mb-6 sm:p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-300">Opportunity Type Navigation</div>
+            <button
+              type="button"
+              onClick={() => setShowOpportunityTypeGuide(true)}
+              className="inline-flex min-h-[38px] items-center justify-center rounded-full border border-sky-400/25 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-200 transition-colors hover:bg-sky-500/20"
+            >
+              What does this mean?
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setFilters({ ...filters, opportunityType: '' })}
+              className={`inline-flex min-h-[40px] items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${!filters.opportunityType
+                ? 'border-white/30 bg-white/[0.12] text-white'
+                : 'border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.08] hover:text-white'
+              }`}
+            >
+              All
+            </button>
+            {OPPORTUNITY_SECTION_CONFIGS.map((section) => {
+              const selected = filters.opportunityType === section.key;
+
+              return (
+                <button
+                  key={section.key}
+                  type="button"
+                  onClick={() => setFilters({ ...filters, opportunityType: section.key })}
+                  className={`inline-flex min-h-[40px] items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${selected
+                    ? section.badgeClassName
+                    : 'border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.08] hover:text-white'
+                  }`}
+                >
+                  {section.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="sticky top-20 z-20 -mx-4 mb-5 bg-[#050b18]/95 px-4 py-3 backdrop-blur sm:static sm:m-0 sm:mb-8 sm:bg-transparent sm:px-0 sm:py-0">
           <FilterBar filters={filters} onChange={setFilters} />
         </div>
@@ -2238,7 +2410,7 @@ export default function HomePage() {
             <AlertCircle className="h-5 w-5" />
             <span className="text-sm">{error}</span>
           </div>
-        ) : filtered.length === 0 ? (
+        ) : filtered.length === 0 && !filters.opportunityType ? (
           <div className="py-24 text-center">
             <p className="text-sm text-gray-500">No airdrops match your filters.</p>
             <button
@@ -2253,17 +2425,42 @@ export default function HomePage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-              {visibleAirdrops.map((airdrop, index) => {
-                const desktopOnlyInitially = visibleCount === INITIAL_VISIBLE_AIRDROPS && index >= 3 && index < INITIAL_VISIBLE_AIRDROPS;
-                const nextAirdropSlug = getNextAirdropSlug(visibleAirdrops, index);
-
-                return (
-                  <div key={airdrop.id} className={desktopOnlyInitially ? 'hidden sm:block' : ''}>
-                    <AirdropCard airdrop={airdrop} nextAirdropSlug={nextAirdropSlug} />
+            <div className="space-y-6">
+              {listingSections.map((section) => (
+                <div key={section.key} className={`rounded-3xl border p-4 sm:p-5 ${section.sectionClassName}`}>
+                  <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${section.badgeClassName}`}>
+                        {section.label}
+                      </div>
+                      <p className="mt-2 max-w-3xl text-xs leading-relaxed text-gray-300 sm:text-sm">
+                        {section.description}
+                      </p>
+                    </div>
+                    <div className="text-xs text-gray-400">{section.items.length} listing{section.items.length === 1 ? '' : 's'}</div>
                   </div>
-                );
-              })}
+
+                  {section.items.length === 0 ? (
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-gray-400">
+                      No listings available for this opportunity type right now.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
+                      {section.items.map((airdrop, index, list) => {
+                        const absoluteIndex = visibleAirdropIndexes.get(airdrop.id) ?? index;
+                        const desktopOnlyInitially = visibleCount === INITIAL_VISIBLE_AIRDROPS && absoluteIndex >= 3 && absoluteIndex < INITIAL_VISIBLE_AIRDROPS;
+                        const nextAirdropSlug = getNextAirdropSlug(list, index);
+
+                        return (
+                          <div key={airdrop.id} className={desktopOnlyInitially ? 'hidden sm:block' : ''}>
+                            <AirdropCard airdrop={airdrop} nextAirdropSlug={nextAirdropSlug} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
             {hasMoreAirdrops && (
@@ -2283,6 +2480,42 @@ export default function HomePage() {
           </>
         )}
       </section>
+
+      {showOpportunityTypeGuide && (
+        <div className="fixed inset-0 z-[90] flex items-end bg-black/70 p-3 backdrop-blur sm:items-center sm:justify-center sm:p-6">
+          <button
+            type="button"
+            aria-label="Close opportunity type guide"
+            className="absolute inset-0"
+            onClick={() => setShowOpportunityTypeGuide(false)}
+          />
+          <div className="relative w-full max-w-2xl rounded-3xl border border-white/15 bg-[#091225] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.55)] sm:p-6">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-black text-white sm:text-xl">Opportunity Type Guide</h3>
+              <button
+                type="button"
+                onClick={() => setShowOpportunityTypeGuide(false)}
+                className="inline-flex min-h-[36px] items-center rounded-full border border-white/15 px-3 text-xs font-semibold text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Close
+              </button>
+            </div>
+            <p className="mb-4 text-sm leading-relaxed text-gray-300">
+              Opportunity Type is the classification source of truth. Use these labels to understand intent before spending time or connecting any wallet.
+            </p>
+            <div className="space-y-2.5">
+              {OPPORTUNITY_SECTION_CONFIGS.map((section) => (
+                <div key={section.key} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                  <div className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${section.badgeClassName}`}>
+                    {section.label}
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-gray-300">{section.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {speculativeTokens.length > 0 && (
         <section id="speculative-tokens" className="mx-auto max-w-7xl px-4 pb-4 sm:px-6 lg:px-8 lg:pb-8">

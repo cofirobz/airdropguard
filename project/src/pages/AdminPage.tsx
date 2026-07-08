@@ -10,9 +10,9 @@ import {
   FileText, Plus, X, Pencil, Trash2, AlertTriangle, LogOut, ShieldCheck, Gift,
   ImagePlus, Monitor, CalendarClock, BadgeCheck, Bell, Newspaper, Radar, Sparkles, Menu, Search,
 } from 'lucide-react';
-import type { Airdrop, Blockchain, Category } from '../lib/types';
+import type { Airdrop, Blockchain, Category, OpportunityTypeKey } from '../lib/types';
 import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
-import { getOpportunityType, getOpportunityTypeTone, resolveListingStateFromCategory } from '../lib/utils';
+import { getOpportunityType, getOpportunityTypeTone } from '../lib/utils';
 import {
   DEFAULT_ARTICLE_CHECKLIST,
   DEFAULT_ARTICLE_TRUST_PROFILES,
@@ -203,6 +203,9 @@ type AirdropFormData = {
   blockchain: Blockchain[]; category: Category[];
   status: Airdrop['status']; risk_level: Airdrop['risk_level'];
   reward_potential: Airdrop['reward_potential']; difficulty: Airdrop['difficulty'];
+  opportunity_type: OpportunityTypeKey;
+  points_name: string; season_name: string; snapshot_date: string; claim_status: string; reward_status: string;
+  risk_reasons: string; official_safe_url: string; network_name: string; faucet_url: string;
   ai_recommendation_override: '' | 'verify' | 'review_further' | 'blacklist';
   human_override_score: string;
   human_decision: string;
@@ -218,12 +221,175 @@ const BLANK_FORM: AirdropFormData = {
   estimated_reward: '', expiry_date: '', time_required: 'Varies',
   blockchain: [], category: [],
   status: 'Active', risk_level: 'Medium', reward_potential: 'Medium', difficulty: 'Moderate',
+  opportunity_type: 'potential_airdrop',
+  points_name: '', season_name: '', snapshot_date: '', claim_status: '', reward_status: '',
+  risk_reasons: '', official_safe_url: '', network_name: '', faucet_url: '',
   ai_recommendation_override: '',
   human_override_score: '',
   human_decision: '',
   published: false, is_featured: false, is_trending: false, is_sponsored: false,
   tasks_text: '',
 };
+
+const OPPORTUNITY_TYPE_OPTIONS: Array<{ value: OpportunityTypeKey; label: string; tone: string }> = [
+  { value: 'confirmed_airdrop', label: 'Confirmed Airdrop', tone: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200' },
+  { value: 'potential_airdrop', label: 'Potential Airdrop', tone: 'border-amber-500/25 bg-amber-500/10 text-amber-100' },
+  { value: 'points_program', label: 'Points Program', tone: 'border-sky-500/25 bg-sky-500/10 text-sky-100' },
+  { value: 'rewards_program', label: 'Rewards Program', tone: 'border-violet-500/25 bg-violet-500/10 text-violet-100' },
+  { value: 'testnet', label: 'Testnet', tone: 'border-cyan-500/25 bg-cyan-500/10 text-cyan-100' },
+  { value: 'scam_alert', label: 'Scam Alert', tone: 'border-rose-500/25 bg-rose-500/10 text-rose-100' },
+];
+
+function getOpportunityTypeLabel(value: OpportunityTypeKey): string {
+  return OPPORTUNITY_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? 'Potential Airdrop';
+}
+
+function normalizeOpportunityTypeKey(value: unknown): OpportunityTypeKey {
+  if (typeof value !== 'string') return 'potential_airdrop';
+
+  switch (value.trim()) {
+    case 'confirmed_airdrop':
+    case 'Verified Airdrop':
+      return 'confirmed_airdrop';
+    case 'potential_airdrop':
+    case 'Potential Airdrop':
+      return 'potential_airdrop';
+    case 'points_program':
+    case 'Points Program':
+      return 'points_program';
+    case 'rewards_program':
+    case 'Rewards Program':
+      return 'rewards_program';
+    case 'testnet':
+    case 'Testnet':
+      return 'testnet';
+    case 'scam_alert':
+    case 'Scam Alert':
+      return 'scam_alert';
+    default:
+      return 'potential_airdrop';
+  }
+}
+
+function getContractAddressGuidance(opportunityType: OpportunityTypeKey): string {
+  if (opportunityType === 'confirmed_airdrop') {
+    return 'Add the contract address when the token or claim is confirmed/live.';
+  }
+  if (opportunityType === 'scam_alert') {
+    return 'Add a contract address only if it helps explain the risk signal.';
+  }
+  return 'Optional for this type. Leave blank unless you have a verified on-chain address.';
+}
+
+function getOpportunityTypeHelperText(opportunityType: OpportunityTypeKey): string {
+  switch (opportunityType) {
+    case 'confirmed_airdrop':
+      return 'Use for officially confirmed token/claim/snapshot announcements. If token is live, include contract address.';
+    case 'potential_airdrop':
+      return 'Use for strong future airdrop signals when no token is launched yet. Display as Token not launched yet.';
+    case 'points_program':
+      return 'Use for points, XP, petals, credits, seasons, and campaign score systems.';
+    case 'rewards_program':
+      return 'Use for ongoing incentives after or beyond initial airdrop window.';
+    case 'testnet':
+      return 'Use for faucet/test-token based testnet participation and task completion campaigns.';
+    case 'scam_alert':
+      return 'Use for suspicious, phishing, fake, blacklisted, or dangerous listings. Risk reasons are required.';
+    default:
+      return 'Use Opportunity Type as the source of truth for listing classification.';
+  }
+}
+
+function hasLiveTokenSignal(form: Pick<AirdropFormData, 'claim_status' | 'status'>): boolean {
+  const signal = `${form.claim_status ?? ''} ${form.status ?? ''}`.toLowerCase();
+  return /(token\s+live|live\s+token|launched|mainnet|tge|claim\s*(is\s*)?(open|live|active)|claimable)/i.test(signal);
+}
+
+function looksSuspiciousUrl(value: string): boolean {
+  const raw = value.trim();
+  if (!raw) return false;
+
+  const lowered = raw.toLowerCase();
+  const suspiciousHostTerms = ['bit.ly', 'tinyurl', 't.ly', 'rb.gy', 'shorturl', 'cutt.ly'];
+  const suspiciousPathTerms = ['airdrop-claim', 'claim-now', 'wallet-verify', 'seed-verify', 'connect-wallet'];
+  return suspiciousHostTerms.some((term) => lowered.includes(term)) || suspiciousPathTerms.some((term) => lowered.includes(term));
+}
+
+function getClaimUrlCandidate(form: Pick<AirdropFormData, 'website_url' | 'docs_url' | 'official_safe_url' | 'faucet_url'>): string {
+  const candidates = [form.official_safe_url, form.website_url, form.docs_url, form.faucet_url]
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const claimLike = candidates.find((value) => /claim|airdrop|reward/i.test(value));
+  return claimLike ?? '';
+}
+
+type OpportunityConflict = {
+  tone: 'warning' | 'suggestion';
+  message: string;
+};
+
+function getOpportunityConflicts(form: AirdropFormData): OpportunityConflict[] {
+  const conflicts: OpportunityConflict[] = [];
+  const riskReasons = form.risk_reasons
+    .split('\n')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const claimUrlCandidate = getClaimUrlCandidate(form);
+  const tokenLive = hasLiveTokenSignal(form);
+  const noTokenEvidence = !form.contract_address.trim() && !form.claim_status.trim() && !form.snapshot_date;
+  const blacklistSignal =
+    form.ai_recommendation_override === 'blacklist'
+    || /blacklist|phish|scam|fake|malicious|danger/i.test(form.human_decision)
+    || form.category.includes('Scam Alert');
+
+  if (form.opportunity_type === 'confirmed_airdrop' && noTokenEvidence) {
+    conflicts.push({
+      tone: 'warning',
+      message: 'Confirmed Airdrop selected, but token/claim evidence is missing. Add claim status, snapshot, or contract details.',
+    });
+  }
+
+  if (form.points_name.trim() && form.opportunity_type !== 'points_program') {
+    conflicts.push({
+      tone: 'suggestion',
+      message: 'Points Name is filled while type is not Points Program. Consider switching Opportunity Type to Points Program.',
+    });
+  }
+
+  if ((riskReasons.length > 0 || blacklistSignal) && form.opportunity_type !== 'scam_alert') {
+    conflicts.push({
+      tone: 'suggestion',
+      message: 'Risk/blacklist signals detected. Consider switching Opportunity Type to Scam Alert.',
+    });
+  }
+
+  if (claimUrlCandidate && looksSuspiciousUrl(claimUrlCandidate)) {
+    conflicts.push({
+      tone: 'warning',
+      message: 'Claim URL pattern looks suspicious. Double-check destination domain and avoid shorteners.',
+    });
+  }
+
+  if (tokenLive && !form.contract_address.trim()) {
+    conflicts.push({
+      tone: 'warning',
+      message: 'Live token signal detected but contract address is missing.',
+    });
+  }
+
+  return conflicts;
+}
+
+function resolveListingStateFromOpportunityType(
+  opportunityType: OpportunityTypeKey,
+  existingListingState: Airdrop['listing_state'] | undefined,
+): Airdrop['listing_state'] {
+  if (opportunityType === 'scam_alert') return 'scam_alert';
+  if (existingListingState === 'under_review') return 'under_review';
+  return 'verified';
+}
 
 const SPECULATIVE_TOKEN_CATEGORY: Category = 'Speculative Token';
 
@@ -1288,7 +1454,7 @@ function getOpportunityDiscoveryDetails(opportunity: CompetitorOpportunity): {
       listingUrl: typeof parsed.listing_url === 'string' && parsed.listing_url.trim() ? parsed.listing_url : fallback.listingUrl,
       shortDescription: typeof parsed.short_description === 'string' && parsed.short_description.trim() ? parsed.short_description : null,
       listingDate: typeof parsed.listing_date === 'string' && parsed.listing_date.trim() ? parsed.listing_date : null,
-      opportunityType: parsed.opportunity_type === 'Verified Airdrop' || parsed.opportunity_type === 'Testnet' || parsed.opportunity_type === 'Points Program' || parsed.opportunity_type === 'Speculative Token' || parsed.opportunity_type === 'Scam Alert'
+      opportunityType: typeof parsed.opportunity_type === 'string' && parsed.opportunity_type.trim()
         ? parsed.opportunity_type
         : fallback.opportunityType,
       riskLevel: parsed.risk_level === 'Low' || parsed.risk_level === 'Medium' || parsed.risk_level === 'High'
@@ -1697,6 +1863,15 @@ function AirdropFormModal({
   const inp = 'w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40';
   const lbl = 'block text-[10px] text-gray-500 uppercase tracking-wider mb-1';
   const speculativeSelected = isSpeculativeForm(form);
+  const opportunityConflicts = getOpportunityConflicts(form);
+  const opportunityFieldsVisible = {
+    contractAddress: form.opportunity_type === 'confirmed_airdrop' || form.opportunity_type === 'rewards_program' || form.opportunity_type === 'scam_alert',
+    points: form.opportunity_type === 'points_program',
+    rewards: form.opportunity_type === 'rewards_program',
+    confirmed: form.opportunity_type === 'confirmed_airdrop',
+    testnet: form.opportunity_type === 'testnet',
+    scam: form.opportunity_type === 'scam_alert',
+  };
 
   function toggleChain(chain: Blockchain) {
     setForm(f => ({
@@ -1750,16 +1925,149 @@ function AirdropFormModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className={`grid grid-cols-1 gap-3 ${opportunityFieldsVisible.contractAddress ? 'sm:grid-cols-2' : ''}`}>
           <div>
             <label className={lbl}>Logo URL</label>
             <input value={form.logo_url} onChange={e => setForm(f => ({ ...f, logo_url: e.target.value }))} placeholder="https://..." className={inp} />
           </div>
-          <div>
-            <label className={lbl}>Contract Address</label>
-            <input value={form.contract_address} onChange={e => setForm(f => ({ ...f, contract_address: e.target.value }))} placeholder="0x..." className={`${inp} font-mono`} />
+          {opportunityFieldsVisible.contractAddress ? (
+            <div>
+              <label className={lbl}>Contract Address</label>
+              <input value={form.contract_address} onChange={e => setForm(f => ({ ...f, contract_address: e.target.value }))} placeholder="0x..." className={`${inp} font-mono`} />
+              <p className="mt-1 text-[10px] leading-relaxed text-gray-600">{getContractAddressGuidance(form.opportunity_type)}</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[11px] text-gray-300">
+              Contract address hidden for this type. Keep this listing tokenless unless on-chain token details are officially confirmed.
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className={lbl}>Opportunity Type (Source of Truth)</label>
+          <select
+            value={form.opportunity_type}
+            onChange={(e) => setForm((f) => ({ ...f, opportunity_type: e.target.value as OpportunityTypeKey }))}
+            className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40 cursor-pointer"
+          >
+            {OPPORTUNITY_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value} className="bg-dark-900">
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[10px] leading-relaxed text-gray-600">{getOpportunityTypeHelperText(form.opportunity_type)}</p>
+          <div className="mt-2">
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${OPPORTUNITY_TYPE_OPTIONS.find((option) => option.value === form.opportunity_type)?.tone ?? 'border-amber-500/25 bg-amber-500/10 text-amber-100'}`}>
+              {getOpportunityTypeLabel(form.opportunity_type)}
+            </span>
           </div>
         </div>
+
+        {opportunityConflicts.length > 0 && (
+          <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.08] p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-200">Type Conflict Warnings</p>
+            <div className="mt-2 space-y-2">
+              {opportunityConflicts.map((conflict, index) => (
+                <div
+                  key={`${conflict.message}-${index}`}
+                  className={`rounded-xl border px-3 py-2 text-xs leading-relaxed ${conflict.tone === 'warning'
+                    ? 'border-rose-500/30 bg-rose-500/12 text-rose-100'
+                    : 'border-amber-500/30 bg-amber-500/12 text-amber-100'
+                  }`}
+                >
+                  {conflict.message}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {opportunityFieldsVisible.confirmed && (
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.06] p-4 sm:grid-cols-2">
+            <div>
+              <label className={lbl}>Claim Status</label>
+              <input value={form.claim_status} onChange={e => setForm(f => ({ ...f, claim_status: e.target.value }))} placeholder="e.g. Claim open / Token live" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Snapshot Date</label>
+              <input type="date" value={form.snapshot_date} onChange={e => setForm(f => ({ ...f, snapshot_date: e.target.value }))} className={`${inp} [color-scheme:dark]`} />
+            </div>
+            <div className="sm:col-span-2 text-[11px] leading-relaxed text-emerald-100/85">
+              Confirmed Airdrop mode highlights token and claim fields first. If token is live, include contract address.
+            </div>
+          </div>
+        )}
+
+        {form.opportunity_type === 'potential_airdrop' && (
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] p-4 text-xs leading-6 text-amber-100">
+            Token not launched yet. Use this when ecosystem signal is real, but token or claim details are not officially confirmed.
+          </div>
+        )}
+
+        {opportunityFieldsVisible.points && (
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/[0.06] p-4 sm:grid-cols-2">
+            <div>
+              <label className={lbl}>Points Name</label>
+              <input value={form.points_name} onChange={e => setForm(f => ({ ...f, points_name: e.target.value }))} placeholder="e.g. Season Points" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Season Name</label>
+              <input value={form.season_name} onChange={e => setForm(f => ({ ...f, season_name: e.target.value }))} placeholder="e.g. Season 2" className={inp} />
+            </div>
+            <div className="sm:col-span-2 text-[11px] leading-relaxed text-sky-100/85">Add points_name and season_name so users clearly understand points accumulation context.</div>
+          </div>
+        )}
+
+        {opportunityFieldsVisible.rewards && (
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-violet-500/20 bg-violet-500/[0.06] p-4 sm:grid-cols-2">
+            <div>
+              <label className={lbl}>Reward Status</label>
+              <input value={form.reward_status} onChange={e => setForm(f => ({ ...f, reward_status: e.target.value }))} placeholder="e.g. Incentives still active" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Season Name</label>
+              <input value={form.season_name} onChange={e => setForm(f => ({ ...f, season_name: e.target.value }))} placeholder="e.g. Season 3" className={inp} />
+            </div>
+            <div className="sm:col-span-2 text-[11px] leading-relaxed text-violet-100/85">
+              Original airdrop may be complete. Use this for ongoing incentive programs and post-airdrop rewards.
+            </div>
+          </div>
+        )}
+
+        {opportunityFieldsVisible.testnet && (
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.06] p-4 sm:grid-cols-2">
+            <div>
+              <label className={lbl}>Network Name</label>
+              <input value={form.network_name} onChange={e => setForm(f => ({ ...f, network_name: e.target.value }))} placeholder="e.g. Sepolia" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Faucet URL</label>
+              <input value={form.faucet_url} onChange={e => setForm(f => ({ ...f, faucet_url: e.target.value }))} placeholder="https://faucet..." className={inp} />
+            </div>
+            <div className="sm:col-span-2 text-[11px] leading-relaxed text-cyan-100/85">Highlight faucet usage and testnet task flow. Contract address is normally not required for testnet campaigns.</div>
+          </div>
+        )}
+
+        {opportunityFieldsVisible.scam && (
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/[0.06] p-4 sm:grid-cols-2">
+            <div>
+              <label className={lbl}>Risk Reasons *</label>
+              <textarea
+                value={form.risk_reasons}
+                onChange={e => setForm(f => ({ ...f, risk_reasons: e.target.value }))}
+                rows={3}
+                placeholder="One risk reason per line"
+                className={`${inp} resize-none`}
+              />
+            </div>
+            <div>
+              <label className={lbl}>Official Safe URL</label>
+              <input value={form.official_safe_url} onChange={e => setForm(f => ({ ...f, official_safe_url: e.target.value }))} placeholder="https://..." className={inp} />
+              <p className="mt-1 text-[10px] leading-relaxed text-rose-100/80">Scam Alert mode suppresses normal wallet/action CTAs on user-facing pages.</p>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -1933,7 +2241,7 @@ function AirdropFormModal({
           </div>
           <textarea
             value={form.tasks_text}
-            disabled={speculativeSelected}
+            disabled={speculativeSelected || form.opportunity_type === 'scam_alert'}
             onChange={e => setForm(f => ({ ...f, tasks_text: e.target.value }))}
             placeholder={`Follow official X account
 Join Discord
@@ -1941,10 +2249,12 @@ Complete onboarding
 Use testnet / bridge / swap
 Check eligibility updates`}
             rows={5}
-            className={`w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40 resize-none ${speculativeSelected ? 'cursor-not-allowed opacity-60' : ''}`}
+            className={`w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40 resize-none ${speculativeSelected || form.opportunity_type === 'scam_alert' ? 'cursor-not-allowed opacity-60' : ''}`}
           />
           <p className="text-[10px] text-gray-600 mt-1">
-            {speculativeSelected
+            {form.opportunity_type === 'scam_alert'
+              ? 'Action tasks are hidden for Scam Alert listings to avoid wallet-connection style CTA flows.'
+              : speculativeSelected
               ? 'Task checklists are disabled for speculative tokens to prevent qualification-style UX.'
               : 'These tasks are saved into the airdrop_tasks table so the customer dashboard can show real tasks and progress.'}
           </p>
@@ -2977,9 +3287,11 @@ export default function AdminPage() {
     if (opportunityType === 'Speculative Token') return 'Speculative Token';
     if (opportunityType === 'Scam Alert') return 'Scam Alert';
     if (airdrop.listing_state === 'under_review') return 'Under Review';
-    if (opportunityType === 'Verified Airdrop') return 'Verified Airdrop';
+    if (opportunityType === 'Confirmed Airdrop') return 'Verified Airdrop';
+    if (opportunityType === 'Potential Airdrop') return 'Ecosystem Campaign';
     if (opportunityType === 'Testnet') return 'Testnet';
     if (opportunityType === 'Points Program') return 'Points Program';
+    if (opportunityType === 'Rewards Program') return 'Ecosystem Campaign';
     return 'Ecosystem Campaign';
   }, []);
 
@@ -5402,6 +5714,7 @@ export default function AdminPage() {
 
   const openAddFromDiscovery = (opportunity: CompetitorOpportunity, asSpeculative = false) => {
     const details = getOpportunityDiscoveryDetails(opportunity);
+    const opportunityType = asSpeculative ? 'potential_airdrop' : normalizeOpportunityTypeKey(details.opportunityType);
     const mappedCategory = (() => {
       if (asSpeculative || details.opportunityType === 'Speculative Token') return ['Speculative Token'] as Category[];
       if (details.opportunityType === 'Testnet') return ['Testnet'] as Category[];
@@ -5426,6 +5739,7 @@ export default function AdminPage() {
       time_required: details.estimatedTime || BLANK_FORM.time_required,
       blockchain: opportunity.blockchain && BLOCKCHAIN_OPTIONS.includes(opportunity.blockchain as Blockchain) ? [opportunity.blockchain as Blockchain] : [],
       category: mappedCategory,
+      opportunity_type: opportunityType,
       difficulty: details.estimatedDifficulty,
       risk_level: details.riskLevel,
       reward_potential: asSpeculative ? 'Low' : details.estimatedQuality === 'High' ? 'High' : details.estimatedQuality === 'Medium' ? 'Medium' : 'Low',
@@ -5678,6 +5992,16 @@ export default function AdminPage() {
       risk_level: a.risk_level,
       reward_potential: a.reward_potential,
       difficulty: a.difficulty,
+      opportunity_type: (a.opportunity_type as OpportunityTypeKey | null) ?? 'potential_airdrop',
+      points_name: a.points_name ?? '',
+      season_name: a.season_name ?? '',
+      snapshot_date: a.snapshot_date ?? '',
+      claim_status: a.claim_status ?? '',
+      reward_status: a.reward_status ?? '',
+      risk_reasons: Array.isArray(a.risk_reasons) ? a.risk_reasons.join('\n') : '',
+      official_safe_url: a.official_safe_url ?? '',
+      network_name: a.network_name ?? '',
+      faucet_url: a.faucet_url ?? '',
       ai_recommendation_override: a.ai_recommendation_override ?? '',
       human_override_score: typeof a.human_override_score === 'number' ? String(a.human_override_score) : '',
       human_decision: a.human_decision ?? '',
@@ -5729,6 +6053,7 @@ export default function AdminPage() {
             blacklist_reason: patch.blacklist_reason,
             published: patch.published,
             human_verified: patch.human_verified,
+            opportunity_type: decision === 'approve' ? row.opportunity_type : 'scam_alert',
           }
         : row
     )));
@@ -5844,11 +6169,21 @@ export default function AdminPage() {
         setForm(normalizedForm);
       }
 
-      const resolvedListingState = resolveListingStateFromCategory({
-        category: normalizedForm.category,
-        listing_state: existing?.listing_state ?? 'verified',
-        human_verified: existing?.human_verified ?? false,
-      });
+      const riskReasons = normalizedForm.risk_reasons
+        .split('\n')
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      if (normalizedForm.opportunity_type === 'scam_alert' && riskReasons.length === 0) {
+        showToast('Scam Alert requires at least one risk reason before saving.', 'error');
+        setSaving(false);
+        return;
+      }
+
+      const resolvedListingState = resolveListingStateFromOpportunityType(
+        normalizedForm.opportunity_type,
+        existing?.listing_state,
+      );
 
       currentStep = 'prepare_payload';
       const payload = {
@@ -5875,6 +6210,16 @@ export default function AdminPage() {
         risk_level: normalizedForm.risk_level,
         reward_potential: normalizedForm.reward_potential,
         difficulty: normalizedForm.difficulty,
+        opportunity_type: normalizedForm.opportunity_type,
+        points_name: normalizedForm.points_name.trim() || null,
+        season_name: normalizedForm.season_name.trim() || null,
+        snapshot_date: normalizedForm.snapshot_date || null,
+        claim_status: normalizedForm.claim_status.trim() || null,
+        reward_status: normalizedForm.reward_status.trim() || null,
+        risk_reasons: riskReasons,
+        official_safe_url: normalizedForm.official_safe_url.trim() || null,
+        network_name: normalizedForm.network_name.trim() || null,
+        faucet_url: normalizedForm.faucet_url.trim() || null,
         published: normalizedForm.published,
         human_verified: normalizedForm.published,
         is_featured: normalizedForm.is_featured,
@@ -6685,6 +7030,16 @@ export default function AdminPage() {
       existing = existingByName.data as { id: string; name: string } | null;
     }
 
+    const submissionOpportunityType = submission.category === 'Scam Alert'
+      ? 'scam_alert'
+      : submission.category === 'Testnet'
+      ? 'testnet'
+      : submission.category === 'Points Program'
+      ? 'points_program'
+      : submission.category === 'Rewards Program'
+      ? 'rewards_program'
+      : 'potential_airdrop';
+
     if (existing) {
       const { error } = await supabase
         .from('airdrops')
@@ -6695,6 +7050,7 @@ export default function AdminPage() {
           listing_state: 'verified',
           blacklist_reason: null,
           source,
+          opportunity_type: submissionOpportunityType,
         })
         .eq('id', existing.id);
 
@@ -6749,6 +7105,7 @@ export default function AdminPage() {
       trust_score: null,
       listing_state: 'verified',
       blacklist_reason: null,
+      opportunity_type: submissionOpportunityType,
       sort_order: airdrops.length,
       source,
       human_verified: true,

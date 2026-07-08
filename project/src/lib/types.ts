@@ -96,6 +96,13 @@ export type RewardPotential = 'Low' | 'Medium' | 'High';
 export type Difficulty = 'Easy' | 'Moderate' | 'Hard';
 export type RiskLevel = 'Low' | 'Medium' | 'High';
 export type AirdropStatus = 'Active' | 'Ending Soon' | 'Expired';
+export type OpportunityTypeKey =
+  | 'confirmed_airdrop'
+  | 'potential_airdrop'
+  | 'points_program'
+  | 'rewards_program'
+  | 'testnet'
+  | 'scam_alert';
 
 export interface Airdrop {
   id: string;
@@ -114,6 +121,16 @@ export interface Airdrop {
   ai_summary: string;
   ai_risk_analysis: string;
   ai_reward_estimate: string;
+  opportunity_type?: OpportunityTypeKey | null;
+  points_name?: string | null;
+  season_name?: string | null;
+  snapshot_date?: string | null;
+  claim_status?: string | null;
+  reward_status?: string | null;
+  risk_reasons?: string[] | null;
+  official_safe_url?: string | null;
+  network_name?: string | null;
+  faucet_url?: string | null;
   overview: string;
   why_airdrop: string;
   estimated_reward: string;

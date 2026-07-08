@@ -1,7 +1,8 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { useState } from 'react';
-import type { Blockchain, Category, RewardPotential, RiskLevel, Difficulty } from '../lib/types';
+import type { Blockchain, Category, RewardPotential, RiskLevel, Difficulty, OpportunityTypeKey } from '../lib/types';
 import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
+import { getOpportunityTypeTone } from '../lib/utils';
 
 export interface Filters {
   search: string;
@@ -10,6 +11,8 @@ export interface Filters {
   reward: RewardPotential | '';
   risk: RiskLevel | '';
   difficulty: Difficulty | '';
+  opportunityType: OpportunityTypeKey | '';
+  sortBy: 'highest_score' | 'newest' | 'lowest_risk' | 'most_active' | 'ending_soon';
 }
 
 interface Props {
@@ -26,12 +29,31 @@ export default function FilterBar({ filters, onChange }: Props) {
     filters.reward,
     filters.risk,
     filters.difficulty,
+    filters.opportunityType,
   ].filter(Boolean).length;
 
   const hasActiveFilters = activeFilterCount > 0;
 
   const selectClass =
     'min-h-[46px] w-full rounded-xl border border-white/10 bg-dark-700/70 px-3 py-2 text-sm text-gray-300 outline-none transition-colors focus:border-neon-purple/50';
+
+  const typeOptions: Array<{ value: OpportunityTypeKey | ''; label: string }> = [
+    { value: '', label: 'All' },
+    { value: 'confirmed_airdrop', label: 'Confirmed' },
+    { value: 'potential_airdrop', label: 'Potential' },
+    { value: 'points_program', label: 'Points' },
+    { value: 'rewards_program', label: 'Rewards' },
+    { value: 'testnet', label: 'Testnet' },
+    { value: 'scam_alert', label: 'Scam Alerts' },
+  ];
+
+  const sortOptions: Array<{ value: Filters['sortBy']; label: string }> = [
+    { value: 'highest_score', label: 'Highest score' },
+    { value: 'newest', label: 'Newest' },
+    { value: 'lowest_risk', label: 'Lowest risk' },
+    { value: 'most_active', label: 'Most active' },
+    { value: 'ending_soon', label: 'Ending soon' },
+  ];
 
   return (
     <div className="space-y-3">
@@ -83,7 +105,26 @@ export default function FilterBar({ filters, onChange }: Props) {
 
       {showFilters && (
         <div id="airdrop-filters" className="glass-card rounded-2xl p-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {typeOptions.map((option) => {
+                const selected = filters.opportunityType === option.value;
+                const tone = option.value ? getOpportunityTypeTone(option.value === 'confirmed_airdrop' ? 'Confirmed Airdrop' : option.value === 'potential_airdrop' ? 'Potential Airdrop' : option.value === 'points_program' ? 'Points Program' : option.value === 'rewards_program' ? 'Rewards Program' : option.value === 'testnet' ? 'Testnet' : 'Scam Alert') : 'border-white/10 bg-white/[0.03] text-gray-300';
+
+                return (
+                  <button
+                    key={option.label}
+                    type="button"
+                    onClick={() => onChange({ ...filters, opportunityType: option.value })}
+                    className={`inline-flex min-h-[40px] items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${selected ? tone : 'border-white/10 bg-white/[0.03] text-gray-400 hover:bg-white/[0.06] hover:text-white'}`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <label className="space-y-1.5">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">
                 Chain
@@ -163,6 +204,22 @@ export default function FilterBar({ filters, onChange }: Props) {
                 <option value="Hard">Hard</option>
               </select>
             </label>
+
+            <label className="space-y-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-600">
+                Sort by
+              </span>
+              <select
+                value={filters.sortBy}
+                onChange={(e) => onChange({ ...filters, sortBy: e.target.value as Filters['sortBy'] })}
+                className={selectClass}
+              >
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           </div>
 
           {hasActiveFilters && (
@@ -176,6 +233,8 @@ export default function FilterBar({ filters, onChange }: Props) {
                   reward: '',
                   risk: '',
                   difficulty: '',
+                  opportunityType: '',
+                  sortBy: 'highest_score',
                 })
               }
               className="mt-4 min-h-[42px] rounded-xl px-3 text-sm font-semibold text-neon-purple hover:bg-neon-purple/5 hover:text-neon-purple/80"

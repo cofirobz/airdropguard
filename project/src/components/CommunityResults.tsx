@@ -22,6 +22,10 @@ interface UserResult {
 
 interface Props {
   airdropId: string;
+  reportedRewardsLabel?: string | null;
+  usersParticipatingLabel?: string | null;
+  latestAiUpdateLabel?: string | null;
+  latestHumanReviewLabel?: string | null;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -60,7 +64,13 @@ const MIN_RESPONSES = 10;
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function CommunityResults({ airdropId }: Props) {
+export default function CommunityResults({
+  airdropId,
+  reportedRewardsLabel,
+  usersParticipatingLabel,
+  latestAiUpdateLabel,
+  latestHumanReviewLabel,
+}: Props) {
   const { user } = useAuth();
 
   const [stats,      setStats]      = useState<AirdropStats | null>(null);
@@ -157,6 +167,25 @@ export default function CommunityResults({ airdropId }: Props) {
         </div>
       ) : (
         <>
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500">Users Participating</div>
+              <div className="mt-1 text-sm font-bold text-white">{usersParticipatingLabel || `${total} responses`}</div>
+            </div>
+            <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500">Reported Rewards</div>
+              <div className="mt-1 text-sm font-bold text-white">{reportedRewardsLabel || (stats?.top_reward_range ? REWARD_LABELS[stats.top_reward_range as RewardRange] : 'TBA')}</div>
+            </div>
+            <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500">Latest AI Update</div>
+              <div className="mt-1 text-sm font-bold text-white">{latestAiUpdateLabel || 'Recently refreshed'}</div>
+            </div>
+            <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500">Latest Human Review</div>
+              <div className="mt-1 text-sm font-bold text-white">{latestHumanReviewLabel || 'Pending review'}</div>
+            </div>
+          </div>
+
           {/* Stats — only shown when we have enough data */}
           {hasEnough ? (
             <>
