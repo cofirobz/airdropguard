@@ -198,7 +198,7 @@ function CodeBlock({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="relative">
-      <pre className="overflow-x-auto rounded-xl border border-white/10 bg-dark-900 p-4 font-mono text-xs leading-relaxed text-gray-300">
+      <pre className="w-full overflow-x-auto rounded-xl border border-white/10 bg-dark-900 p-3 pr-11 font-mono text-[11px] leading-relaxed text-gray-300 sm:p-4 sm:pr-12 sm:text-xs">
         {code}
       </pre>
       <button
@@ -207,7 +207,7 @@ function CodeBlock({ code }: { code: string }) {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }}
-        className="absolute right-3 top-3 rounded-lg border border-white/10 bg-dark-700/80 p-1.5 transition-colors hover:border-cyan-300/35"
+        className="absolute right-2 top-2 rounded-lg border border-white/10 bg-dark-700/80 p-1.5 transition-colors hover:border-cyan-300/35 sm:right-3 sm:top-3"
         aria-label="Copy code sample"
       >
         {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-gray-400" />}
@@ -229,7 +229,7 @@ function EndpointCard({ endpoint, internal = false }: { endpoint: EndpointDoc; i
       </div>
 
       <h3 className="text-base font-bold text-white">{endpoint.name}</h3>
-      <p className="mt-1 break-all font-mono text-xs text-cyan-200">{endpoint.url}</p>
+      <p className="mt-1 break-words font-mono text-xs text-cyan-200">{endpoint.url}</p>
       <p className="mt-3 text-sm text-gray-300"><span className="font-semibold text-white">Returns:</span> {endpoint.returns}</p>
       <p className="mt-2 text-sm text-gray-300"><span className="font-semibold text-white">Auth:</span> {endpoint.auth}</p>
       {endpoint.notes && <p className="mt-2 text-xs text-amber-200/90">{endpoint.notes}</p>}
@@ -288,7 +288,7 @@ export default function ApiDocsPage() {
         canonical={canonicalFromPath('/api-docs')}
         schema={apiDocsSchema}
       />
-      <section className="mb-10 rounded-3xl border border-cyan-300/20 bg-[radial-gradient(circle_at_12%_18%,rgba(34,211,238,0.16),transparent_40%),linear-gradient(160deg,rgba(3,10,24,0.96),rgba(4,16,38,0.94)_45%,rgba(3,11,27,0.95))] p-6 shadow-[0_20px_60px_rgba(2,8,23,0.5)] sm:p-8">
+      <section className="mb-10 rounded-3xl border border-cyan-300/20 bg-[radial-gradient(circle_at_12%_18%,rgba(34,211,238,0.16),transparent_40%),linear-gradient(160deg,rgba(3,10,24,0.96),rgba(4,16,38,0.94)_45%,rgba(3,11,27,0.95))] p-5 shadow-[0_20px_60px_rgba(2,8,23,0.5)] sm:p-8">
         <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
           <Code2 className="h-3.5 w-3.5" />
           AirdropGuard API
@@ -318,7 +318,7 @@ export default function ApiDocsPage() {
         className="mb-8 px-0 py-0"
       />
 
-      <section className="mb-8 glass-card rounded-2xl p-6">
+      <section className="mb-8 glass-card rounded-2xl p-4 sm:p-6">
         <div className="mb-3 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-cyan-200" />
           <h2 className="text-lg font-bold text-white">Getting Started</h2>
@@ -331,7 +331,7 @@ export default function ApiDocsPage() {
         </ol>
       </section>
 
-      <section className="mb-8 glass-card rounded-2xl p-6">
+      <section className="mb-8 glass-card rounded-2xl p-4 sm:p-6">
         <div className="mb-3 flex items-center gap-2">
           <Shield className="h-5 w-5 text-cyan-200" />
           <h2 className="text-lg font-bold text-white">Authentication</h2>
@@ -357,7 +357,7 @@ export default function ApiDocsPage() {
         </div>
       </section>
 
-      <section className="mb-8 glass-card rounded-2xl p-6">
+      <section className="mb-8 glass-card rounded-2xl p-4 sm:p-6">
         <div className="mb-3 flex items-center gap-2">
           <Zap className="h-5 w-5 text-amber-300" />
           <h2 className="text-lg font-bold text-white">Rate Limits</h2>
@@ -379,7 +379,7 @@ export default function ApiDocsPage() {
         </div>
       </section>
 
-      <section className="mb-8 glass-card rounded-2xl p-6">
+      <section className="mb-8 glass-card rounded-2xl p-4 sm:p-6">
         <h2 className="text-lg font-bold text-white">Public Website Routes</h2>
         <p className="mt-2 text-sm text-gray-300">
           These are browser pages available to visitors. They are not API endpoints.
@@ -428,7 +428,7 @@ export default function ApiDocsPage() {
         </div>
       </section>
 
-      <section className="mb-8 glass-card rounded-2xl p-6">
+      <section className="mb-8 glass-card rounded-2xl p-4 sm:p-6">
         <div className="mb-3 flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-rose-300" />
           <h2 className="text-lg font-bold text-white">Errors</h2>
@@ -454,7 +454,7 @@ export default function ApiDocsPage() {
         </div>
       </section>
 
-      <section className="glass-card rounded-2xl p-6 sm:flex sm:items-center sm:justify-between">
+      <section className="glass-card rounded-2xl p-4 sm:flex sm:items-center sm:justify-between sm:p-6">
         <div>
           <h3 className="text-base font-bold text-white">Ready to build with AirdropGuard?</h3>
           <p className="mt-1 text-sm text-gray-400">Create your key, test the public endpoints, and ship quickly.</p>

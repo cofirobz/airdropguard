@@ -1965,7 +1965,7 @@ export default function HomePage() {
             <div className="absolute right-4 top-3 h-px w-24 bg-gradient-to-r from-transparent via-blue-300/80 to-transparent" />
 
             <div className="relative grid gap-4 sm:gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
-              <div>
+              <div className="text-center sm:text-left">
                 <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-cyan-100 sm:text-xs">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   AI + Human Verified
@@ -1982,7 +1982,7 @@ export default function HomePage() {
                   AI analysed. Human reviewed. Trust the airdrops that are actually worth your time.
                 </p>
 
-                <div className="mt-3 grid grid-cols-1 gap-2 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(180deg,rgba(6,17,40,0.88),rgba(4,11,26,0.8))] p-2.5 sm:hidden">
+                <div className="mt-3 grid grid-cols-1 gap-2 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(180deg,rgba(6,17,40,0.88),rgba(4,11,26,0.8))] p-2.5 text-left sm:hidden">
                   <div className="flex items-center justify-between rounded-xl border border-cyan-300/20 bg-cyan-400/8 px-3 py-2">
                     <p className="text-[11px] font-semibold text-cyan-100">Trust momentum</p>
                     <p className={`text-xs font-black ${trustScoreTextTone}`}>{trustScoreValue}%</p>
@@ -1990,7 +1990,7 @@ export default function HomePage() {
                   <div className="h-1.5 overflow-hidden rounded-full bg-slate-800/85">
                     <div className={`trust-bar-glow h-full rounded-full ${trustScoreBarTone}`} style={{ width: `${trustScoreValue}%` }} />
                   </div>
-                  <div className="flex gap-1.5 text-[10px] font-semibold text-cyan-100/90">
+                  <div className="flex flex-wrap gap-1.5 text-[10px] font-semibold text-cyan-100/90">
                     <span className="inline-flex items-center rounded-full border border-emerald-300/35 bg-emerald-500/10 px-2 py-1">Low-risk picks</span>
                     <span className="inline-flex items-center rounded-full border border-amber-300/35 bg-amber-500/10 px-2 py-1">Hot now</span>
                     <span className="inline-flex items-center rounded-full border border-fuchsia-300/35 bg-fuchsia-500/10 px-2 py-1">AI watched</span>
@@ -2050,7 +2050,7 @@ export default function HomePage() {
                 <div className="mt-3.5 grid gap-2 sm:grid-cols-2">
                   <a
                     href="#live-opportunities"
-                    className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(98deg,#1fb6ff_0%,#4f8dfb_42%,#7c4dff_100%)] px-5 py-3 text-sm font-black text-white shadow-[0_14px_26px_rgba(59,130,246,0.35)] transition-transform hover:translate-y-[-1px]"
+                    className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(98deg,#1fb6ff_0%,#4f8dfb_42%,#7c4dff_100%)] px-5 py-3 text-sm font-black text-white shadow-[0_14px_26px_rgba(59,130,246,0.35)] transition-transform hover:translate-y-[-1px]"
                   >
                     Explore Airdrops
                     <ArrowRight className="h-4 w-4" />
@@ -2058,7 +2058,7 @@ export default function HomePage() {
                   <CopilotCta
                     prompt="Review current airdrop opportunities and rank my safest next action."
                     context="homepage-hero-primary"
-                    className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/[0.1]"
+                    className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/[0.1]"
                   >
                     <Sparkles className="h-4 w-4 text-cyan-300" />
                     Ask AI
@@ -2066,29 +2066,29 @@ export default function HomePage() {
                 </div>
 
                 <div className="mt-3.5 space-y-2.5">
-                  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-100/85">
+                  <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-100/85 sm:justify-start">
                     <Activity className="h-3.5 w-3.5 text-cyan-300" />
                     Live confidence pulse
                   </div>
-                  <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <div className="attention-card hero-stagger min-w-[148px] rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(6,182,212,0.16)]" style={{ ['--stagger-delay' as string]: '80ms' }}>
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-2 sm:overflow-x-auto sm:pb-1 sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden">
+                    <div className="attention-card hero-stagger min-w-0 rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(6,182,212,0.16)] sm:min-w-[148px]" style={{ ['--stagger-delay' as string]: '80ms' }}>
                       <p className="text-[1rem] font-black leading-none text-cyan-100">{safeDisplayCount(verifiedProjects.length, '+')}</p>
                       <p className="mt-1 text-[11px] text-cyan-200/85">Trusted right now</p>
                     </div>
-                    <div className="attention-card hero-stagger min-w-[148px] rounded-xl border border-emerald-300/35 bg-emerald-500/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(16,185,129,0.15)]" style={{ ['--stagger-delay' as string]: '150ms' }}>
+                    <div className="attention-card hero-stagger min-w-0 rounded-xl border border-emerald-300/35 bg-emerald-500/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(16,185,129,0.15)] sm:min-w-[148px]" style={{ ['--stagger-delay' as string]: '150ms' }}>
                       <p className="text-[1rem] font-black leading-none text-emerald-100">{safeDisplayCount(lowRiskPool, '+')}</p>
                       <p className="mt-1 text-[11px] text-emerald-200/85">Low-risk pool</p>
                     </div>
-                    <div className="attention-card hero-stagger min-w-[148px] rounded-xl border border-amber-300/35 bg-amber-500/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(245,158,11,0.16)]" style={{ ['--stagger-delay' as string]: '220ms' }}>
+                    <div className="attention-card hero-stagger min-w-0 rounded-xl border border-amber-300/35 bg-amber-500/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(245,158,11,0.16)] sm:min-w-[148px]" style={{ ['--stagger-delay' as string]: '220ms' }}>
                       <p className="text-[1rem] font-black leading-none text-amber-100">{safeDisplayCount(trendingNow, '+')}</p>
                       <p className="mt-1 text-[11px] text-amber-200/85">Trending this cycle</p>
                     </div>
-                    <div className="attention-card hero-stagger min-w-[178px] rounded-xl border border-fuchsia-300/35 bg-fuchsia-500/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(217,70,239,0.16)]" style={{ ['--stagger-delay' as string]: '290ms' }}>
+                    <div className="attention-card hero-stagger col-span-2 min-w-0 rounded-xl border border-fuchsia-300/35 bg-fuchsia-500/10 px-3 py-2.5 shadow-[0_8px_24px_rgba(217,70,239,0.16)] sm:col-span-1 sm:min-w-[178px]" style={{ ['--stagger-delay' as string]: '290ms' }}>
                       <p className="truncate text-[1rem] font-black leading-none text-fuchsia-100">{topProjectName}</p>
                       <p className="mt-1 text-[11px] text-fuchsia-200/85">Top confidence pick</p>
                     </div>
                   </div>
-                  <p className="text-xs leading-relaxed text-cyan-100/85">
+                  <p className="text-center text-xs leading-relaxed text-cyan-100/85 sm:text-left">
                     Stay for 30 seconds and you get a clearer picture than most users get in 30 minutes of random scrolling.
                   </p>
                 </div>
