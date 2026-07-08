@@ -244,9 +244,9 @@ function normalizeSpeculativeForm(form: AirdropFormData): AirdropFormData {
 
 const SCAM_REPORT_REP = 50;
 
-type BannerPlacement = 'Homepage Hero Banner' | 'Homepage Mid-Page Banner' | 'Airdrop Detail Banner' | 'Dashboard Banner';
-type BannerStatus = 'Enquiry' | 'Awaiting Artwork' | 'Ready to Publish' | 'Live' | 'Expired';
-type BannerDisplayStatus = 'Active' | 'Scheduled' | 'Expired';
+type BannerPlacement = 'homepage_hero' | 'homepage_mid' | 'sidebar' | 'footer' | 'recommended_tools';
+type BannerStatus = 'draft' | 'live' | 'scheduled' | 'expired' | 'disabled';
+type BannerDisplayStatus = 'Draft' | 'Live' | 'Scheduled' | 'Expired' | 'Disabled';
 type BannerPaymentState = 'Unpaid' | 'Pending' | 'Paid';
 
 type DiscordUpdateStatus = 'draft' | 'approved' | 'scheduled' | 'sent' | 'failed' | 'rejected';
@@ -301,9 +301,26 @@ interface BannerAd {
   paymentState: BannerPaymentState;
   archived: boolean;
   updatedAt: string;
+  createdAt: string;
 }
 
-type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt'>;
+type BannerFormData = Omit<BannerAd, 'id' | 'updatedAt' | 'createdAt'>;
+
+type BannerDbRow = {
+  id: string;
+  project_name: string;
+  contact_email: string | null;
+  website_url: string | null;
+  placement: string;
+  destination_url: string;
+  banner_image_url: string;
+  alt_text: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
 
 type ContentView = 'airdrops' | 'articles' | 'hero' | 'featured' | 'trending' | 'learn' | 'sections';
 type AdminView = 'overview' | 'airdrops' | 'speculative-tokens' | 'submissions' | 'competitor-watch' | 'ignored-deleted-projects' | 'articles' | 'social-admin' | 'affiliate-hub' | 'advertise-admin' | 'users' | 'audit-logs' | 'system-tools';
@@ -1381,14 +1398,21 @@ function inferAuditTarget(log: AdminAuditLog): { targetType: AuditTargetType; ta
   return { targetType: 'unknown', targetNameOrId: 'unknown target' };
 }
 
-const BANNER_PLACEMENT_OPTIONS: BannerPlacement[] = [
-  'Homepage Hero Banner',
-  'Homepage Mid-Page Banner',
-  'Airdrop Detail Banner',
-  'Dashboard Banner',
+const BANNER_PLACEMENT_OPTIONS: Array<{ value: BannerPlacement; label: string }> = [
+  { value: 'homepage_hero', label: 'Homepage Hero Banner' },
+  { value: 'homepage_mid', label: 'Homepage Mid Banner' },
+  { value: 'sidebar', label: 'Sidebar Banner' },
+  { value: 'footer', label: 'Footer Banner' },
+  { value: 'recommended_tools', label: 'Recommended Tools Banner' },
 ];
 
-const BANNER_STATUS_OPTIONS: BannerStatus[] = ['Enquiry', 'Awaiting Artwork', 'Ready to Publish', 'Live', 'Expired'];
+const BANNER_STATUS_OPTIONS: Array<{ value: BannerStatus; label: string }> = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'live', label: 'Live' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'expired', label: 'Expired' },
+  { value: 'disabled', label: 'Disabled' },
+];
 
 const BLANK_BANNER_FORM: BannerFormData = {
   advertiserName: '',
@@ -1397,10 +1421,10 @@ const BLANK_BANNER_FORM: BannerFormData = {
   bannerImageUrl: '',
   destinationUrl: '',
   altText: '',
-  placement: 'Homepage Hero Banner',
+  placement: 'homepage_hero',
   startDate: '',
   endDate: '',
-  status: 'Enquiry',
+  status: 'draft',
   enabled: false,
   exclusivePlacement: true,
   notes: '',
@@ -1408,18 +1432,68 @@ const BLANK_BANNER_FORM: BannerFormData = {
   archived: false,
 };
 
-const BANNERS_STORAGE_KEY = 'ag.admin.banners.v1';
+const BANNER_PLACEMENT_LABELS: Record<BannerPlacement, string> = {
+  homepage_hero: 'Homepage Hero Banner',
+  homepage_mid: 'Homepage Mid Banner',
+  sidebar: 'Sidebar Banner',
+  footer: 'Footer Banner',
+  recommended_tools: 'Recommended Tools Banner',
+};
 
-function coerceBannerPlacement(value: unknown): BannerPlacement {
-  return BANNER_PLACEMENT_OPTIONS.includes(value as BannerPlacement)
-    ? (value as BannerPlacement)
-    : 'Homepage Hero Banner';
+const BANNER_STATUS_LABELS: Record<BannerStatus, BannerDisplayStatus> = {
+  draft: 'Draft',
+  live: 'Live',
+  scheduled: 'Scheduled',
+  expired: 'Expired',
+  disabled: 'Disabled',
+};
+
+function parseBannerPlacement(value: unknown): BannerPlacement {
+  if (value === 'homepage_mid') return 'homepage_mid';
+  if (value === 'sidebar') return 'sidebar';
+  if (value === 'footer') return 'footer';
+  if (value === 'recommended_tools') return 'recommended_tools';
+  return 'homepage_hero';
 }
 
-function coerceBannerStatus(value: unknown): BannerStatus {
-  return BANNER_STATUS_OPTIONS.includes(value as BannerStatus)
-    ? (value as BannerStatus)
-    : 'Enquiry';
+function parseBannerStatus(value: unknown): BannerStatus {
+  if (value === 'live') return 'live';
+  if (value === 'scheduled') return 'scheduled';
+  if (value === 'expired') return 'expired';
+  if (value === 'disabled') return 'disabled';
+  return 'draft';
+}
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function parseBannerDateInput(value: string): number {
+  if (!value) return Number.NaN;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function validateBannerDestinationUrl(value: string): string | null {
+  const candidate = value.trim();
+  if (!candidate) return 'Destination URL is required.';
+  if (/[<>]/.test(candidate) || /^\s*<a\b/i.test(candidate)) {
+    return 'Destination URL must be a plain URL, not HTML.';
+  }
+  if (!isValidHttpUrl(candidate)) return 'Destination URL must be a valid http/https URL.';
+  return null;
+}
+
+function validateBannerImageUrl(value: string): string | null {
+  const candidate = value.trim();
+  if (!candidate) return 'Banner image URL is required.';
+  if (!isValidHttpUrl(candidate)) return 'Banner image must be a valid uploaded or external image URL.';
+  return null;
 }
 
 function coercePaymentState(value: unknown): BannerPaymentState {
@@ -1427,60 +1501,25 @@ function coercePaymentState(value: unknown): BannerPaymentState {
   return 'Unpaid';
 }
 
-function loadPersistedBanners(): BannerAd[] {
-  if (typeof window === 'undefined') return [];
+function getBannerStatus(status: BannerStatus, startDate: string, endDate: string): BannerStatus {
+  if (status === 'disabled' || status === 'draft') return status;
 
-  try {
-    const raw = window.localStorage.getItem(BANNERS_STORAGE_KEY);
-    if (!raw) return [];
+  const now = Date.now();
+  const startMs = parseBannerDateInput(startDate);
+  const endMs = parseBannerDateInput(endDate);
 
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed.map((row, index) => {
-      const candidate = (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
-      const fallbackId = `banner_${Date.now()}_${index}`;
-
-      return {
-        id: typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id : fallbackId,
-        advertiserName: String(candidate.advertiserName ?? ''),
-        contactEmail: String(candidate.contactEmail ?? ''),
-        websiteLink: String(candidate.websiteLink ?? ''),
-        bannerImageUrl: String(candidate.bannerImageUrl ?? ''),
-        destinationUrl: String(candidate.destinationUrl ?? ''),
-        altText: String(candidate.altText ?? ''),
-        placement: coerceBannerPlacement(candidate.placement),
-        startDate: String(candidate.startDate ?? ''),
-        endDate: String(candidate.endDate ?? ''),
-        status: coerceBannerStatus(candidate.status),
-        enabled: Boolean(candidate.enabled),
-        exclusivePlacement: candidate.exclusivePlacement === undefined ? true : Boolean(candidate.exclusivePlacement),
-        notes: String(candidate.notes ?? ''),
-        paymentState: coercePaymentState(candidate.paymentState),
-        archived: Boolean(candidate.archived),
-        updatedAt: String(candidate.updatedAt ?? new Date().toISOString()),
-      };
-    }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  } catch {
-    return [];
-  }
-}
-
-function deriveBannerStatus(status: BannerStatus, _startDate: string, endDate: string): BannerStatus {
-  if (status === 'Expired') return 'Expired';
-  const now = new Date().getTime();
-  const endMs = endDate ? new Date(endDate).getTime() : Number.NaN;
-
-  if (Number.isFinite(endMs) && endMs < now) return 'Expired';
+  if (Number.isFinite(endMs) && endMs < now) return 'expired';
+  if (status === 'live' && Number.isFinite(startMs) && startMs > now) return 'scheduled';
+  if (status === 'scheduled' && Number.isFinite(startMs) && startMs <= now) return 'live';
   return status;
 }
 
 function getBannerStatusClass(status: BannerStatus): string {
-  if (status === 'Live') return 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10';
-  if (status === 'Ready to Publish') return 'text-sky-300 border-sky-500/25 bg-sky-500/10';
-  if (status === 'Awaiting Artwork') return 'text-amber-300 border-amber-500/25 bg-amber-500/10';
-  if (status === 'Enquiry') return 'text-violet-300 border-violet-500/25 bg-violet-500/10';
-  if (status === 'Expired') return 'text-rose-300 border-rose-500/25 bg-rose-500/10';
+  if (status === 'live') return 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10';
+  if (status === 'scheduled') return 'text-sky-300 border-sky-500/25 bg-sky-500/10';
+  if (status === 'draft') return 'text-violet-300 border-violet-500/25 bg-violet-500/10';
+  if (status === 'expired') return 'text-rose-300 border-rose-500/25 bg-rose-500/10';
+  if (status === 'disabled') return 'text-amber-300 border-amber-500/25 bg-amber-500/10';
   return 'text-gray-300 border-white/15 bg-white/[0.04]';
 }
 
@@ -1490,18 +1529,15 @@ function hasLastAnalyzedAt(airdrop: Airdrop): boolean {
 }
 
 function getBannerDisplayStatus(status: BannerStatus, startDate: string, endDate: string): BannerDisplayStatus {
-  const now = Date.now();
-  const start = startDate ? new Date(startDate).getTime() : Number.NaN;
-  const end = endDate ? new Date(endDate).getTime() : Number.NaN;
-
-  if (status === 'Expired' || (Number.isFinite(end) && end < now)) return 'Expired';
-  if ((status === 'Ready to Publish' || status === 'Awaiting Artwork' || status === 'Enquiry') && Number.isFinite(start) && start > now) return 'Scheduled';
-  return 'Active';
+  const resolved = getBannerStatus(status, startDate, endDate);
+  return BANNER_STATUS_LABELS[resolved];
 }
 
 function getBannerDisplayClass(status: BannerDisplayStatus): string {
-  if (status === 'Active') return 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10';
+  if (status === 'Live') return 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10';
   if (status === 'Scheduled') return 'text-sky-300 border-sky-500/25 bg-sky-500/10';
+  if (status === 'Draft') return 'text-violet-300 border-violet-500/25 bg-violet-500/10';
+  if (status === 'Disabled') return 'text-amber-300 border-amber-500/25 bg-amber-500/10';
   return 'text-rose-300 border-rose-500/25 bg-rose-500/10';
 }
 
@@ -1512,11 +1548,49 @@ function getPaymentStateClass(state: BannerPaymentState): string {
 }
 
 function getBannerNextAction(status: BannerStatus): string {
-  if (status === 'Enquiry') return 'Upload artwork';
-  if (status === 'Awaiting Artwork') return 'Check link';
-  if (status === 'Ready to Publish') return 'Set dates';
-  if (status === 'Live') return 'Expire banner';
-  return 'Create new banner';
+  if (status === 'draft') return 'Complete creative';
+  if (status === 'scheduled') return 'Wait for start date';
+  if (status === 'live') return 'Monitor campaign';
+  if (status === 'expired') return 'Renew or disable';
+  return 'Re-enable when ready';
+}
+
+function mapBannerDbRow(row: BannerDbRow): BannerAd {
+  return {
+    id: row.id,
+    advertiserName: row.project_name,
+    contactEmail: row.contact_email ?? '',
+    websiteLink: row.website_url ?? '',
+    bannerImageUrl: row.banner_image_url ?? '',
+    destinationUrl: row.destination_url,
+    altText: row.alt_text ?? '',
+    placement: parseBannerPlacement(row.placement),
+    startDate: row.start_date ?? '',
+    endDate: row.end_date ?? '',
+    status: parseBannerStatus(row.status),
+    enabled: row.status !== 'disabled',
+    exclusivePlacement: true,
+    notes: '',
+    paymentState: 'Unpaid',
+    archived: row.status === 'expired',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toBannerDbPayload(form: BannerFormData, resolvedStatus: BannerStatus) {
+  return {
+    project_name: form.advertiserName.trim(),
+    contact_email: form.contactEmail.trim() || null,
+    website_url: form.websiteLink.trim() || null,
+    placement: form.placement,
+    destination_url: form.destinationUrl.trim(),
+    banner_image_url: form.bannerImageUrl.trim(),
+    alt_text: form.altText.trim() || null,
+    start_date: form.startDate || null,
+    end_date: form.endDate || null,
+    status: resolvedStatus,
+  };
 }
 
 function levelFromRep(rep: number) {
@@ -1931,12 +2005,14 @@ function BannerFormModal({
   setForm,
   onClose,
   onSave,
+  saving,
 }: {
   mode: 'add' | 'edit';
   form: BannerFormData;
   setForm: React.Dispatch<React.SetStateAction<BannerFormData>>;
   onClose: () => void;
   onSave: () => void;
+  saving: boolean;
 }) {
   const inputClass = 'w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-neon-purple/40';
   const labelClass = 'block text-[10px] text-gray-500 uppercase tracking-wider mb-1';
@@ -1954,7 +2030,7 @@ function BannerFormModal({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-white">{mode === 'add' ? 'Create Banner' : 'Edit Banner'}</h2>
-            <p className="text-xs text-gray-500 mt-1">Prepare enquiry workflow, upload artwork assets, and preview before going live.</p>
+            <p className="text-xs text-gray-500 mt-1">Prepare draft workflow, upload artwork assets, and preview before going live.</p>
           </div>
           <button onClick={onClose} aria-label="Close banner form" className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
             <X className="w-5 h-5" />
@@ -2009,10 +2085,10 @@ function BannerFormModal({
                   className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40"
                 >
                   {BANNER_PLACEMENT_OPTIONS.map((placement) => (
-                    <option key={placement} value={placement} className="bg-dark-900">{placement}</option>
+                    <option key={placement.value} value={placement.value} className="bg-dark-900">{placement.label}</option>
                   ))}
                 </select>
-                <p className="text-[10px] text-gray-600 mt-1">Each placement is $149 and exclusive.</p>
+                <p className="text-[10px] text-gray-600 mt-1">Use stable placement keys with display labels in the manager.</p>
               </div>
               <div>
                 <label className={labelClass}>Destination URL *</label>
@@ -2085,10 +2161,10 @@ function BannerFormModal({
                   className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40"
                 >
                   {BANNER_STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status} className="bg-dark-900">{status}</option>
+                    <option key={status.value} value={status.value} className="bg-dark-900">{status.label}</option>
                   ))}
                 </select>
-                <p className="text-[10px] text-gray-600 mt-1">Move from enquiry to live in clear steps.</p>
+                <p className="text-[10px] text-gray-600 mt-1">Move from draft to live in clear steps.</p>
               </div>
             </div>
           </div>
@@ -2164,11 +2240,11 @@ function BannerFormModal({
           </button>
           <button
             onClick={onSave}
-            disabled={!form.advertiserName.trim() || !form.destinationUrl.trim()}
+            disabled={saving || !form.advertiserName.trim() || !form.destinationUrl.trim()}
             className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-medium bg-neon-purple/15 border border-neon-purple/30 text-neon-purple hover:bg-neon-purple/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {mode === 'add' ? <Plus className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
-            {mode === 'add' ? 'Create Banner' : 'Save Banner'}
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'add' ? <Plus className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+            {saving ? 'Saving...' : mode === 'add' ? 'Create Banner' : 'Save Banner'}
           </button>
         </div>
       </div>
@@ -2479,16 +2555,12 @@ export default function AdminPage() {
   const [specSecurityFilter, setSpecSecurityFilter] = useState<'all' | 'high' | 'medium' | 'low' | 'missing'>('all');
   const [specMissingContractFilter, setSpecMissingContractFilter] = useState<'all' | 'missing' | 'present'>('all');
 
-  const [banners, setBanners] = useState<BannerAd[]>(() => loadPersistedBanners());
+  const [banners, setBanners] = useState<BannerAd[]>([]);
   const [bannerModalMode, setBannerModalMode] = useState<'add' | 'edit' | null>(null);
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [bannerForm, setBannerForm] = useState<BannerFormData>(BLANK_BANNER_FORM);
   const [previewBannerId, setPreviewBannerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(BANNERS_STORAGE_KEY, JSON.stringify(banners));
-  }, [banners]);
+  const [savingBanner, setSavingBanner] = useState(false);
 
   const [adminView, setAdminView] = useState<AdminView>('affiliate-hub');
   const [contentView, setContentView] = useState<ContentView>('airdrops');
@@ -2578,7 +2650,7 @@ export default function AdminPage() {
   } | null>(null);
 
   const pendingBannerEnquiries = useMemo(
-    () => banners.filter((b) => b.status === 'Enquiry' || b.status === 'Awaiting Artwork').length,
+    () => banners.filter((b) => b.status === 'draft' || b.status === 'scheduled').length,
     [banners]
   );
   const pendingScamReports = useMemo(
@@ -3071,6 +3143,27 @@ export default function AdminPage() {
     }
     await openEdit(match);
   };
+
+  const fetchBanners = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('banner_ads')
+        .select('id, project_name, contact_email, website_url, placement, destination_url, banner_image_url, alt_text, start_date, end_date, status, created_at, updated_at')
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('[Banner][Admin] failed fetch', error);
+        throw error;
+      }
+
+      const rows = (data ?? []) as BannerDbRow[];
+      setBanners(rows.map(mapBannerDbRow));
+    } catch (error) {
+      const details = describeError(error);
+      console.error('[Banner][Admin] failed fetch', details);
+      showToast(`Banner fetch failed: ${details}`, 'error');
+    }
+  }, [describeError, showToast]);
 
   const fetchOpsUsers = useCallback(async () => {
     setUsersLoading(true);
@@ -5286,48 +5379,61 @@ export default function AdminPage() {
   };
 
   const saveBannerForm = async () => {
-    const resolvedStatus = deriveBannerStatus(bannerForm.status, bannerForm.startDate, bannerForm.endDate);
-    const requiresPublishReview = resolvedStatus === 'Live';
+    const destinationUrlError = validateBannerDestinationUrl(bannerForm.destinationUrl);
+    if (destinationUrlError) {
+      showToast(destinationUrlError, 'error');
+      return;
+    }
+
+    const bannerImageError = validateBannerImageUrl(bannerForm.bannerImageUrl);
+    if (bannerImageError) {
+      showToast(bannerImageError, 'error');
+      return;
+    }
+
+    const startMs = parseBannerDateInput(bannerForm.startDate);
+    const endMs = parseBannerDateInput(bannerForm.endDate);
+    if (Number.isFinite(startMs) && Number.isFinite(endMs) && startMs > endMs) {
+      showToast('Start date cannot be after end date.', 'error');
+      return;
+    }
+
+    const resolvedStatus = getBannerStatus(bannerForm.status, bannerForm.startDate, bannerForm.endDate);
+    const requiresPublishReview = resolvedStatus === 'live';
     const reviewNotes = requiresPublishReview ? await promptHumanVerificationNotes(`Publish banner for ${bannerForm.advertiserName || 'unknown advertiser'}`) : '';
     if (requiresPublishReview && !reviewNotes) return;
 
-    if (bannerModalMode === 'add') {
-      const nextBanner: BannerAd = {
-        id: `banner_${Date.now()}`,
-        ...bannerForm,
-        status: resolvedStatus,
-        updatedAt: new Date().toISOString(),
-      };
-      setBanners((prev) => [nextBanner, ...prev]);
-      showToast('Banner created');
+    setSavingBanner(true);
 
-      if (resolvedStatus === 'Live') {
-        await logAdminAudit({
-          actionTaken: 'Publish banner advertisement',
-          aiRecommendation: `Banner status ${bannerForm.status}`,
-          finalDecision: 'Approved and published',
-          notes: reviewNotes ?? undefined,
-          context: {
-            advertiser: nextBanner.advertiserName,
-            destinationUrl: nextBanner.destinationUrl,
-            placement: nextBanner.placement,
-            bannerId: nextBanner.id,
-          },
-        });
+    try {
+      const payload = toBannerDbPayload(bannerForm, resolvedStatus);
+
+      if (bannerModalMode === 'add') {
+        const { error } = await supabase
+          .from('banner_ads')
+          .insert(payload);
+
+        if (error) {
+          console.error('[Banner][Admin] failed save', error);
+          throw error;
+        }
+      } else {
+        if (!editingBannerId) {
+          throw new Error('Banner ID is missing for update.');
+        }
+
+        const { error } = await supabase
+          .from('banner_ads')
+          .update(payload)
+          .eq('id', editingBannerId);
+
+        if (error) {
+          console.error('[Banner][Admin] failed save', error);
+          throw error;
+        }
       }
-    } else {
-      setBanners((prev) => prev.map((banner) => {
-        if (banner.id !== editingBannerId) return banner;
-        return {
-          ...banner,
-          ...bannerForm,
-          status: resolvedStatus,
-          updatedAt: new Date().toISOString(),
-        };
-      }));
-      showToast('Banner updated');
 
-      if (resolvedStatus === 'Live') {
+      if (resolvedStatus === 'live') {
         await logAdminAudit({
           actionTaken: 'Publish banner advertisement',
           aiRecommendation: `Banner status ${bannerForm.status}`,
@@ -5341,30 +5447,88 @@ export default function AdminPage() {
           },
         });
       }
+
+      await fetchBanners();
+      showToast('Banner saved');
+      setBannerModalMode(null);
+      setEditingBannerId(null);
+    } catch (error) {
+      const details = describeError(error);
+      console.error('[Banner][Admin] failed save', details);
+      showToast(`Banner save failed: ${details}`, 'error');
+      return;
+    } finally {
+      setSavingBanner(false);
     }
-
-    setBannerModalMode(null);
-    setEditingBannerId(null);
   };
 
-  const toggleBannerEnabled = (id: string) => {
-    setBanners((prev) => prev.map((banner) => {
-      if (banner.id !== id) return banner;
-      return { ...banner, enabled: !banner.enabled, updatedAt: new Date().toISOString() };
-    }));
+  const toggleBannerEnabled = async (id: string) => {
+    const target = banners.find((banner) => banner.id === id);
+    if (!target) return;
+
+    const nextStatus: BannerStatus = target.status === 'disabled' ? getBannerStatus('live', target.startDate, target.endDate) : 'disabled';
+
+    try {
+      const { error } = await supabase
+        .from('banner_ads')
+        .update({ status: nextStatus })
+        .eq('id', id);
+
+      if (error) {
+        console.error('[Banner][Admin] failed save', error);
+        throw error;
+      }
+
+      await fetchBanners();
+      showToast('Banner saved');
+    } catch (error) {
+      const details = describeError(error);
+      console.error('[Banner][Admin] failed save', details);
+      showToast(`Banner save failed: ${details}`, 'error');
+    }
   };
 
-  const deleteBanner = (id: string) => {
-    setBanners((prev) => prev.filter((banner) => banner.id !== id));
-    if (previewBannerId === id) setPreviewBannerId(null);
-    showToast('Banner deleted');
+  const deleteBanner = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('banner_ads')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('[Banner][Admin] failed save', error);
+        throw error;
+      }
+
+      if (previewBannerId === id) setPreviewBannerId(null);
+      await fetchBanners();
+      showToast('Banner saved');
+    } catch (error) {
+      const details = describeError(error);
+      console.error('[Banner][Admin] failed save', details);
+      showToast(`Banner save failed: ${details}`, 'error');
+    }
   };
 
-  const archiveBanner = (id: string) => {
-    setBanners((prev) => prev.map((banner) => banner.id === id
-      ? { ...banner, archived: true, enabled: false, status: 'Expired', updatedAt: new Date().toISOString() }
-      : banner));
-    showToast('Banner archived');
+  const archiveBanner = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('banner_ads')
+        .update({ status: 'expired' })
+        .eq('id', id);
+
+      if (error) {
+        console.error('[Banner][Admin] failed save', error);
+        throw error;
+      }
+
+      await fetchBanners();
+      showToast('Banner saved');
+    } catch (error) {
+      const details = describeError(error);
+      console.error('[Banner][Admin] failed save', details);
+      showToast(`Banner save failed: ${details}`, 'error');
+    }
   };
 
   const openEdit = async (a: Airdrop) => {
@@ -6338,6 +6502,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authLoading && isAdmin) {
       runSectionLoad('airdrops', fetchAirdrops);
+      runSectionLoad('banners', fetchBanners);
       runSectionLoad('stats', fetchStats);
       runSectionLoad('submissions', fetchSubmissions);
       runSectionLoad('scamReports', fetchScamReports);
@@ -6348,7 +6513,7 @@ export default function AdminPage() {
       runSectionLoad('notifications', fetchAdminNotifications);
       runSectionLoad('discordSocialOps', fetchDiscordSocialOps);
     }
-  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications, fetchDiscordSocialOps, runSectionLoad]);
+  }, [authLoading, isAdmin, fetchAirdrops, fetchBanners, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications, fetchDiscordSocialOps, runSectionLoad]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -8915,7 +9080,7 @@ export default function AdminPage() {
               <Monitor className="w-3.5 h-3.5" />
               Banner Advertisement Management
             </h2>
-            <p className="text-[11px] text-gray-500 mt-1">Admin preparation flow only using frontend state. No payment handling or backend persistence in this section.</p>
+            <p className="text-[11px] text-gray-500 mt-1">Supabase-backed placement inventory with full status visibility and post-save sync.</p>
           </div>
           <button
             onClick={openAddBanner}
@@ -8929,7 +9094,7 @@ export default function AdminPage() {
         <div className="rounded-2xl border border-cyan-500/15 bg-cyan-500/[0.04] p-3 mb-3 flex flex-wrap items-center gap-2 text-xs">
           <span className="inline-flex items-center gap-1 rounded-full border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">
             <CalendarClock className="w-3.5 h-3.5" />
-            Enquiry to live workflow
+            Draft to live workflow
           </span>
           <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-amber-200">
             <BadgeCheck className="w-3.5 h-3.5" />
@@ -8943,24 +9108,24 @@ export default function AdminPage() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 mb-3">
           <p className="text-[11px] font-semibold text-gray-200 mb-2">Banner workflow</p>
           <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs">
-            {['1. Enquiry received', '2. Artwork received', '3. Ready to publish', '4. Live', '5. Expired'].map((step) => (
+            {['1. Draft', '2. Scheduled', '3. Live', '4. Expired', '5. Disabled'].map((step) => (
               <div key={step} className="rounded-xl border border-white/10 bg-dark-900/40 px-2.5 py-2 text-gray-300">
                 {step}
               </div>
             ))}
           </div>
           <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-gray-500">
-            <span className="rounded-full border border-white/10 px-2 py-0.5">Upload artwork</span>
-            <span className="rounded-full border border-white/10 px-2 py-0.5">Check link</span>
-            <span className="rounded-full border border-white/10 px-2 py-0.5">Set dates</span>
-            <span className="rounded-full border border-white/10 px-2 py-0.5">Publish banner</span>
-            <span className="rounded-full border border-white/10 px-2 py-0.5">Expire banner</span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5">Draft creative</span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5">Set launch dates</span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5">Go live</span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5">Expire campaign</span>
+            <span className="rounded-full border border-white/10 px-2 py-0.5">Disable placement</span>
           </div>
         </div>
 
         <div className="space-y-3 md:hidden">
           {banners.map((banner) => {
-            const effectiveStatus = deriveBannerStatus(banner.status, banner.startDate, banner.endDate);
+            const effectiveStatus = getBannerStatus(banner.status, banner.startDate, banner.endDate);
             const displayStatus = getBannerDisplayStatus(banner.status, banner.startDate, banner.endDate);
             return (
               <article key={`banner-mobile-${banner.id}`} className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
@@ -8969,7 +9134,7 @@ export default function AdminPage() {
                     <p className="text-sm font-semibold text-white truncate">{banner.advertiserName}</p>
                     <p className="text-[11px] text-gray-500 mt-1 break-all">{banner.destinationUrl}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
-                      <span className="rounded-full border border-white/15 bg-white/[0.04] px-2 py-0.5 text-gray-300">{banner.placement}</span>
+                      <span className="rounded-full border border-white/15 bg-white/[0.04] px-2 py-0.5 text-gray-300">{BANNER_PLACEMENT_LABELS[banner.placement]}</span>
                       <span className={`rounded-full border px-2 py-0.5 ${getBannerDisplayClass(displayStatus)}`}>{displayStatus}</span>
                       <span className={`rounded-full border px-2 py-0.5 ${getPaymentStateClass(banner.paymentState)}`}>{banner.paymentState}</span>
                     </div>
@@ -8978,7 +9143,7 @@ export default function AdminPage() {
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-gray-400">
                   <div>Start: {banner.startDate || '—'}</div>
                   <div>End: {banner.endDate || '—'}</div>
-                  <div>Status: {effectiveStatus}</div>
+                  <div>Status: {BANNER_STATUS_LABELS[effectiveStatus]}</div>
                   <div>Next: {getBannerNextAction(effectiveStatus)}</div>
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2">
@@ -9009,7 +9174,7 @@ export default function AdminPage() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {banners.map((banner) => {
-                const effectiveStatus = deriveBannerStatus(banner.status, banner.startDate, banner.endDate);
+                const effectiveStatus = getBannerStatus(banner.status, banner.startDate, banner.endDate);
                 const displayStatus = getBannerDisplayStatus(banner.status, banner.startDate, banner.endDate);
                 return (
                   <tr key={banner.id} className="hover:bg-white/[0.02] transition-colors">
@@ -9031,11 +9196,11 @@ export default function AdminPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] px-2.5 py-1 rounded-full border border-white/15 bg-white/[0.04] text-gray-300">{banner.placement}</span>
+                        <span className="text-[11px] px-2.5 py-1 rounded-full border border-white/15 bg-white/[0.04] text-gray-300">{BANNER_PLACEMENT_LABELS[banner.placement]}</span>
                         {banner.exclusivePlacement && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/25 bg-amber-500/10 text-amber-300">Exclusive</span>
                         )}
-                        {banner.archived && (
+                        {effectiveStatus === 'expired' && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full border border-white/20 bg-white/[0.06] text-gray-300">Archived</span>
                         )}
                       </div>
@@ -9060,10 +9225,10 @@ export default function AdminPage() {
                     <td className="px-4 py-3 text-center">
                       <button
                         onClick={() => toggleBannerEnabled(banner.id)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-semibold transition-colors ${banner.enabled ? 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10' : 'text-gray-400 border-white/15 bg-white/[0.04]'}`}
-                        title={banner.enabled ? 'Disable banner' : 'Enable banner'}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-semibold transition-colors ${effectiveStatus !== 'disabled' ? 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10' : 'text-gray-400 border-white/15 bg-white/[0.04]'}`}
+                        title={effectiveStatus !== 'disabled' ? 'Disable banner' : 'Enable banner'}
                       >
-                        {banner.enabled ? 'Enabled' : 'Disabled'}
+                        {effectiveStatus !== 'disabled' ? 'Enabled' : 'Disabled'}
                       </button>
                     </td>
                     <td className="px-4 py-3">
@@ -9089,7 +9254,7 @@ export default function AdminPage() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
-                        {!banner.archived && (
+                        {effectiveStatus !== 'expired' && effectiveStatus !== 'disabled' && (
                           <button
                             onClick={() => archiveBanner(banner.id)}
                             title="Archive banner"
@@ -9115,7 +9280,7 @@ export default function AdminPage() {
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
                   <p className="text-xs uppercase tracking-wider text-cyan-300 font-semibold">Preview Banner</p>
-                  <p className="text-sm text-white font-semibold mt-1">{banner.advertiserName} · {banner.placement}</p>
+                  <p className="text-sm text-white font-semibold mt-1">{banner.advertiserName} · {BANNER_PLACEMENT_LABELS[banner.placement]}</p>
                   <span className="inline-flex mt-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
                     Sponsored
                   </span>
@@ -9143,8 +9308,8 @@ export default function AdminPage() {
                     <p className="text-sm font-bold text-white truncate">{banner.altText || banner.advertiserName}</p>
                     <p className="text-xs text-gray-300 mt-1 truncate">{banner.destinationUrl}</p>
                     <div className="mt-2 flex items-center gap-2 text-[10px]">
-                      <span className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-gray-300">{banner.placement}</span>
-                      <span className={`rounded-full border px-2.5 py-1 ${getBannerStatusClass(deriveBannerStatus(banner.status, banner.startDate, banner.endDate))}`}>{deriveBannerStatus(banner.status, banner.startDate, banner.endDate)}</span>
+                      <span className="rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-1 text-gray-300">{BANNER_PLACEMENT_LABELS[banner.placement]}</span>
+                      <span className={`rounded-full border px-2.5 py-1 ${getBannerStatusClass(getBannerStatus(banner.status, banner.startDate, banner.endDate))}`}>{BANNER_STATUS_LABELS[getBannerStatus(banner.status, banner.startDate, banner.endDate)]}</span>
                     </div>
                   </div>
                 </div>
@@ -10048,6 +10213,7 @@ export default function AdminPage() {
           setForm={setBannerForm}
           onClose={() => setBannerModalMode(null)}
           onSave={saveBannerForm}
+          saving={savingBanner}
         />
       )}
 

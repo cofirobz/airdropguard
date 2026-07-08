@@ -71,84 +71,52 @@ type LeadOpportunity = {
   detail: string;
 };
 
-type HomepageBannerStatus = 'Enquiry' | 'Awaiting Artwork' | 'Ready to Publish' | 'Live' | 'Expired';
+type BannerPlacement = 'homepage_hero' | 'homepage_mid' | 'sidebar' | 'footer' | 'recommended_tools';
+type BannerStatus = 'draft' | 'live' | 'scheduled' | 'expired' | 'disabled';
 
-type HomepageBannerRecord = {
+type HomepageBanner = {
   id: string;
-  advertiserName: string;
-  bannerImageUrl: string;
+  projectName: string;
+  placement: BannerPlacement;
   destinationUrl: string;
+  bannerImageUrl: string;
   altText: string;
-  placement: string;
-  startDate: string;
-  endDate: string;
-  status: HomepageBannerStatus;
-  enabled: boolean;
-  archived: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  status: BannerStatus;
+  createdAt: string;
   updatedAt: string;
 };
 
-const BANNERS_STORAGE_KEY = 'ag.admin.banners.v1';
-const HOMEPAGE_HERO_PLACEMENT = 'Homepage Hero Banner';
+function parseBannerPlacement(value: string): BannerPlacement {
+  if (value === 'homepage_mid') return 'homepage_mid';
+  if (value === 'sidebar') return 'sidebar';
+  if (value === 'footer') return 'footer';
+  if (value === 'recommended_tools') return 'recommended_tools';
+  return 'homepage_hero';
+}
 
-function parseDateMs(value: string): number {
+function parseBannerStatus(value: string): BannerStatus {
+  if (value === 'live') return 'live';
+  if (value === 'scheduled') return 'scheduled';
+  if (value === 'expired') return 'expired';
+  if (value === 'disabled') return 'disabled';
+  return 'draft';
+}
+
+function toBannerTime(value: string | null): number {
   if (!value) return Number.NaN;
   const parsed = new Date(value).getTime();
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
-function normalizeBannerRows(value: unknown): HomepageBannerRecord[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .map((row) => {
-      const candidate = (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
-      const status = String(candidate.status ?? 'Enquiry') as HomepageBannerStatus;
-      const normalizedStatus: HomepageBannerStatus =
-        status === 'Awaiting Artwork' || status === 'Ready to Publish' || status === 'Live' || status === 'Expired'
-          ? status
-          : 'Enquiry';
-
-      return {
-        id: String(candidate.id ?? ''),
-        advertiserName: String(candidate.advertiserName ?? ''),
-        bannerImageUrl: String(candidate.bannerImageUrl ?? ''),
-        destinationUrl: String(candidate.destinationUrl ?? ''),
-        altText: String(candidate.altText ?? ''),
-        placement: String(candidate.placement ?? ''),
-        startDate: String(candidate.startDate ?? ''),
-        endDate: String(candidate.endDate ?? ''),
-        status: normalizedStatus,
-        enabled: Boolean(candidate.enabled),
-        archived: Boolean(candidate.archived),
-        updatedAt: String(candidate.updatedAt ?? ''),
-      };
-    })
-    .filter((row) => row.id.trim().length > 0 && row.destinationUrl.trim().length > 0);
-}
-
-function selectHomepageHeroBanner(rows: HomepageBannerRecord[]): HomepageBannerRecord | null {
-  const now = Date.now();
-
-  const eligible = rows.filter((row) => {
-    if (row.archived || !row.enabled || row.status !== 'Live') return false;
-    if (row.placement !== HOMEPAGE_HERO_PLACEMENT) return false;
-
-    const startMs = parseDateMs(row.startDate);
-    const endMs = parseDateMs(row.endDate);
-
-    if (Number.isFinite(startMs) && startMs > now) return false;
-    if (Number.isFinite(endMs) && endMs < now) return false;
-    return true;
-  });
-
-  if (eligible.length === 0) return null;
-
-  return [...eligible].sort((a, b) => {
-    const aMs = parseDateMs(a.updatedAt);
-    const bMs = parseDateMs(b.updatedAt);
-    return bMs - aMs;
-  })[0] ?? null;
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function safeDisplayCount(value: number, suffix = ''): string {
@@ -1593,32 +1561,13 @@ export default function HomePage() {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_AIRDROPS);
   const [communityCount, setCommunityCount] = useState(0);
   const [walletCount, setWalletCount] = useState(0);
-  const [homepageHeroBanner, setHomepageHeroBanner] = useState<HomepageBannerRecord | null>(null);
+  const [homepageBanners, setHomepageBanners] = useState<HomepageBanner[]>([]);
 
   const tab = (searchParams.get('filter') as Tab) ?? 'all';
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_AIRDROPS);
   }, [tab, filters]);
-
-  useEffect(() => {
-    const loadBannerFromStorage = () => {
-      if (typeof window === 'undefined') return;
-
-      try {
-        const raw = window.localStorage.getItem(BANNERS_STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-        const rows = normalizeBannerRows(parsed);
-        setHomepageHeroBanner(selectHomepageHeroBanner(rows));
-      } catch {
-        setHomepageHeroBanner(null);
-      }
-    };
-
-    loadBannerFromStorage();
-    window.addEventListener('storage', loadBannerFromStorage);
-    return () => window.removeEventListener('storage', loadBannerFromStorage);
-  }, []);
 
   useEffect(() => {
     const activeFilters = [filters.blockchain, filters.category, filters.reward, filters.risk, filters.difficulty]
@@ -1663,6 +1612,43 @@ export default function HomePage() {
     }
 
     load();
+  }, []);
+
+  useEffect(() => {
+    async function loadBanners() {
+      try {
+        const { data, error } = await supabase
+          .from('banner_ads')
+          .select('id, project_name, placement, destination_url, banner_image_url, alt_text, start_date, end_date, status, created_at, updated_at')
+          .in('placement', ['homepage_hero', 'homepage_mid', 'footer', 'recommended_tools'])
+          .order('updated_at', { ascending: false });
+
+        if (error) {
+          console.error('[Banner][Home] failed homepage banner load', error);
+          return;
+        }
+
+        const mapped = ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+          id: String(row.id ?? ''),
+          projectName: String(row.project_name ?? ''),
+          placement: parseBannerPlacement(String(row.placement ?? 'homepage_hero')),
+          destinationUrl: String(row.destination_url ?? ''),
+          bannerImageUrl: String(row.banner_image_url ?? ''),
+          altText: String(row.alt_text ?? ''),
+          startDate: row.start_date ? String(row.start_date) : null,
+          endDate: row.end_date ? String(row.end_date) : null,
+          status: parseBannerStatus(String(row.status ?? 'draft')),
+          createdAt: String(row.created_at ?? ''),
+          updatedAt: String(row.updated_at ?? ''),
+        })) as HomepageBanner[];
+
+        setHomepageBanners(mapped);
+      } catch (error) {
+        console.error('[Banner][Home] failed homepage banner load', error);
+      }
+    }
+
+    loadBanners();
   }, []);
 
   const opportunityAirdrops = useMemo(
@@ -1741,19 +1727,59 @@ export default function HomePage() {
 
   const hasMoreAirdrops = visibleCount < filtered.length;
 
-  const homepageHeroBannerHref = useMemo(() => {
-    if (!homepageHeroBanner) return null;
+  const activeHomepageHeroBanner = useMemo(() => {
+    const now = Date.now();
+    const eligible = homepageBanners.filter((banner) => {
+      if (banner.placement !== 'homepage_hero') return false;
+      if (banner.status !== 'live') return false;
+      if (!banner.bannerImageUrl.trim() || !banner.destinationUrl.trim()) return false;
+      if (!isValidHttpUrl(banner.bannerImageUrl) || !isValidHttpUrl(banner.destinationUrl)) return false;
 
-    try {
-      const parsed = new URL(homepageHeroBanner.destinationUrl);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-        return parsed.toString();
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }, [homepageHeroBanner]);
+      const startMs = toBannerTime(banner.startDate);
+      const endMs = toBannerTime(banner.endDate);
+      if (Number.isFinite(startMs) && startMs > now) return false;
+      if (Number.isFinite(endMs) && endMs < now) return false;
+      return true;
+    });
+
+    return eligible[0] ?? null;
+  }, [homepageBanners]);
+
+  const activeHomepageMidBanner = useMemo(() => {
+    const now = Date.now();
+    const eligible = homepageBanners.filter((banner) => {
+      if (banner.placement !== 'homepage_mid') return false;
+      if (banner.status !== 'live') return false;
+      if (!banner.bannerImageUrl.trim() || !banner.destinationUrl.trim()) return false;
+      if (!isValidHttpUrl(banner.bannerImageUrl) || !isValidHttpUrl(banner.destinationUrl)) return false;
+
+      const startMs = toBannerTime(banner.startDate);
+      const endMs = toBannerTime(banner.endDate);
+      if (Number.isFinite(startMs) && startMs > now) return false;
+      if (Number.isFinite(endMs) && endMs < now) return false;
+      return true;
+    });
+
+    return eligible[0] ?? null;
+  }, [homepageBanners]);
+
+  const activeFooterBanner = useMemo(() => {
+    const now = Date.now();
+    const eligible = homepageBanners.filter((banner) => {
+      if (banner.placement !== 'footer') return false;
+      if (banner.status !== 'live') return false;
+      if (!banner.bannerImageUrl.trim() || !banner.destinationUrl.trim()) return false;
+      if (!isValidHttpUrl(banner.bannerImageUrl) || !isValidHttpUrl(banner.destinationUrl)) return false;
+
+      const startMs = toBannerTime(banner.startDate);
+      const endMs = toBannerTime(banner.endDate);
+      if (Number.isFinite(startMs) && startMs > now) return false;
+      if (Number.isFinite(endMs) && endMs < now) return false;
+      return true;
+    });
+
+    return eligible[0] ?? null;
+  }, [homepageBanners]);
 
   const homepageSchema = {
     '@context': 'https://schema.org',
@@ -1973,46 +1999,24 @@ export default function HomePage() {
         </div>
       </section>
 
-      {homepageHeroBanner && homepageHeroBannerHref && (
-        <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-          <a
-            href={homepageHeroBannerHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group block overflow-hidden rounded-3xl border border-cyan-400/25 bg-[linear-gradient(135deg,rgba(34,211,238,0.12),rgba(59,130,246,0.08),rgba(3,7,18,0.94))] shadow-[0_20px_50px_rgba(2,12,27,0.35)]"
-            aria-label={`Open sponsor campaign for ${homepageHeroBanner.advertiserName}`}
-          >
-            <div className="grid gap-0 md:grid-cols-[1.2fr_0.8fr]">
-              <div className="p-4 sm:p-6">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Homepage hero banner</p>
-                <h2 className="mt-2 text-xl font-black text-white sm:text-2xl">{homepageHeroBanner.advertiserName}</h2>
-                <p className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-cyan-100">
-                  Visit sponsor site
-                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-                </p>
-              </div>
-
-              <div className="relative min-h-[140px] border-t border-white/10 bg-white/[0.03] md:border-l md:border-t-0">
-                {homepageHeroBanner.bannerImageUrl ? (
-                  <img
-                    src={homepageHeroBanner.bannerImageUrl}
-                    alt={homepageHeroBanner.altText || `${homepageHeroBanner.advertiserName} banner`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm font-semibold text-cyan-100/85">
-                    {homepageHeroBanner.advertiserName}
-                  </div>
-                )}
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#020711]/35 to-transparent" />
-              </div>
-            </div>
+      {activeHomepageHeroBanner && (
+        <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+          <a href={activeHomepageHeroBanner.destinationUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-2xl border border-cyan-400/25 bg-white/[0.02]">
+            <img src={activeHomepageHeroBanner.bannerImageUrl} alt={activeHomepageHeroBanner.altText || activeHomepageHeroBanner.projectName} className="h-28 w-full object-cover sm:h-36" />
           </a>
         </section>
       )}
 
       <WhySection />
       <LiveOpportunitiesSection airdrops={opportunityAirdrops} />
+
+      {activeHomepageMidBanner && (
+        <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+          <a href={activeHomepageMidBanner.destinationUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+            <img src={activeHomepageMidBanner.bannerImageUrl} alt={activeHomepageMidBanner.altText || activeHomepageMidBanner.projectName} className="h-24 w-full object-cover sm:h-32" />
+          </a>
+        </section>
+      )}
       <HomepageHowItWorksSection />
       <CopilotPreviewSection />
       <HomepageTrustSection counters={trustCounters} />
@@ -2187,6 +2191,15 @@ export default function HomePage() {
       )}
 
       <HomepageFinalCtaSection />
+
+      {activeFooterBanner && (
+        <section className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+          <a href={activeFooterBanner.destinationUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+            <img src={activeFooterBanner.bannerImageUrl} alt={activeFooterBanner.altText || activeFooterBanner.projectName} className="h-20 w-full object-cover sm:h-24" />
+          </a>
+        </section>
+      )}
+
       <div className="hidden md:block">
         <NewsletterSection />
       </div>
