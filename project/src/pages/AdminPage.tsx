@@ -1479,6 +1479,29 @@ function parseBannerDateInput(value: string): number {
   return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
+function toDateOnlyKey(value: string | null | undefined): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const direct = raw.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(direct)) return direct;
+
+  const parsed = new Date(raw);
+  if (!Number.isFinite(parsed.getTime())) return null;
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function todayDateOnlyKey(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function validateBannerDestinationUrl(value: string): string | null {
   const candidate = value.trim();
   if (!candidate) return 'Destination URL is required.';
@@ -1504,13 +1527,13 @@ function coercePaymentState(value: unknown): BannerPaymentState {
 function getBannerStatus(status: BannerStatus, startDate: string, endDate: string): BannerStatus {
   if (status === 'disabled' || status === 'draft') return status;
 
-  const now = Date.now();
-  const startMs = parseBannerDateInput(startDate);
-  const endMs = parseBannerDateInput(endDate);
+  const today = todayDateOnlyKey();
+  const startKey = toDateOnlyKey(startDate);
+  const endKey = toDateOnlyKey(endDate);
 
-  if (Number.isFinite(endMs) && endMs < now) return 'expired';
-  if (status === 'live' && Number.isFinite(startMs) && startMs > now) return 'scheduled';
-  if (status === 'scheduled' && Number.isFinite(startMs) && startMs <= now) return 'live';
+  if (endKey && endKey < today) return 'expired';
+  if (status === 'live' && startKey && startKey > today) return 'scheduled';
+  if (status === 'scheduled' && startKey && startKey <= today) return 'live';
   return status;
 }
 
@@ -3151,7 +3174,7 @@ export default function AdminPage() {
     await openEdit(match);
   };
 
-  const fetchBanners = useCallback(async () => {
+  const fetchBanners = useCallback(async (): Promise<boolean> => {
     setBannerLoading(true);
     setBannerError(null);
     try {
@@ -3167,12 +3190,14 @@ export default function AdminPage() {
 
       const rows = (data ?? []) as BannerDbRow[];
       setBanners(rows.map(mapBannerDbRow));
+      return true;
     } catch (error) {
       const details = describeError(error);
       console.error('[Banner][Admin] failed fetch', details);
       setBannerError(details);
       setBanners([]);
       showToast(`Banner fetch failed: ${details}`, 'error');
+      return false;
     } finally {
       setBannerLoading(false);
     }
@@ -5461,7 +5486,11 @@ export default function AdminPage() {
         });
       }
 
-      await fetchBanners();
+      const refreshed = await fetchBanners();
+      if (!refreshed) {
+        showToast('Banner saved, but list refresh failed. Please retry refresh to confirm.', 'error');
+        return;
+      }
       showToast('Banner saved');
       setBannerModalMode(null);
       setEditingBannerId(null);
@@ -5492,7 +5521,8 @@ export default function AdminPage() {
         throw error;
       }
 
-      await fetchBanners();
+      const refreshed = await fetchBanners();
+      if (!refreshed) return;
       showToast('Banner saved');
     } catch (error) {
       const details = describeError(error);
@@ -5514,7 +5544,8 @@ export default function AdminPage() {
       }
 
       if (previewBannerId === id) setPreviewBannerId(null);
-      await fetchBanners();
+      const refreshed = await fetchBanners();
+      if (!refreshed) return;
       showToast('Banner saved');
     } catch (error) {
       const details = describeError(error);
@@ -5535,7 +5566,8 @@ export default function AdminPage() {
         throw error;
       }
 
-      await fetchBanners();
+      const refreshed = await fetchBanners();
+      if (!refreshed) return;
       showToast('Banner saved');
     } catch (error) {
       const details = describeError(error);
@@ -9141,7 +9173,9 @@ export default function AdminPage() {
             { key: 'all', label: 'All', count: banners.length },
             { key: 'draft', label: 'Draft', count: banners.filter((banner) => getBannerStatus(banner.status, banner.startDate, banner.endDate) === 'draft').length },
             { key: 'live', label: 'Live', count: banners.filter((banner) => getBannerStatus(banner.status, banner.startDate, banner.endDate) === 'live').length },
+            { key: 'scheduled', label: 'Scheduled', count: banners.filter((banner) => getBannerStatus(banner.status, banner.startDate, banner.endDate) === 'scheduled').length },
             { key: 'expired', label: 'Expired', count: banners.filter((banner) => getBannerStatus(banner.status, banner.startDate, banner.endDate) === 'expired').length },
+            { key: 'disabled', label: 'Disabled', count: banners.filter((banner) => getBannerStatus(banner.status, banner.startDate, banner.endDate) === 'disabled').length },
           ] as const).map((tab) => {
             const active = bannerStatusFilter === tab.key;
             return (

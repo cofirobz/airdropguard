@@ -104,10 +104,42 @@ function parseBannerStatus(value: string): BannerStatus {
   return 'draft';
 }
 
-function toBannerTime(value: string | null): number {
-  if (!value) return Number.NaN;
-  const parsed = new Date(value).getTime();
-  return Number.isFinite(parsed) ? parsed : Number.NaN;
+function toDateOnlyKey(value: string | null | undefined): string | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const direct = raw.slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(direct)) return direct;
+
+  const parsed = new Date(raw);
+  if (!Number.isFinite(parsed.getTime())) return null;
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function todayDateOnlyKey(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isBannerActiveToday(banner: HomepageBanner, placement: BannerPlacement): boolean {
+  if (banner.placement !== placement) return false;
+  if (banner.status !== 'live') return false;
+  if (!banner.bannerImageUrl.trim() || !banner.destinationUrl.trim()) return false;
+  if (!isValidHttpUrl(banner.bannerImageUrl) || !isValidHttpUrl(banner.destinationUrl)) return false;
+
+  const today = todayDateOnlyKey();
+  const startKey = toDateOnlyKey(banner.startDate);
+  const endKey = toDateOnlyKey(banner.endDate);
+
+  if (startKey && startKey > today) return false;
+  if (endKey && endKey < today) return false;
+  return true;
 }
 
 function isValidHttpUrl(value: string): boolean {
@@ -1728,55 +1760,25 @@ export default function HomePage() {
   const hasMoreAirdrops = visibleCount < filtered.length;
 
   const activeHomepageHeroBanner = useMemo(() => {
-    const now = Date.now();
-    const eligible = homepageBanners.filter((banner) => {
-      if (banner.placement !== 'homepage_hero') return false;
-      if (banner.status !== 'live') return false;
-      if (!banner.bannerImageUrl.trim() || !banner.destinationUrl.trim()) return false;
-      if (!isValidHttpUrl(banner.bannerImageUrl) || !isValidHttpUrl(banner.destinationUrl)) return false;
-
-      const startMs = toBannerTime(banner.startDate);
-      const endMs = toBannerTime(banner.endDate);
-      if (Number.isFinite(startMs) && startMs > now) return false;
-      if (Number.isFinite(endMs) && endMs < now) return false;
-      return true;
-    });
+    const eligible = homepageBanners.filter((banner) => isBannerActiveToday(banner, 'homepage_hero'));
 
     return eligible[0] ?? null;
   }, [homepageBanners]);
 
   const activeHomepageMidBanner = useMemo(() => {
-    const now = Date.now();
-    const eligible = homepageBanners.filter((banner) => {
-      if (banner.placement !== 'homepage_mid') return false;
-      if (banner.status !== 'live') return false;
-      if (!banner.bannerImageUrl.trim() || !banner.destinationUrl.trim()) return false;
-      if (!isValidHttpUrl(banner.bannerImageUrl) || !isValidHttpUrl(banner.destinationUrl)) return false;
-
-      const startMs = toBannerTime(banner.startDate);
-      const endMs = toBannerTime(banner.endDate);
-      if (Number.isFinite(startMs) && startMs > now) return false;
-      if (Number.isFinite(endMs) && endMs < now) return false;
-      return true;
-    });
+    const eligible = homepageBanners.filter((banner) => isBannerActiveToday(banner, 'homepage_mid'));
 
     return eligible[0] ?? null;
   }, [homepageBanners]);
 
   const activeFooterBanner = useMemo(() => {
-    const now = Date.now();
-    const eligible = homepageBanners.filter((banner) => {
-      if (banner.placement !== 'footer') return false;
-      if (banner.status !== 'live') return false;
-      if (!banner.bannerImageUrl.trim() || !banner.destinationUrl.trim()) return false;
-      if (!isValidHttpUrl(banner.bannerImageUrl) || !isValidHttpUrl(banner.destinationUrl)) return false;
+    const eligible = homepageBanners.filter((banner) => isBannerActiveToday(banner, 'footer'));
 
-      const startMs = toBannerTime(banner.startDate);
-      const endMs = toBannerTime(banner.endDate);
-      if (Number.isFinite(startMs) && startMs > now) return false;
-      if (Number.isFinite(endMs) && endMs < now) return false;
-      return true;
-    });
+    return eligible[0] ?? null;
+  }, [homepageBanners]);
+
+  const activeRecommendedToolsBanner = useMemo(() => {
+    const eligible = homepageBanners.filter((banner) => isBannerActiveToday(banner, 'recommended_tools'));
 
     return eligible[0] ?? null;
   }, [homepageBanners]);
@@ -2044,6 +2046,14 @@ export default function HomePage() {
         title="Homepage security partner"
         subtitle="This button is placement-tracked and automatically routes through the active affiliate record."
       />
+
+      {activeRecommendedToolsBanner && (
+        <section className="mx-auto max-w-7xl px-4 pb-2 sm:px-6 lg:px-8">
+          <a href={activeRecommendedToolsBanner.destinationUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-2xl border border-emerald-400/25 bg-white/[0.02]">
+            <img src={activeRecommendedToolsBanner.bannerImageUrl} alt={activeRecommendedToolsBanner.altText || activeRecommendedToolsBanner.projectName} className="h-20 w-full object-cover sm:h-24" />
+          </a>
+        </section>
+      )}
 
       <section id="airdrops" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-16">
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
