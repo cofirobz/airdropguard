@@ -13,6 +13,11 @@ export default function GoRedirectPage() {
     return (params.get('source') || '').toLowerCase().trim();
   }, [location.search]);
 
+  const bannerFromQuery = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return (params.get('banner') || '').trim();
+  }, [location.search]);
+
   const cleanSource = useMemo(() => {
     const candidate = (sourceFromQuery || sourceFromPath || '').toLowerCase().trim();
     if (!candidate) return '';
@@ -28,9 +33,12 @@ export default function GoRedirectPage() {
 
   const edgeUrl = useMemo(() => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-    const sourceQuery = cleanSource ? `?source=${encodeURIComponent(cleanSource)}` : '';
-    return `${supabaseUrl}/functions/v1/affiliate-redirect/${encodeURIComponent(cleanSlug)}${sourceQuery}`;
-  }, [cleanSlug, cleanSource]);
+    const params = new URLSearchParams();
+    if (cleanSource) params.set('source', cleanSource);
+    if (/^[0-9a-f-]{36}$/i.test(bannerFromQuery)) params.set('banner', bannerFromQuery);
+    const query = params.toString();
+    return `${supabaseUrl}/functions/v1/affiliate-redirect/${encodeURIComponent(cleanSlug)}${query ? `?${query}` : ''}`;
+  }, [bannerFromQuery, cleanSlug, cleanSource]);
 
   useEffect(() => {
     if (!validSlug) return;

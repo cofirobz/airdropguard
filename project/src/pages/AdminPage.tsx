@@ -24,7 +24,7 @@ import {
 } from '../lib/articleTrust';
 import SEO from '../components/SEO';
 import { canonicalFromPath } from '../lib/seo';
-import { AffiliateHubSection } from '../components/admin/AffiliateHubSection.tsx';
+import { AffiliateHubSection } from '../components/admin/AffiliateHubSectionPremium.tsx';
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -3257,7 +3257,7 @@ export default function AdminPage() {
     try {
       const { data, error } = await supabase
         .from('admin_users')
-        .select('user_id,created_at')
+        .select('id,created_at')
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -3265,8 +3265,8 @@ export default function AdminPage() {
 
       const rows = (data ?? []) as Array<Record<string, unknown>>;
       const mapped: OpsUser[] = rows.map((row) => ({
-        id: String(row.user_id ?? crypto.randomUUID()),
-        email: `admin+${String(row.user_id ?? 'unknown').slice(0, 8)}@airdropguard.local`,
+        id: String(row.id ?? crypto.randomUUID()),
+        email: `admin+${String(row.id ?? 'unknown').slice(0, 8)}@airdropguard.local`,
         createdAt: String(row.created_at ?? new Date().toISOString()),
         lastSeenAt: String(row.created_at ?? new Date().toISOString()),
         plan: 'premium',

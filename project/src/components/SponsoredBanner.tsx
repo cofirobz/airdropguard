@@ -13,38 +13,61 @@ export interface SponsoredBannerData {
 }
 
 interface SponsoredBannerProps {
-	banner: SponsoredBannerData;
+	banner?: Partial<SponsoredBannerData> | null;
 	compact?: boolean;
 	className?: string;
 }
 
 const PLACEHOLDER_BG = 'bg-[linear-gradient(145deg,rgba(8,145,178,0.18),rgba(8,14,26,0.95))]';
 
+function isValidHttpUrl(value: string): boolean {
+	try {
+		const parsed = new URL(value);
+		return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+	} catch {
+		return false;
+	}
+}
+
 export function SponsoredBanner({ banner, compact = false, className = '' }: SponsoredBannerProps) {
 	const [imageFailed, setImageFailed] = useState(false);
+	const normalizedBanner: SponsoredBannerData = {
+		active: Boolean(banner?.active),
+		advertiserName: String(banner?.advertiserName ?? 'Sponsored placement'),
+		destinationUrl: String(banner?.destinationUrl ?? '').trim(),
+		ctaText: String(banner?.ctaText ?? 'Visit sponsor'),
+		label: banner?.label === 'Advertisement' ? 'Advertisement' : 'Sponsored',
+		imageUrl: String(banner?.imageUrl ?? '').trim() || undefined,
+		altText: String(banner?.altText ?? '').trim() || undefined,
+	};
+	const hasImage = Boolean(normalizedBanner.imageUrl) && isValidHttpUrl(normalizedBanner.imageUrl ?? '') && !imageFailed;
+	const hasDestination = isValidHttpUrl(normalizedBanner.destinationUrl);
 
 	useEffect(() => {
 		setImageFailed(false);
-	}, [banner.imageUrl]);
+	}, [normalizedBanner.imageUrl]);
 
-	if (!banner.active) return null;
+	if (!normalizedBanner.active) return null;
 
 	return (
 		<aside className={`rounded-2xl border border-cyan-500/20 ${PLACEHOLDER_BG} p-3 sm:p-4 ${className}`.trim()}>
 			<div className="flex items-center justify-between gap-2 mb-2">
 				<span className="inline-flex items-center rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300">
-					{banner.label ?? 'Sponsored'}
+					{normalizedBanner.label}
 				</span>
-				<span className="text-[10px] text-cyan-100/80">{banner.advertiserName}</span>
+				<span className="text-[10px] text-cyan-100/80">{normalizedBanner.advertiserName}</span>
 			</div>
 
 			<div className={`overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] ${compact ? 'h-16' : 'h-24 sm:h-28'}`}>
-				{banner.imageUrl && !imageFailed ? (
+				{hasImage ? (
 					<img
-						src={banner.imageUrl}
-						alt={banner.altText || `${banner.advertiserName} banner`}
+						src={normalizedBanner.imageUrl}
+						alt={normalizedBanner.altText || `${normalizedBanner.advertiserName} banner`}
 						className="h-full w-full object-cover"
-						onError={() => setImageFailed(true)}
+						onError={(event) => {
+							event.currentTarget.onerror = null;
+							setImageFailed(true);
+						}}
 					/>
 				) : (
 					<div className="h-full w-full flex items-center justify-center text-[11px] text-gray-400">Banner visual placeholder</div>
@@ -52,18 +75,24 @@ export function SponsoredBanner({ banner, compact = false, className = '' }: Spo
 			</div>
 
 			<div className="mt-3 flex items-center justify-between gap-2">
-				<p className="truncate text-xs sm:text-sm font-semibold text-white">{banner.advertiserName}</p>
-				<a
-					href={banner.destinationUrl}
-					target="_blank"
-					rel="noopener noreferrer"
-					className="inline-flex items-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-medium text-cyan-200 hover:bg-cyan-400/20 transition-colors"
-				>
-					{banner.ctaText}
-				</a>
+				<p className="truncate text-xs sm:text-sm font-semibold text-white">{normalizedBanner.advertiserName}</p>
+				{hasDestination ? (
+					<a
+						href={normalizedBanner.destinationUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-medium text-cyan-200 hover:bg-cyan-400/20 transition-colors"
+					>
+						{normalizedBanner.ctaText}
+					</a>
+				) : (
+					<span className="inline-flex items-center rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-gray-400">
+						{normalizedBanner.ctaText}
+					</span>
+				)}
 			</div>
 
-			<p className="mt-1 truncate text-[10px] text-gray-400">{banner.destinationUrl || 'https://example.com'}</p>
+			<p className="mt-1 truncate text-[10px] text-gray-400">{normalizedBanner.destinationUrl || 'https://example.com'}</p>
 		</aside>
 	);
 }

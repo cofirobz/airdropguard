@@ -35,12 +35,26 @@ function parseSource(req: Request): string | null {
 
   const aliases: Record<string, string> = {
     'affiliate-detail': 'affiliate-page',
-    'api-docs': 'articles',
+    'api-docs': 'api-docs',
     dashboard: 'homepage',
     'scam-alert': 'scam-alerts',
   };
 
   return aliases[normalized] || normalized;
+}
+
+function parseBannerId(req: Request): string | null {
+  const url = new URL(req.url);
+  const candidate = (url.searchParams.get('banner') || '').trim();
+  return /^[0-9a-f-]{36}$/i.test(candidate) ? candidate : null;
+}
+
+function detectDeviceType(userAgent: string | null): 'desktop' | 'mobile' | 'tablet' | 'unknown' {
+  const value = String(userAgent || '').toLowerCase();
+  if (!value) return 'unknown';
+  if (/(ipad|tablet|playbook|silk)|(android(?!.*mobile))/i.test(value)) return 'tablet';
+    if (/(mobi|iphone|ipod|android.*mobile|windows phone)/i.test(value)) return 'mobile';
+  return 'desktop';
 }
 
 function mapTrackerValue(source: string | null): string | null {
@@ -127,6 +141,7 @@ Deno.serve(async (req: Request) => {
 
   const slug = parseSlug(req);
   const source = parseSource(req);
+  const bannerId = parseBannerId(req);
   if (!slug) {
     return new Response(cleanUnavailableHtml('invalid-slug'), {
       status: 404,
@@ -167,6 +182,8 @@ Deno.serve(async (req: Request) => {
   const referrer = req.headers.get('referer');
   const userAgent = req.headers.get('user-agent');
   const clientIp = resolveClientIp(req);
+  const countryCode = (req.headers.get('cf-ipcountry') || req.headers.get('x-country-code') || '').trim().toUpperCase() || null;
+  const deviceType = detectDeviceType(userAgent);
   const ipSalt = Deno.env.get('AFFILIATE_IP_HASH_SALT') || '';
 
   let ipHash: string | null = null;
@@ -185,12 +202,15 @@ Deno.serve(async (req: Request) => {
   if (clickTrackingEnabled) {
     await supabase.from('affiliate_clicks').insert({
       affiliate_link_id: link.id,
+      affiliate_banner_id: bannerId,
       slug,
       placement_name: source,
       tracker_value: trackerValue,
       referrer,
       user_agent: userAgent,
       ip_hash: ipHash,
+      device_type: deviceType,
+      country_code: countryCode,
     });
   }
 
