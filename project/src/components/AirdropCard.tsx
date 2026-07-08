@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import type { MouseEvent } from 'react';
-import { ArrowRight, Clock, Zap, ShieldAlert, Bookmark, BookmarkCheck, AlertTriangle, ShieldCheck, ChevronDown } from 'lucide-react';
+import { ArrowRight, Clock, Zap, ShieldAlert, Bookmark, BookmarkCheck, AlertTriangle, ShieldCheck, ChevronDown, Gift } from 'lucide-react';
 import type { Airdrop } from '../lib/types';
 import {
   cn,
@@ -18,6 +18,9 @@ import {
   getOpportunityType,
   getOpportunityTypeTone,
   getOpportunityScoreLabel,
+  getPastDistributionStatusKey,
+  getPastDistributionStatusLabel,
+  getPastDistributionStatusTone,
 } from '../lib/utils';
 
 interface Props {
@@ -48,6 +51,8 @@ export default function AirdropCard({ airdrop, priority = false, nextAirdropSlug
   const [imgError, setImgError] = useState(false);
   const [bookmarked, setBookmarked] = useState(() => isBookmarked(airdrop.id));
   const opportunityType = getOpportunityType(airdrop);
+  const pastDistributionStatusKey = getPastDistributionStatusKey(airdrop.past_distribution_status ?? 'none');
+  const hasPastDistributionBadge = pastDistributionStatusKey !== 'none';
   const isSpeculativeToken = opportunityType === 'Speculative Token';
   const isScamAlert = opportunityType === 'Scam Alert';
   const isRiskOnlyOpportunity = isSpeculativeToken || isScamAlert;
@@ -119,33 +124,6 @@ export default function AirdropCard({ airdrop, priority = false, nextAirdropSlug
               </span>
             )}
           </div>
-
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <span className={cn('inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold', getOpportunityTypeTone(opportunityType))}>
-              {opportunityType}
-            </span>
-          </div>
-
-          <div className="hidden flex-wrap items-center gap-1.5 sm:flex">
-            <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', getStatusColor(airdrop.status))}>
-              {airdrop.status}
-            </span>
-
-            {airdrop.blockchain.slice(0, 2).map((b) => (
-              <span
-                key={b}
-                className="rounded-full border border-white/10 bg-dark-600/60 px-2 py-0.5 text-[10px] text-gray-500"
-              >
-                {b}
-              </span>
-            ))}
-
-            {airdrop.blockchain.length > 2 && (
-              <span className="rounded-full border border-white/10 bg-dark-600/60 px-2 py-0.5 text-[10px] text-gray-600">
-                +{airdrop.blockchain.length - 2}
-              </span>
-            )}
-          </div>
         </div>
 
         <button
@@ -160,6 +138,55 @@ export default function AirdropCard({ airdrop, priority = false, nextAirdropSlug
             <Bookmark className="h-4 w-4" />
           )}
         </button>
+      </div>
+
+      <div className={cn('mb-2 grid items-stretch gap-2', hasPastDistributionBadge ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1')}>
+        <div className={cn('min-h-[68px] rounded-xl border px-2.5 py-2', getOpportunityTypeTone(opportunityType))}>
+          <div className="flex min-w-0 items-start gap-2">
+            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-black/15">
+              <Zap className="h-3.5 w-3.5" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-[10px] font-medium uppercase tracking-[0.08em] opacity-85">Current Opportunity</div>
+              <div className="mt-0.5 text-sm font-semibold leading-tight break-words">{opportunityType}</div>
+            </div>
+          </div>
+        </div>
+
+        {hasPastDistributionBadge && (
+          <div className={cn('min-h-[68px] rounded-xl border px-2.5 py-2', getPastDistributionStatusTone(pastDistributionStatusKey))}>
+            <div className="flex min-w-0 items-start gap-2">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-black/15">
+                <Gift className="h-3.5 w-3.5" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[10px] font-medium uppercase tracking-[0.08em] opacity-85">Past Distribution</div>
+                <div className="mt-0.5 text-sm font-semibold leading-tight break-words">{getPastDistributionStatusLabel(pastDistributionStatusKey)}</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mb-2 hidden flex-wrap items-center gap-1.5 sm:flex">
+        <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-medium', getStatusColor(airdrop.status))}>
+          {airdrop.status}
+        </span>
+
+        {airdrop.blockchain.slice(0, 2).map((b) => (
+          <span
+            key={b}
+            className="rounded-full border border-white/10 bg-dark-600/60 px-2 py-0.5 text-[10px] text-gray-500"
+          >
+            {b}
+          </span>
+        ))}
+
+        {airdrop.blockchain.length > 2 && (
+          <span className="rounded-full border border-white/10 bg-dark-600/60 px-2 py-0.5 text-[10px] text-gray-600">
+            +{airdrop.blockchain.length - 2}
+          </span>
+        )}
       </div>
 
       {isScamAlert && (

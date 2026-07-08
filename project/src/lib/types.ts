@@ -104,6 +104,13 @@ export type OpportunityTypeKey =
   | 'testnet'
   | 'scam_alert';
 
+export type PastDistributionStatusKey =
+  | 'none'
+  | 'confirmed_past_airdrop'
+  | 'claim_live'
+  | 'claim_ended'
+  | 'distribution_complete';
+
 export interface Airdrop {
   id: string;
   slug: string;
@@ -122,6 +129,11 @@ export interface Airdrop {
   ai_risk_analysis: string;
   ai_reward_estimate: string;
   opportunity_type?: OpportunityTypeKey | null;
+  past_distribution_status?: PastDistributionStatusKey | null;
+  ai_suggested_opportunity_type?: OpportunityTypeKey | null;
+  ai_suggested_past_distribution_status?: PastDistributionStatusKey | null;
+  ai_classification_reason?: string | null;
+  admin_classification_confirmed?: boolean | null;
   points_name?: string | null;
   season_name?: string | null;
   snapshot_date?: string | null;

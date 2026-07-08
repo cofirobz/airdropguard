@@ -10,7 +10,7 @@ import {
   FileText, Plus, X, Pencil, Trash2, AlertTriangle, LogOut, ShieldCheck, Gift,
   ImagePlus, Monitor, CalendarClock, BadgeCheck, Bell, Newspaper, Radar, Sparkles, Menu, Search,
 } from 'lucide-react';
-import type { Airdrop, Blockchain, Category, OpportunityTypeKey } from '../lib/types';
+import type { Airdrop, Blockchain, Category, OpportunityTypeKey, PastDistributionStatusKey } from '../lib/types';
 import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
 import { getOpportunityType, getOpportunityTypeTone } from '../lib/utils';
 import {
@@ -192,6 +192,30 @@ interface ScamReport {
   reviewed_at: string | null;
 }
 
+type AirdropClassificationAuditRow = {
+  id: string;
+  slug: string;
+  name: string;
+  currentOpportunityType: OpportunityTypeKey;
+  currentPastDistributionStatus: PastDistributionStatusKey;
+  currentPointsName: string;
+  currentSeasonName: string;
+  currentRewardStatus: string;
+  currentClaimStatus: string;
+  suggestedOpportunityType: OpportunityTypeKey;
+  suggestedPastDistributionStatus: PastDistributionStatusKey;
+  suggestedPointsName: string;
+  suggestedSeasonName: string;
+  suggestedRewardStatus: string;
+  suggestedClaimStatus: string;
+  missingClassification: boolean;
+  conflictingFields: boolean;
+  missingContractForLiveToken: boolean;
+  pointsNameMissing: boolean;
+  riskReasonsMissing: boolean;
+  conflictMessages: string[];
+};
+
 // ─── Airdrop form data ────────────────────────────────────────────────────────
 
 type AirdropFormData = {
@@ -204,6 +228,11 @@ type AirdropFormData = {
   status: Airdrop['status']; risk_level: Airdrop['risk_level'];
   reward_potential: Airdrop['reward_potential']; difficulty: Airdrop['difficulty'];
   opportunity_type: OpportunityTypeKey;
+  past_distribution_status: PastDistributionStatusKey;
+  ai_suggested_opportunity_type: OpportunityTypeKey | '';
+  ai_suggested_past_distribution_status: PastDistributionStatusKey | '';
+  ai_classification_reason: string;
+  admin_classification_confirmed: boolean;
   points_name: string; season_name: string; snapshot_date: string; claim_status: string; reward_status: string;
   risk_reasons: string; official_safe_url: string; network_name: string; faucet_url: string;
   ai_recommendation_override: '' | 'verify' | 'review_further' | 'blacklist';
@@ -222,6 +251,11 @@ const BLANK_FORM: AirdropFormData = {
   blockchain: [], category: [],
   status: 'Active', risk_level: 'Medium', reward_potential: 'Medium', difficulty: 'Moderate',
   opportunity_type: 'potential_airdrop',
+  past_distribution_status: 'none',
+  ai_suggested_opportunity_type: '',
+  ai_suggested_past_distribution_status: '',
+  ai_classification_reason: '',
+  admin_classification_confirmed: false,
   points_name: '', season_name: '', snapshot_date: '', claim_status: '', reward_status: '',
   risk_reasons: '', official_safe_url: '', network_name: '', faucet_url: '',
   ai_recommendation_override: '',
@@ -240,8 +274,20 @@ const OPPORTUNITY_TYPE_OPTIONS: Array<{ value: OpportunityTypeKey; label: string
   { value: 'scam_alert', label: 'Scam Alert', tone: 'border-rose-500/25 bg-rose-500/10 text-rose-100' },
 ];
 
+const PAST_DISTRIBUTION_STATUS_OPTIONS: Array<{ value: PastDistributionStatusKey; label: string; tone: string }> = [
+  { value: 'none', label: 'None', tone: 'border-white/10 bg-white/[0.03] text-gray-300' },
+  { value: 'confirmed_past_airdrop', label: 'Past Airdrop Confirmed', tone: 'border-cyan-500/25 bg-cyan-500/10 text-cyan-100' },
+  { value: 'claim_live', label: 'Claim Live', tone: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-100' },
+  { value: 'claim_ended', label: 'Claim Ended', tone: 'border-amber-500/25 bg-amber-500/10 text-amber-100' },
+  { value: 'distribution_complete', label: 'Distribution Complete', tone: 'border-violet-500/25 bg-violet-500/10 text-violet-100' },
+];
+
 function getOpportunityTypeLabel(value: OpportunityTypeKey): string {
   return OPPORTUNITY_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? 'Potential Airdrop';
+}
+
+function getPastDistributionStatusLabel(value: PastDistributionStatusKey): string {
+  return PAST_DISTRIBUTION_STATUS_OPTIONS.find((option) => option.value === value)?.label ?? 'None';
 }
 
 function normalizeOpportunityTypeKey(value: unknown): OpportunityTypeKey {
@@ -268,6 +314,25 @@ function normalizeOpportunityTypeKey(value: unknown): OpportunityTypeKey {
       return 'scam_alert';
     default:
       return 'potential_airdrop';
+  }
+}
+
+function normalizePastDistributionStatusKey(value: unknown): PastDistributionStatusKey {
+  if (typeof value !== 'string') return 'none';
+
+  switch (value.trim()) {
+    case 'none':
+      return 'none';
+    case 'confirmed_past_airdrop':
+      return 'confirmed_past_airdrop';
+    case 'claim_live':
+      return 'claim_live';
+    case 'claim_ended':
+      return 'claim_ended';
+    case 'distribution_complete':
+      return 'distribution_complete';
+    default:
+      return 'none';
   }
 }
 
@@ -300,6 +365,23 @@ function getOpportunityTypeHelperText(opportunityType: OpportunityTypeKey): stri
   }
 }
 
+function getPastDistributionHelperText(value: PastDistributionStatusKey): string {
+  switch (value) {
+    case 'none':
+      return 'No known previous token distribution or claim cycle has been confirmed.';
+    case 'confirmed_past_airdrop':
+      return 'Project previously distributed tokens/rewards. Use this with the current opportunity users can take now.';
+    case 'claim_live':
+      return 'A previous distribution claim is currently live.';
+    case 'claim_ended':
+      return 'A previous distribution claim window ended.';
+    case 'distribution_complete':
+      return 'Distribution and claim cycle are complete.';
+    default:
+      return 'Track what happened before, separately from what users can do now.';
+  }
+}
+
 function hasLiveTokenSignal(form: Pick<AirdropFormData, 'claim_status' | 'status'>): boolean {
   const signal = `${form.claim_status ?? ''} ${form.status ?? ''}`.toLowerCase();
   return /(token\s+live|live\s+token|launched|mainnet|tge|claim\s*(is\s*)?(open|live|active)|claimable)/i.test(signal);
@@ -329,6 +411,98 @@ type OpportunityConflict = {
   message: string;
 };
 
+type AIClassificationSuggestion = {
+  suggestedOpportunityType: OpportunityTypeKey;
+  suggestedPastDistributionStatus: PastDistributionStatusKey;
+  confidence: 'Low' | 'Medium' | 'High';
+  reason: string;
+};
+
+function hasOfficialConfirmationSignal(form: Pick<AirdropFormData, 'website_url' | 'docs_url' | 'official_safe_url' | 'claim_status'>): boolean {
+  const signal = [form.website_url, form.docs_url, form.official_safe_url, form.claim_status]
+    .map((value) => value.trim().toLowerCase())
+    .join(' ');
+  return /(official|announcement|claim|token\s+live|distribution|snapshot)/i.test(signal);
+}
+
+function inferPastDistributionStatus(form: AirdropFormData): PastDistributionStatusKey {
+  const signal = [
+    form.claim_status,
+    form.reward_status,
+    form.ai_summary,
+    form.human_decision,
+    form.ai_classification_reason,
+    form.tasks_text,
+  ].join(' ').toLowerCase();
+
+  if (/distribution\s+complete|airdrop\s+complete|fully\s+distributed/.test(signal)) return 'distribution_complete';
+  if (/claim\s+ended|claim\s+closed|claim\s+expired/.test(signal)) return 'claim_ended';
+  if (/claim\s+(is\s+)?(live|open|active|ongoing)|claimable\s+now/.test(signal)) return 'claim_live';
+  if (/past\s+airdrop|already\s+airdropped|previous\s+airdrop|genesis\s+distribution|token\s+was\s+distributed/.test(signal)) return 'confirmed_past_airdrop';
+  return 'none';
+}
+
+function buildAIClassificationSuggestion(form: AirdropFormData): AIClassificationSuggestion {
+  const riskReasons = form.risk_reasons
+    .split('\n')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const signalBlob = [
+    form.name,
+    form.claim_status,
+    form.reward_status,
+    form.points_name,
+    form.season_name,
+    form.tasks_text,
+    form.ai_summary,
+    form.human_decision,
+    form.website_url,
+    form.docs_url,
+    form.official_safe_url,
+    form.faucet_url,
+  ].join(' ').toLowerCase();
+
+  let suggestedOpportunityType: OpportunityTypeKey = 'potential_airdrop';
+  const suggestedPastDistributionStatus = inferPastDistributionStatus(form);
+  const reasons: string[] = [];
+
+  if (riskReasons.length > 0 || /scam|phish|fake|drainer|blacklist|malicious/.test(signalBlob)) {
+    suggestedOpportunityType = 'scam_alert';
+    reasons.push('Risk reasons or scam indicators are present.');
+  } else if (form.points_name.trim() || /points|xp|petal|season|campaign\s*score|credits/.test(signalBlob)) {
+    suggestedOpportunityType = 'points_program';
+    reasons.push('Points-style signals detected (points/season/campaign scoring).');
+  } else if (form.reward_status.trim() || /rewards|incentive|ongoing\s+earn|yield/.test(signalBlob)) {
+    suggestedOpportunityType = 'rewards_program';
+    reasons.push('Reward status and ongoing incentives detected.');
+  } else if (form.faucet_url.trim() || form.network_name.trim() || /testnet|faucet/.test(signalBlob)) {
+    suggestedOpportunityType = 'testnet';
+    reasons.push('Testnet or faucet workflow detected.');
+  } else if ((form.claim_status.trim() || form.snapshot_date || (form.contract_address.trim() && hasOfficialConfirmationSignal(form))) && !/not\s+launched|rumor|unconfirmed/.test(signalBlob)) {
+    suggestedOpportunityType = 'confirmed_airdrop';
+    reasons.push('Claim/snapshot or official token confirmation signal detected.');
+  } else {
+    suggestedOpportunityType = 'potential_airdrop';
+    reasons.push('No hard token confirmation detected; positioning as potential opportunity.');
+  }
+
+  if (suggestedPastDistributionStatus !== 'none' && suggestedOpportunityType === 'confirmed_airdrop' && form.reward_status.trim()) {
+    suggestedOpportunityType = 'rewards_program';
+    reasons.push('Past distribution + active rewards found; classify current opportunity as Rewards Program.');
+  }
+
+  let confidence: AIClassificationSuggestion['confidence'] = 'Low';
+  if (reasons.length >= 2 || riskReasons.length > 0) confidence = 'High';
+  else if (reasons.length >= 1) confidence = 'Medium';
+
+  return {
+    suggestedOpportunityType,
+    suggestedPastDistributionStatus,
+    confidence,
+    reason: reasons.join(' '),
+  };
+}
+
 function getOpportunityConflicts(form: AirdropFormData): OpportunityConflict[] {
   const conflicts: OpportunityConflict[] = [];
   const riskReasons = form.risk_reasons
@@ -339,6 +513,7 @@ function getOpportunityConflicts(form: AirdropFormData): OpportunityConflict[] {
   const claimUrlCandidate = getClaimUrlCandidate(form);
   const tokenLive = hasLiveTokenSignal(form);
   const noTokenEvidence = !form.contract_address.trim() && !form.claim_status.trim() && !form.snapshot_date;
+  const hasOfficialConfirmation = hasOfficialConfirmationSignal(form);
   const blacklistSignal =
     form.ai_recommendation_override === 'blacklist'
     || /blacklist|phish|scam|fake|malicious|danger/i.test(form.human_decision)
@@ -376,6 +551,34 @@ function getOpportunityConflicts(form: AirdropFormData): OpportunityConflict[] {
     conflicts.push({
       tone: 'warning',
       message: 'Live token signal detected but contract address is missing.',
+    });
+  }
+
+  if (form.reward_status.trim() && form.past_distribution_status !== 'none' && form.opportunity_type !== 'rewards_program') {
+    conflicts.push({
+      tone: 'suggestion',
+      message: 'Reward status with prior distribution detected. Consider Rewards Program with a past distribution status.',
+    });
+  }
+
+  if (form.contract_address.trim() && !hasOfficialConfirmation && form.opportunity_type === 'confirmed_airdrop') {
+    conflicts.push({
+      tone: 'warning',
+      message: 'Contract address exists but official token confirmation is weak. Verify official announcement before keeping Confirmed Airdrop.',
+    });
+  }
+
+  if (form.past_distribution_status !== 'none' && form.reward_status.trim() && form.opportunity_type === 'confirmed_airdrop') {
+    conflicts.push({
+      tone: 'suggestion',
+      message: 'Project had past distribution and active rewards. Use Rewards Program + Past Distribution instead of forcing Confirmed Airdrop.',
+    });
+  }
+
+  if (form.opportunity_type === 'confirmed_airdrop' && !hasOfficialConfirmation && !form.claim_status.trim() && !form.snapshot_date) {
+    conflicts.push({
+      tone: 'warning',
+      message: 'No official claim/announcement evidence found. Avoid Confirmed Airdrop classification until verified.',
     });
   }
 
@@ -1872,6 +2075,7 @@ function AirdropFormModal({
     testnet: form.opportunity_type === 'testnet',
     scam: form.opportunity_type === 'scam_alert',
   };
+  const aiSuggestion = useMemo(() => buildAIClassificationSuggestion(form), [form]);
 
   function toggleChain(chain: Blockchain) {
     setForm(f => ({
@@ -1947,7 +2151,7 @@ function AirdropFormModal({
           <label className={lbl}>Opportunity Type (Source of Truth)</label>
           <select
             value={form.opportunity_type}
-            onChange={(e) => setForm((f) => ({ ...f, opportunity_type: e.target.value as OpportunityTypeKey }))}
+            onChange={(e) => setForm((f) => ({ ...f, opportunity_type: e.target.value as OpportunityTypeKey, admin_classification_confirmed: false }))}
             className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40 cursor-pointer"
           >
             {OPPORTUNITY_TYPE_OPTIONS.map((option) => (
@@ -1962,6 +2166,90 @@ function AirdropFormModal({
               {getOpportunityTypeLabel(form.opportunity_type)}
             </span>
           </div>
+        </div>
+
+        <div>
+          <label className={lbl}>Past Distribution Status</label>
+          <select
+            value={form.past_distribution_status}
+            onChange={(e) => setForm((f) => ({ ...f, past_distribution_status: e.target.value as PastDistributionStatusKey, admin_classification_confirmed: false }))}
+            className="w-full bg-dark-900/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-neon-purple/40 cursor-pointer"
+          >
+            {PAST_DISTRIBUTION_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value} className="bg-dark-900">
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-[10px] leading-relaxed text-gray-600">{getPastDistributionHelperText(form.past_distribution_status)}</p>
+          <div className="mt-2">
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${PAST_DISTRIBUTION_STATUS_OPTIONS.find((option) => option.value === form.past_distribution_status)?.tone ?? 'border-white/10 bg-white/[0.03] text-gray-300'}`}>
+              {getPastDistributionStatusLabel(form.past_distribution_status)}
+            </span>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.06] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-cyan-200">AI Classification Suggestion</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-cyan-100/85">
+                AI suggests lifecycle classification from project name, token/contract state, claim/official links, docs, tasks, rewards/points fields, risk reasons and admin notes.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({
+                ...f,
+                opportunity_type: aiSuggestion.suggestedOpportunityType,
+                past_distribution_status: aiSuggestion.suggestedPastDistributionStatus,
+                ai_suggested_opportunity_type: aiSuggestion.suggestedOpportunityType,
+                ai_suggested_past_distribution_status: aiSuggestion.suggestedPastDistributionStatus,
+                ai_classification_reason: aiSuggestion.reason,
+                admin_classification_confirmed: false,
+              }))}
+              className="inline-flex min-h-[38px] items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20"
+            >
+              Apply AI Suggestion
+            </button>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500">Suggested Opportunity Type</div>
+              <div className="mt-1 text-sm font-semibold text-white">{getOpportunityTypeLabel(aiSuggestion.suggestedOpportunityType)}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500">Suggested Past Distribution</div>
+              <div className="mt-1 text-sm font-semibold text-white">{getPastDistributionStatusLabel(aiSuggestion.suggestedPastDistributionStatus)}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500">Confidence</div>
+              <div className="mt-1 text-sm font-semibold text-white">{aiSuggestion.confidence}</div>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 sm:col-span-2">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500">Reason</div>
+              <div className="mt-1 text-sm leading-relaxed text-gray-200">{aiSuggestion.reason}</div>
+            </div>
+          </div>
+
+          <label className="mt-3 flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={form.admin_classification_confirmed}
+              onChange={(e) => setForm((f) => ({
+                ...f,
+                admin_classification_confirmed: e.target.checked,
+                ai_suggested_opportunity_type: aiSuggestion.suggestedOpportunityType,
+                ai_suggested_past_distribution_status: aiSuggestion.suggestedPastDistributionStatus,
+                ai_classification_reason: aiSuggestion.reason,
+              }))}
+              className="mt-0.5"
+            />
+            <span className="text-xs leading-relaxed text-cyan-100/90">
+              Classification reviewed by admin. I confirm current opportunity and past distribution status before saving.
+            </span>
+          </label>
         </div>
 
         {opportunityConflicts.length > 0 && (
@@ -3321,6 +3609,124 @@ export default function AdminPage() {
     if (airdropPublishedFilter === 'draft' && airdrop.published) return false;
     return true;
   }), [airdropListings, getAdminOpportunityBucket, airdropCategoryFilter, airdropChainFilter, airdropPublishedFilter]);
+
+  const classificationAuditRows = useMemo<AirdropClassificationAuditRow[]>(() => {
+    const asText = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+
+    return airdrops
+      .map((airdrop) => {
+        const row = airdrop as unknown as Record<string, unknown>;
+        const currentOpportunityType = normalizeOpportunityTypeKey(row.opportunity_type);
+        const currentPastDistributionStatus = normalizePastDistributionStatusKey(row.past_distribution_status);
+        const currentPointsName = asText(row.points_name);
+        const currentSeasonName = asText(row.season_name);
+        const currentRewardStatus = asText(row.reward_status);
+        const currentClaimStatus = asText(row.claim_status);
+        const currentRiskReasons = Array.isArray(row.risk_reasons)
+          ? row.risk_reasons.map((value) => String(value).trim()).filter(Boolean)
+          : [];
+
+        const auditForm: AirdropFormData = {
+          ...BLANK_FORM,
+          name: airdrop.name ?? '',
+          ticker: airdrop.ticker ?? '',
+          website_url: airdrop.website_url ?? '',
+          docs_url: asText(row.docs_url),
+          official_safe_url: asText(row.official_safe_url),
+          contract_address: airdrop.contract_address ?? '',
+          status: airdrop.status,
+          blockchain: Array.isArray(airdrop.blockchain) ? airdrop.blockchain : [],
+          category: Array.isArray(airdrop.category)
+            ? (airdrop.category.filter((value): value is Category => typeof value === 'string') as Category[])
+            : [],
+          opportunity_type: currentOpportunityType,
+          past_distribution_status: currentPastDistributionStatus,
+          points_name: currentPointsName,
+          season_name: currentSeasonName,
+          claim_status: currentClaimStatus,
+          reward_status: currentRewardStatus,
+          snapshot_date: airdrop.snapshot_date ? String(airdrop.snapshot_date) : '',
+          ai_recommendation_override: row.ai_recommendation_override === 'verify' || row.ai_recommendation_override === 'review_further' || row.ai_recommendation_override === 'blacklist'
+            ? row.ai_recommendation_override
+            : '',
+          human_decision: asText(row.human_decision),
+          risk_reasons: currentRiskReasons.join('\n'),
+        };
+
+        const aiSuggestion = buildAIClassificationSuggestion(auditForm);
+        const conflicts = getOpportunityConflicts(auditForm);
+
+        const missingClassification = !asText(row.opportunity_type) || !asText(row.past_distribution_status);
+        const missingContractForLiveToken = hasLiveTokenSignal(auditForm) && !auditForm.contract_address.trim();
+        const pointsNameMissing = currentOpportunityType === 'points_program' && !currentPointsName;
+        const riskReasonsMissing = currentOpportunityType === 'scam_alert' && currentRiskReasons.length === 0;
+
+        const suggestedPointsName = currentPointsName
+          || ((aiSuggestion.suggestedOpportunityType === 'points_program' || currentOpportunityType === 'points_program')
+            ? 'Needs admin input'
+            : '—');
+        const suggestedSeasonName = currentSeasonName
+          || ((aiSuggestion.suggestedOpportunityType === 'points_program' || aiSuggestion.suggestedOpportunityType === 'rewards_program' || currentOpportunityType === 'points_program' || currentOpportunityType === 'rewards_program')
+            ? 'Needs admin input'
+            : '—');
+        const suggestedRewardStatus = currentRewardStatus
+          || ((aiSuggestion.suggestedOpportunityType === 'rewards_program' || currentOpportunityType === 'rewards_program')
+            ? 'Needs admin input'
+            : '—');
+        const suggestedClaimStatus = currentClaimStatus
+          || ((aiSuggestion.suggestedOpportunityType === 'confirmed_airdrop' || currentOpportunityType === 'confirmed_airdrop')
+            ? (aiSuggestion.suggestedPastDistributionStatus === 'claim_ended'
+              ? 'Claim ended'
+              : aiSuggestion.suggestedPastDistributionStatus === 'claim_live'
+              ? 'Claim live'
+              : 'Needs admin input')
+            : '—');
+
+        return {
+          id: airdrop.id,
+          slug: airdrop.slug,
+          name: airdrop.name,
+          currentOpportunityType,
+          currentPastDistributionStatus,
+          currentPointsName,
+          currentSeasonName,
+          currentRewardStatus,
+          currentClaimStatus,
+          suggestedOpportunityType: aiSuggestion.suggestedOpportunityType,
+          suggestedPastDistributionStatus: aiSuggestion.suggestedPastDistributionStatus,
+          suggestedPointsName,
+          suggestedSeasonName,
+          suggestedRewardStatus,
+          suggestedClaimStatus,
+          missingClassification,
+          conflictingFields: conflicts.length > 0,
+          missingContractForLiveToken,
+          pointsNameMissing,
+          riskReasonsMissing,
+          conflictMessages: conflicts.map((conflict) => conflict.message),
+        };
+      })
+      .sort((a, b) => {
+        const aIssueCount = Number(a.missingClassification) + Number(a.conflictingFields) + Number(a.missingContractForLiveToken) + Number(a.pointsNameMissing) + Number(a.riskReasonsMissing);
+        const bIssueCount = Number(b.missingClassification) + Number(b.conflictingFields) + Number(b.missingContractForLiveToken) + Number(b.pointsNameMissing) + Number(b.riskReasonsMissing);
+        if (aIssueCount !== bIssueCount) return bIssueCount - aIssueCount;
+        return a.name.localeCompare(b.name);
+      });
+  }, [airdrops]);
+
+  const classificationAuditIssueRows = useMemo(
+    () => classificationAuditRows.filter((row) => row.missingClassification || row.conflictingFields || row.missingContractForLiveToken || row.pointsNameMissing || row.riskReasonsMissing),
+    [classificationAuditRows],
+  );
+
+  const classificationAuditSummary = useMemo(() => ({
+    total: classificationAuditRows.length,
+    missingClassification: classificationAuditRows.filter((row) => row.missingClassification).length,
+    conflictingFields: classificationAuditRows.filter((row) => row.conflictingFields).length,
+    missingContractForLiveToken: classificationAuditRows.filter((row) => row.missingContractForLiveToken).length,
+    pointsNameMissing: classificationAuditRows.filter((row) => row.pointsNameMissing).length,
+    riskReasonsMissing: classificationAuditRows.filter((row) => row.riskReasonsMissing).length,
+  }), [classificationAuditRows]);
 
   const filteredSpeculativeTokenListings = useMemo(() => speculativeTokenListings.filter((airdrop) => {
     const securityScore = getSpeculativeSecurityScore(airdrop);
@@ -5993,6 +6399,11 @@ export default function AdminPage() {
       reward_potential: a.reward_potential,
       difficulty: a.difficulty,
       opportunity_type: (a.opportunity_type as OpportunityTypeKey | null) ?? 'potential_airdrop',
+      past_distribution_status: normalizePastDistributionStatusKey((a as Airdrop & { past_distribution_status?: PastDistributionStatusKey | null }).past_distribution_status ?? 'none'),
+      ai_suggested_opportunity_type: ((a as Airdrop & { ai_suggested_opportunity_type?: OpportunityTypeKey | null }).ai_suggested_opportunity_type ?? '') as OpportunityTypeKey | '',
+      ai_suggested_past_distribution_status: ((a as Airdrop & { ai_suggested_past_distribution_status?: PastDistributionStatusKey | null }).ai_suggested_past_distribution_status ?? '') as PastDistributionStatusKey | '',
+      ai_classification_reason: String((a as Airdrop & { ai_classification_reason?: string | null }).ai_classification_reason ?? ''),
+      admin_classification_confirmed: Boolean((a as Airdrop & { admin_classification_confirmed?: boolean | null }).admin_classification_confirmed),
       points_name: a.points_name ?? '',
       season_name: a.season_name ?? '',
       snapshot_date: a.snapshot_date ?? '',
@@ -6163,6 +6574,12 @@ export default function AdminPage() {
         throw new Error('Missing airdrop ID for edit save.');
       }
 
+      if (!form.admin_classification_confirmed) {
+        showToast('Please confirm lifecycle classification in the AI Classification Suggestion panel before saving.', 'error');
+        setSaving(false);
+        return;
+      }
+
       const normalizedForm = normalizeSpeculativeForm(form);
       const speculativeGuardApplied = normalizedForm !== form;
       if (speculativeGuardApplied) {
@@ -6184,6 +6601,7 @@ export default function AdminPage() {
         normalizedForm.opportunity_type,
         existing?.listing_state,
       );
+      const saveSuggestion = buildAIClassificationSuggestion(normalizedForm);
 
       currentStep = 'prepare_payload';
       const payload = {
@@ -6211,6 +6629,11 @@ export default function AdminPage() {
         reward_potential: normalizedForm.reward_potential,
         difficulty: normalizedForm.difficulty,
         opportunity_type: normalizedForm.opportunity_type,
+        past_distribution_status: normalizedForm.past_distribution_status,
+        ai_suggested_opportunity_type: normalizedForm.ai_suggested_opportunity_type || saveSuggestion.suggestedOpportunityType,
+        ai_suggested_past_distribution_status: normalizedForm.ai_suggested_past_distribution_status || saveSuggestion.suggestedPastDistributionStatus,
+        ai_classification_reason: normalizedForm.ai_classification_reason.trim() || saveSuggestion.reason,
+        admin_classification_confirmed: normalizedForm.admin_classification_confirmed,
         points_name: normalizedForm.points_name.trim() || null,
         season_name: normalizedForm.season_name.trim() || null,
         snapshot_date: normalizedForm.snapshot_date || null,
@@ -9882,6 +10305,113 @@ export default function AdminPage() {
             <option value="draft">Unpublished</option>
           </select>
         </div>
+
+        <div className="mb-4 rounded-2xl border border-cyan-500/20 bg-cyan-500/[0.05] p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-cyan-100">Lifecycle Classification Audit Checklist</h3>
+              <p className="text-xs text-gray-300 mt-1">Read-only audit table for manual admin approval. Suggestions are advisory only and no records are auto-updated.</p>
+            </div>
+            <button
+              onClick={() => showToast('Apply suggested field changes by opening each listing form and saving with admin confirmation.', 'success')}
+              className="rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-100 hover:bg-cyan-500/20 transition-colors"
+            >
+              Manual approval required
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.08em] text-gray-500">Total</p><p className="text-sm font-semibold text-white tabular-nums">{classificationAuditSummary.total}</p></div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.08em] text-gray-500">Missing Classification</p><p className="text-sm font-semibold text-amber-200 tabular-nums">{classificationAuditSummary.missingClassification}</p></div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.08em] text-gray-500">Conflicting Fields</p><p className="text-sm font-semibold text-amber-200 tabular-nums">{classificationAuditSummary.conflictingFields}</p></div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.08em] text-gray-500">Live Token Missing Contract</p><p className="text-sm font-semibold text-rose-200 tabular-nums">{classificationAuditSummary.missingContractForLiveToken}</p></div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.08em] text-gray-500">Points Name Missing</p><p className="text-sm font-semibold text-sky-200 tabular-nums">{classificationAuditSummary.pointsNameMissing}</p></div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.08em] text-gray-500">Scam Risk Reasons Missing</p><p className="text-sm font-semibold text-rose-200 tabular-nums">{classificationAuditSummary.riskReasonsMissing}</p></div>
+          </div>
+
+          {classificationAuditIssueRows.length === 0 ? (
+            <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+              No checklist issues found. All current records pass the configured lifecycle sanity checks.
+            </div>
+          ) : (
+            <div className="glass-card overflow-x-auto">
+              <table className="w-full min-w-[1180px] text-xs">
+                <thead>
+                  <tr className="border-b border-white/10">
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-[0.08em] text-gray-400">Listing</th>
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-[0.08em] text-gray-400">Checklist</th>
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-[0.08em] text-gray-400">Current Classification</th>
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-[0.08em] text-gray-400">Suggested Classification</th>
+                    <th className="px-3 py-2 text-left font-semibold uppercase tracking-[0.08em] text-gray-400">Suggested Fields</th>
+                    <th className="px-3 py-2 text-right font-semibold uppercase tracking-[0.08em] text-gray-400">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {classificationAuditIssueRows.map((row) => {
+                    const checklistFlags = [
+                      row.missingClassification ? 'Missing classification' : null,
+                      row.conflictingFields ? 'Conflicting fields' : null,
+                      row.missingContractForLiveToken ? 'Missing contract for live token' : null,
+                      row.pointsNameMissing ? 'Points name missing for points_program' : null,
+                      row.riskReasonsMissing ? 'Risk reasons missing for scam_alert' : null,
+                    ].filter(Boolean) as string[];
+
+                    return (
+                      <tr key={`classification-audit-${row.id}`} className="align-top">
+                        <td className="px-3 py-2">
+                          <div className="font-semibold text-white">{row.name}</div>
+                          <div className="mt-0.5 text-[10px] text-gray-500">/{row.slug}</div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap gap-1.5">
+                            {checklistFlags.map((flag) => (
+                              <span key={`${row.id}-${flag}`} className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-100">{flag}</span>
+                            ))}
+                          </div>
+                          {row.conflictMessages.length > 0 ? (
+                            <p className="mt-1.5 text-[10px] leading-relaxed text-gray-400">{row.conflictMessages[0]}</p>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2 text-gray-300">
+                          <div>Type: <span className="text-white">{getOpportunityTypeLabel(row.currentOpportunityType)}</span></div>
+                          <div className="mt-1">Past: <span className="text-white">{getPastDistributionStatusLabel(row.currentPastDistributionStatus)}</span></div>
+                        </td>
+                        <td className="px-3 py-2 text-gray-300">
+                          <div>Type: <span className="text-cyan-100">{getOpportunityTypeLabel(row.suggestedOpportunityType)}</span></div>
+                          <div className="mt-1">Past: <span className="text-cyan-100">{getPastDistributionStatusLabel(row.suggestedPastDistributionStatus)}</span></div>
+                        </td>
+                        <td className="px-3 py-2 text-gray-300">
+                          <div>points_name: <span className="text-white">{row.suggestedPointsName || '—'}</span></div>
+                          <div className="mt-1">season_name: <span className="text-white">{row.suggestedSeasonName || '—'}</span></div>
+                          <div className="mt-1">reward_status: <span className="text-white">{row.suggestedRewardStatus || '—'}</span></div>
+                          <div className="mt-1">claim_status: <span className="text-white">{row.suggestedClaimStatus || '—'}</span></div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => void openEdit(airdrops.find((entry) => entry.id === row.id) || null)}
+                              className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[11px] text-sky-100 hover:bg-sky-500/20"
+                            >
+                              Review
+                            </button>
+                            <button
+                              onClick={() => window.open(`/airdrop/${row.slug}`, '_blank', 'noopener,noreferrer')}
+                              className="rounded-lg border border-white/15 bg-white/[0.04] p-1.5 text-gray-300 hover:text-white"
+                              title="Open listing"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         <div className="space-y-3 md:hidden mb-3">
           {filteredAirdropListings.map((a) => {
             const isOpen = expandedAirdropIds.includes(a.id);

@@ -19,6 +19,7 @@ import {
   getWhyWeLikeIt, getThingsToConsider,
   getOpportunityType, getOpportunityTypeTone, getOpportunityTypeBannerCopy,
   getOpportunityTypeKey, getOpportunityScoreLabel,
+  getPastDistributionStatusKey, getPastDistributionStatusLabel, getPastDistributionStatusTone,
 } from '../lib/utils';
 import { TrustScoreBadge } from '../components/TrustScoreSection';
 import CommunityResults from '../components/CommunityResults';
@@ -42,6 +43,7 @@ type RelatedOpportunityItem = {
   logo_url: string | null;
   blockchain: string[] | null;
   opportunity_type: string | null;
+  past_distribution_status?: string | null;
   risk_level: string | null;
   reward_potential: string | null;
   trust_score: number | null;
@@ -300,8 +302,6 @@ function fmtPrice(n: number): string {
 async function fetchMarketData(
   contractAddress: string | null,
   blockchain: string[],
-  ticker: string | null,
-  name: string,
 ): Promise<MarketData | null> {
   // 1. Try contract address lookup (most accurate)
   if (contractAddress) {
@@ -331,11 +331,9 @@ async function fetchMarketData(
   return null;
 }
 
-function MarketDataRow({ contractAddress, blockchain, ticker, name }: {
+function MarketDataRow({ contractAddress, blockchain }: {
   contractAddress: string | null;
   blockchain: string[];
-  ticker?: string;
-  name: string;
 }) {
   const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(Boolean(contractAddress));
@@ -350,11 +348,11 @@ function MarketDataRow({ contractAddress, blockchain, ticker, name }: {
     }
 
     setLoading(true);
-    fetchMarketData(contractAddress, blockchain, ticker ?? null, name).then(d => {
+    fetchMarketData(contractAddress, blockchain).then(d => {
       setData(d);
       setLoading(false);
     });
-  }, [contractAddress, blockchain.join(','), ticker, name]);
+  }, [contractAddress, blockchain.join(',')]);
 
   if (!contractAddress || (!loading && !data)) return null;
 
@@ -2741,10 +2739,12 @@ export default function AirdropDetailPage() {
           ...data,
           tasks: [...(data.airdrop_tasks ?? [])].sort((a, b) => a.sort_order - b.sort_order),
         };
+        const dataId = typeof data.id === 'string' ? data.id : '';
+        const dataName = typeof data.name === 'string' ? data.name : 'Airdrop';
         setAirdrop(sorted);
-        setBookmarked(isBookmarked(data.id));
-        setCompletions(getCompletions(data.id));
-        document.title = `${data.name} Airdrop — Airdrop Guard`;
+        setBookmarked(dataId ? isBookmarked(dataId) : false);
+        setCompletions(dataId ? getCompletions(dataId) : []);
+        document.title = `${dataName} Airdrop — Airdrop Guard`;
 
         const relatedQuery = supabase
           .from('airdrops')
@@ -2752,12 +2752,15 @@ export default function AirdropDetailPage() {
           .eq('published', true)
           .eq('review_status', 'approved')
           .eq('is_demo', false)
-          .neq('id', data.id)
+          .neq('id', dataId)
           .limit(60);
 
         const { data: relatedData } = await relatedQuery;
         const relatedRows = (relatedData ?? []) as RelatedOpportunityItem[];
-        const sameBlockchain = relatedRows.filter((item) => (item.blockchain ?? []).some((chain) => (sorted.blockchain ?? []).includes(chain))).slice(0, 4);
+        const currentChains = (sorted.blockchain ?? []) as string[];
+        const sameBlockchain = relatedRows
+          .filter((item) => (item.blockchain ?? []).some((chain) => currentChains.includes(chain)))
+          .slice(0, 4);
         const sameType = relatedRows.filter((item) => item.opportunity_type === sorted.opportunity_type).slice(0, 4);
         const similarRisk = relatedRows.filter((item) => item.risk_level === sorted.risk_level).slice(0, 4);
         const similarReward = relatedRows.filter((item) => item.reward_potential === sorted.reward_potential).slice(0, 4);
@@ -2888,6 +2891,8 @@ export default function AirdropDetailPage() {
   const opportunityType = getOpportunityType(airdrop);
   const opportunityBannerCopy = getOpportunityTypeBannerCopy(opportunityType);
   const opportunityTypeKey = getOpportunityTypeKey(airdrop) ?? (airdrop.opportunity_type ?? 'potential_airdrop');
+  const pastDistributionStatusKey = getPastDistributionStatusKey(airdrop.past_distribution_status ?? 'none');
+  const hasPastDistribution = pastDistributionStatusKey !== 'none';
   const scoreLabel = getOpportunityScoreLabel(opportunityType);
   const isSpeculativeToken = isSpeculativeTokenProject(airdrop);
   const isScamAlert = opportunityType === 'Scam Alert';
@@ -3149,8 +3154,13 @@ export default function AirdropDetailPage() {
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <h1 className="text-2xl font-black leading-tight text-white sm:text-4xl">{airdrop.name}</h1>
                   <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]', getOpportunityTypeTone(opportunityType))}>
-                    {opportunityType}
+                    Current Opportunity: {opportunityType}
                   </span>
+                  {hasPastDistribution && (
+                    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]', getPastDistributionStatusTone(pastDistributionStatusKey))}>
+                      Past Distribution: {getPastDistributionStatusLabel(pastDistributionStatusKey)}
+                    </span>
+                  )}
                   {airdrop.ticker && (
                     <span className="text-sm font-bold font-mono text-neon-purple bg-neon-purple/10 border border-neon-purple/25 rounded-lg px-2 py-0.5 tracking-wider">
                       ${airdrop.ticker}
@@ -3259,6 +3269,26 @@ export default function AirdropDetailPage() {
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 sm:col-span-2 xl:col-span-4">
+                  <div className="text-[10px] uppercase tracking-wider text-white/70">Lifecycle Classification</div>
+                  <div className="mt-2 text-sm leading-relaxed text-white/90">
+                    Current Opportunity = what users can do now. Past Distribution = whether this project has previously rewarded users.
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]', getOpportunityTypeTone(opportunityType))}>
+                      Current Opportunity: {opportunityType}
+                    </span>
+                    {hasPastDistribution ? (
+                      <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]', getPastDistributionStatusTone(pastDistributionStatusKey))}>
+                        Past Distribution: {getPastDistributionStatusLabel(pastDistributionStatusKey)}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-300">
+                        Past Distribution: None
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
                   <div className="text-[10px] uppercase tracking-wider text-white/70">AI Trust Score</div>
                   <div className="mt-1 flex items-end gap-2">
@@ -3435,8 +3465,6 @@ export default function AirdropDetailPage() {
           <MarketDataRow
             contractAddress={airdrop.contract_address}
             blockchain={airdrop.blockchain as string[]}
-            ticker={airdrop.ticker || undefined}
-            name={airdrop.name}
           />
         )}
       </div>
@@ -3499,7 +3527,7 @@ export default function AirdropDetailPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <IntelligenceSourcePanel airdrop={airdrop} />
-            <AnalystNextSteps airdrop={airdrop} />
+            <AnalystNextSteps airdrop={airdrop} relatedOpportunities={relatedOpportunities} />
           </div>
 
           {/* ── Why We Like It + Things To Consider ───────────────────────── */}

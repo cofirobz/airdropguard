@@ -1,4 +1,4 @@
-import type { RiskLevel, RewardPotential, Difficulty, AirdropStatus, Airdrop, OpportunityTypeKey } from './types';
+import type { RiskLevel, RewardPotential, Difficulty, AirdropStatus, Airdrop, OpportunityTypeKey, PastDistributionStatusKey } from './types';
 
 export type OpportunityType =
   | 'Confirmed Airdrop'
@@ -10,6 +10,14 @@ export type OpportunityType =
   | 'Scam Alert';
 
 type ListingClassificationInput = Pick<Airdrop, 'category' | 'listing_state' | 'human_verified' | 'opportunity_type'>;
+
+const PAST_DISTRIBUTION_STATUS_LABELS: Record<PastDistributionStatusKey, string> = {
+  none: 'None',
+  confirmed_past_airdrop: 'Past Airdrop Confirmed',
+  claim_live: 'Claim Live',
+  claim_ended: 'Claim Ended',
+  distribution_complete: 'Distribution Complete',
+};
 
 const OPPORTUNITY_TYPE_LABELS: Record<OpportunityTypeKey, OpportunityType> = {
   confirmed_airdrop: 'Confirmed Airdrop',
@@ -195,6 +203,42 @@ export function getOpportunityScoreLabel(opportunityType: OpportunityType): stri
     case 'Testnet': return 'Testnet Confidence';
     case 'Scam Alert': return 'Risk Score';
     case 'Speculative Token': return 'Risk Score';
+  }
+}
+
+export function getPastDistributionStatusKey(value: unknown): PastDistributionStatusKey {
+  if (typeof value !== 'string') return 'none';
+  const normalized = value.trim();
+  switch (normalized) {
+    case 'confirmed_past_airdrop':
+    case 'claim_live':
+    case 'claim_ended':
+    case 'distribution_complete':
+      return normalized;
+    default:
+      return 'none';
+  }
+}
+
+export function getPastDistributionStatusLabel(value: unknown): string {
+  const key = getPastDistributionStatusKey(value);
+  return PAST_DISTRIBUTION_STATUS_LABELS[key];
+}
+
+export function getPastDistributionStatusTone(value: unknown): string {
+  const key = getPastDistributionStatusKey(value);
+  switch (key) {
+    case 'confirmed_past_airdrop':
+      return 'text-cyan-100 bg-cyan-500/10 border-cyan-500/30';
+    case 'claim_live':
+      return 'text-emerald-100 bg-emerald-500/10 border-emerald-500/30';
+    case 'claim_ended':
+      return 'text-amber-100 bg-amber-500/10 border-amber-500/30';
+    case 'distribution_complete':
+      return 'text-violet-100 bg-violet-500/10 border-violet-500/30';
+    case 'none':
+    default:
+      return 'text-gray-300 bg-white/[0.04] border-white/10';
   }
 }
 
