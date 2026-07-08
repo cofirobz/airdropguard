@@ -519,49 +519,23 @@ export function AffiliateHubSection({
       <div className="rounded-xl border border-white/10 bg-dark-900/45 p-3 space-y-3">
         <p className="text-[11px] uppercase tracking-[0.1em] text-emerald-200">Add or Edit Affiliate</p>
 
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
           <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="Partner name *" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.slug} onChange={(e) => setForm((p) => ({ ...p, slug: normalizeSlug(e.target.value) }))} placeholder="Slug *" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} placeholder="Category" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.destination_url} onChange={(e) => setForm((p) => ({ ...p, destination_url: e.target.value }))} placeholder="Base Affiliate URL *" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.logo_url} onChange={(e) => setForm((p) => ({ ...p, logo_url: e.target.value }))} placeholder="Logo URL" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-          <input value={form.banner_image_url} onChange={(e) => setForm((p) => ({ ...p, banner_image_url: e.target.value }))} placeholder="Banner Image URL (optional)" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-          <input value={form.official_website} onChange={(e) => setForm((p) => ({ ...p, official_website: e.target.value }))} placeholder="Official Website" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.button_text} onChange={(e) => setForm((p) => ({ ...p, button_text: e.target.value }))} placeholder="Button Text" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-          <input value={form.commission_rate} onChange={(e) => setForm((p) => ({ ...p, commission_rate: e.target.value }))} placeholder="Commission rate" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-          <input value={form.payment_threshold} onChange={(e) => setForm((p) => ({ ...p, payment_threshold: e.target.value }))} placeholder="Payment threshold" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.priority_order} onChange={(e) => setForm((p) => ({ ...p, priority_order: e.target.value }))} placeholder="Display order" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-          <input value={form.tags} onChange={(e) => setForm((p) => ({ ...p, tags: e.target.value }))} placeholder="Tags (comma separated)" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
         </div>
 
         <textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} placeholder="Short Description (cards)" rows={2} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-        <textarea value={form.full_description} onChange={(e) => setForm((p) => ({ ...p, full_description: e.target.value }))} placeholder="Full Description (affiliate page)" rows={3} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
         <textarea value={form.why_we_recommend} onChange={(e) => setForm((p) => ({ ...p, why_we_recommend: e.target.value }))} placeholder="Why We Recommend This" rows={2} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-        <textarea value={form.best_for} onChange={(e) => setForm((p) => ({ ...p, best_for: e.target.value }))} placeholder="Best For" rows={2} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
 
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          <textarea value={form.pros_text} onChange={(e) => setForm((p) => ({ ...p, pros_text: e.target.value }))} placeholder="Pros (one per line or comma separated)" rows={4} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-          <textarea value={form.cons_text} onChange={(e) => setForm((p) => ({ ...p, cons_text: e.target.value }))} placeholder="Cons (one per line or comma separated)" rows={4} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-        </div>
-
-        <textarea value={form.security_benefits} onChange={(e) => setForm((p) => ({ ...p, security_benefits: e.target.value }))} placeholder="Security Benefits" rows={2} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-        <textarea value={form.things_to_consider} onChange={(e) => setForm((p) => ({ ...p, things_to_consider: e.target.value }))} placeholder="Things To Consider" rows={2} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          <input value={form.seo_title} onChange={(e) => setForm((p) => ({ ...p, seo_title: e.target.value }))} placeholder="SEO Title" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-          <input value={form.meta_description} onChange={(e) => setForm((p) => ({ ...p, meta_description: e.target.value }))} placeholder="Meta Description" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-        </div>
-
-        <textarea value={form.disclosure_text} onChange={(e) => setForm((p) => ({ ...p, disclosure_text: e.target.value }))} placeholder="Affiliate Disclosure" rows={2} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-        <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Notes" rows={2} className="w-full rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 text-xs text-gray-200">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 text-xs text-gray-200">
           <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={form.is_featured} onChange={(e) => setForm((p) => ({ ...p, is_featured: e.target.checked }))} className="h-3.5 w-3.5" />Featured</label>
           <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm((p) => ({ ...p, is_active: e.target.checked }))} className="h-3.5 w-3.5" />Active</label>
-          <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={form.show_on_recommended_tools} onChange={(e) => setForm((p) => ({ ...p, show_on_recommended_tools: e.target.checked }))} className="h-3.5 w-3.5" />Show on Recommended Tools</label>
-          <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={form.show_on_homepage} onChange={(e) => setForm((p) => ({ ...p, show_on_homepage: e.target.checked }))} className="h-3.5 w-3.5" />Show on Homepage</label>
-          <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={form.show_on_learn_articles} onChange={(e) => setForm((p) => ({ ...p, show_on_learn_articles: e.target.checked }))} className="h-3.5 w-3.5" />Show on Learn Articles</label>
-          <label className="inline-flex items-center gap-1.5"><input type="checkbox" checked={form.show_on_scam_alerts} onChange={(e) => setForm((p) => ({ ...p, show_on_scam_alerts: e.target.checked }))} className="h-3.5 w-3.5" />Show on Scam Alerts</label>
+          <p className="text-[11px] text-gray-400">Display order controls list priority.</p>
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -587,21 +561,58 @@ export function AffiliateHubSection({
           </select>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="space-y-2 md:hidden">
+          {filteredRows.map((row) => {
+            const stats = clickStatsById.get(row.id) || { total: 0, today: 0, d7: 0, d30: 0, lastClick: null };
+            return (
+              <article key={`affiliate-mobile-${row.id}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{row.name}</p>
+                    <p className="mt-1 text-[11px] text-gray-400">{row.category || 'Uncategorized'}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 text-[10px]">
+                    <span className={`rounded-full px-2 py-0.5 ${row.is_active ? 'bg-emerald-500/15 text-emerald-200' : 'bg-rose-500/15 text-rose-200'}`}>{row.is_active ? 'Active' : 'Inactive'}</span>
+                    <span className={`rounded-full px-2 py-0.5 ${row.is_featured ? 'bg-amber-500/15 text-amber-200' : 'bg-white/10 text-gray-300'}`}>{row.is_featured ? 'Featured' : 'Standard'}</span>
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] text-gray-300">
+                  <div>Total: {stats.total}</div>
+                  <div>7d: {stats.d7}</div>
+                  <div>30d: {stats.d30}</div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <button onClick={() => void copyInternalUrl(row.slug)} className="rounded-md border border-white/15 bg-white/[0.03] px-2 py-1 text-[11px] text-gray-200">Copy URL</button>
+                  <button onClick={() => startEdit(row)} className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-100">Edit</button>
+                  <button onClick={() => void toggleActive(row)} className={`rounded-md border px-2 py-1 text-[11px] ${row.is_active ? 'border-amber-400/30 bg-amber-500/10 text-amber-100' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'}`}>
+                    {row.is_active ? 'Disable' : 'Enable'}
+                  </button>
+                  <button onClick={() => void toggleFeatured(row)} className={`rounded-md border px-2 py-1 text-[11px] ${row.is_featured ? 'border-amber-400/30 bg-amber-500/10 text-amber-100' : 'border-white/15 bg-white/[0.03] text-gray-200'}`}>
+                    {row.is_featured ? 'Unfeature' : 'Feature'}
+                  </button>
+                  <button onClick={() => setConfirmDeleteId(row.id)} className="inline-flex items-center gap-1 rounded-md border border-rose-500/25 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-100">
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+          {filteredRows.length === 0 ? <p className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-4 text-center text-xs text-gray-400">No affiliate records match the current filters.</p> : null}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="min-w-full text-xs text-left text-gray-200">
             <thead className="text-[11px] uppercase tracking-wide text-gray-400">
               <tr>
                 <th className="px-2 py-2">Partner</th>
                 <th className="px-2 py-2">Category</th>
-                <th className="px-2 py-2">Status</th>
-                <th className="px-2 py-2">Slug</th>
+                <th className="px-2 py-2">Active</th>
+                <th className="px-2 py-2">Featured</th>
                 <th className="px-2 py-2">Internal URL</th>
                 <th className="px-2 py-2">Total</th>
-                <th className="px-2 py-2">Today</th>
                 <th className="px-2 py-2">7d</th>
                 <th className="px-2 py-2">30d</th>
-                <th className="px-2 py-2">Last click</th>
-                <th className="px-2 py-2">Featured</th>
                 <th className="px-2 py-2">Actions</th>
               </tr>
             </thead>
@@ -625,7 +636,9 @@ export function AffiliateHubSection({
                     <td className="px-2 py-2">
                       <span className={`rounded-full px-2 py-0.5 ${row.is_active ? 'bg-emerald-500/15 text-emerald-200' : 'bg-rose-500/15 text-rose-200'}`}>{row.is_active ? 'Active' : 'Inactive'}</span>
                     </td>
-                    <td className="px-2 py-2 font-mono">{row.slug}</td>
+                    <td className="px-2 py-2">
+                      <span className={`rounded-full px-2 py-0.5 ${row.is_featured ? 'bg-amber-500/15 text-amber-200' : 'bg-white/10 text-gray-300'}`}>{row.is_featured ? 'Featured' : 'No'}</span>
+                    </td>
                     <td className="px-2 py-2">
                       <button onClick={() => void copyInternalUrl(row.slug)} className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-white/[0.03] px-2 py-1 text-[11px] text-gray-200 hover:bg-white/[0.08]" title={internalUrl}>
                         <Copy className="h-3.5 w-3.5" />
@@ -633,21 +646,17 @@ export function AffiliateHubSection({
                       </button>
                     </td>
                     <td className="px-2 py-2">{stats.total}</td>
-                    <td className="px-2 py-2">{stats.today}</td>
                     <td className="px-2 py-2">{stats.d7}</td>
                     <td className="px-2 py-2">{stats.d30}</td>
-                    <td className="px-2 py-2">{formatWhen(stats.lastClick)}</td>
-                    <td className="px-2 py-2">
-                      <button onClick={() => void toggleFeatured(row)} className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] ${row.is_featured ? 'border-amber-400/30 bg-amber-500/10 text-amber-100' : 'border-white/15 bg-white/[0.03] text-gray-200'}`}>
-                        <Star className="h-3.5 w-3.5" />
-                        {row.is_featured ? 'Yes' : 'No'}
-                      </button>
-                    </td>
                     <td className="px-2 py-2">
                       <div className="flex flex-wrap gap-1">
                         <button onClick={() => startEdit(row)} className="rounded-md border border-sky-400/30 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-100">Edit</button>
                         <button onClick={() => void toggleActive(row)} className={`rounded-md border px-2 py-1 text-[11px] ${row.is_active ? 'border-amber-400/30 bg-amber-500/10 text-amber-100' : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'}`}>
                           {row.is_active ? 'Disable' : 'Enable'}
+                        </button>
+                        <button onClick={() => void toggleFeatured(row)} className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] ${row.is_featured ? 'border-amber-400/30 bg-amber-500/10 text-amber-100' : 'border-white/15 bg-white/[0.03] text-gray-200'}`}>
+                          <Star className="h-3.5 w-3.5" />
+                          {row.is_featured ? 'Unfeature' : 'Feature'}
                         </button>
                         <button onClick={() => setConfirmDeleteId(row.id)} className="inline-flex items-center gap-1 rounded-md border border-rose-500/25 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-100">
                           <Trash2 className="h-3.5 w-3.5" />
@@ -660,7 +669,7 @@ export function AffiliateHubSection({
               })}
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-2 py-4 text-center text-xs text-gray-400">No affiliate records match the current filters.</td>
+                  <td colSpan={9} className="px-2 py-4 text-center text-xs text-gray-400">No affiliate records match the current filters.</td>
                 </tr>
               ) : null}
             </tbody>

@@ -2561,8 +2561,11 @@ export default function AdminPage() {
   const [bannerForm, setBannerForm] = useState<BannerFormData>(BLANK_BANNER_FORM);
   const [previewBannerId, setPreviewBannerId] = useState<string | null>(null);
   const [savingBanner, setSavingBanner] = useState(false);
+  const [bannerLoading, setBannerLoading] = useState(false);
+  const [bannerError, setBannerError] = useState<string | null>(null);
+  const [bannerStatusFilter, setBannerStatusFilter] = useState<'all' | BannerStatus>('all');
 
-  const [adminView, setAdminView] = useState<AdminView>('affiliate-hub');
+  const [adminView, setAdminView] = useState<AdminView>('overview');
   const [contentView, setContentView] = useState<ContentView>('airdrops');
   const [controlArticles, setControlArticles] = useState<ControlArticle[]>([
     {
@@ -2653,6 +2656,11 @@ export default function AdminPage() {
     () => banners.filter((b) => b.status === 'draft' || b.status === 'scheduled').length,
     [banners]
   );
+  const visibleBanners = useMemo(() => {
+    if (bannerStatusFilter === 'all') return banners;
+    return banners.filter((banner) => getBannerStatus(banner.status, banner.startDate, banner.endDate) === bannerStatusFilter);
+  }, [banners, bannerStatusFilter]);
+
   const pendingScamReports = useMemo(
     () => scamReports.filter((r) => r.status === 'pending').length,
     [scamReports]
@@ -3047,16 +3055,15 @@ export default function AdminPage() {
   const adminNavItems: Array<{ id: AdminView; label: string; blurb: string }> = useMemo(() => [
     { id: 'overview', label: 'Overview', blurb: 'KPI cards, activity and quick actions' },
     { id: 'airdrops', label: 'Airdrops', blurb: 'Listings, publish queue, health and lifecycle' },
-    { id: 'speculative-tokens', label: 'Scam Alerts', blurb: 'High-risk/speculative token monitoring and controls' },
-    { id: 'submissions', label: 'Submissions', blurb: 'Project submissions and scam report triage' },
-    { id: 'competitor-watch', label: 'Analytics', blurb: 'Discovery analytics, monitoring and competitor signals' },
-    { id: 'articles', label: 'Articles & SEO', blurb: 'Unified content editor, SEO and publishing workflow' },
-    { id: 'social-admin', label: 'Settings', blurb: 'Operational settings and social publishing controls' },
-    { id: 'affiliate-hub', label: 'Affiliate Hub', blurb: 'Partner links, placements, opportunities and click analytics' },
-    { id: 'advertise-admin', label: 'API & Subscriptions', blurb: 'Paid visibility, API products and subscriber operations' },
-    { id: 'users', label: 'Users', blurb: 'Users and adoption overview' },
-    { id: 'audit-logs', label: 'Audit Log', blurb: 'Human decision trail and admin actions' },
-    { id: 'system-tools', label: 'System Tools', blurb: 'AI queue and maintenance operations' },
+    { id: 'submissions', label: 'Submissions', blurb: 'Project submissions and review queue' },
+    { id: 'speculative-tokens', label: 'Scam Alerts', blurb: 'High-risk token monitoring and controls' },
+    { id: 'users', label: 'Users', blurb: 'User adoption, plans and recent activity' },
+    { id: 'advertise-admin', label: 'Banners', blurb: 'Placement inventory and campaign lifecycle' },
+    { id: 'affiliate-hub', label: 'Affiliate Hub', blurb: 'Partners, links and click analytics' },
+    { id: 'competitor-watch', label: 'Analytics', blurb: 'Discovery monitoring and source insights' },
+    { id: 'articles', label: 'Articles / SEO', blurb: 'Content workflow and SEO controls' },
+    { id: 'social-admin', label: 'Settings', blurb: 'Operational and social publishing settings' },
+    { id: 'audit-logs', label: 'Audit Log', blurb: 'Human decisions and admin action trail' },
   ], []);
 
   const activeAdminNavItem = useMemo(
@@ -3145,6 +3152,8 @@ export default function AdminPage() {
   };
 
   const fetchBanners = useCallback(async () => {
+    setBannerLoading(true);
+    setBannerError(null);
     try {
       const { data, error } = await supabase
         .from('banner_ads')
@@ -3161,7 +3170,11 @@ export default function AdminPage() {
     } catch (error) {
       const details = describeError(error);
       console.error('[Banner][Admin] failed fetch', details);
+      setBannerError(details);
+      setBanners([]);
       showToast(`Banner fetch failed: ${details}`, 'error');
+    } finally {
+      setBannerLoading(false);
     }
   }, [describeError, showToast]);
 
@@ -9123,8 +9136,48 @@ export default function AdminPage() {
           </div>
         </div>
 
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {([
+            { key: 'all', label: 'All', count: banners.length },
+            { key: 'draft', label: 'Draft', count: banners.filter((banner) => getBannerStatus(banner.status, banner.startDate, banner.endDate) === 'draft').length },
+            { key: 'live', label: 'Live', count: banners.filter((banner) => getBannerStatus(banner.status, banner.startDate, banner.endDate) === 'live').length },
+            { key: 'expired', label: 'Expired', count: banners.filter((banner) => getBannerStatus(banner.status, banner.startDate, banner.endDate) === 'expired').length },
+          ] as const).map((tab) => {
+            const active = bannerStatusFilter === tab.key;
+            return (
+              <button
+                key={`banner-filter-${tab.key}`}
+                onClick={() => setBannerStatusFilter(tab.key)}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${active ? 'border-cyan-400/40 bg-cyan-500/15 text-cyan-100' : 'border-white/15 bg-white/[0.03] text-gray-300 hover:bg-white/[0.06]'}`}
+              >
+                <span>{tab.label}</span>
+                <span className="rounded-full border border-white/20 px-1.5 py-0.5 text-[10px]">{tab.count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {bannerError && (
+          <div className="mb-3 rounded-2xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-xs text-rose-100">
+            Banner records failed to load: {bannerError}
+          </div>
+        )}
+
+        {bannerLoading && (
+          <div className="mb-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-sm text-gray-300">
+            Loading banner inventory...
+          </div>
+        )}
+
+        {!bannerLoading && !bannerError && visibleBanners.length === 0 && (
+          <div className="mb-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-sm text-gray-300">
+            No banners match the selected status.
+          </div>
+        )}
+
+        {!bannerLoading && visibleBanners.length > 0 && (
         <div className="space-y-3 md:hidden">
-          {banners.map((banner) => {
+          {visibleBanners.map((banner) => {
             const effectiveStatus = getBannerStatus(banner.status, banner.startDate, banner.endDate);
             const displayStatus = getBannerDisplayStatus(banner.status, banner.startDate, banner.endDate);
             return (
@@ -9155,7 +9208,9 @@ export default function AdminPage() {
             );
           })}
         </div>
+        )}
 
+        {!bannerLoading && visibleBanners.length > 0 && (
         <div className="glass-card overflow-x-auto hidden md:block">
           <table className="w-full text-sm min-w-[1080px]">
             <thead>
@@ -9173,7 +9228,7 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {banners.map((banner) => {
+              {visibleBanners.map((banner) => {
                 const effectiveStatus = getBannerStatus(banner.status, banner.startDate, banner.endDate);
                 const displayStatus = getBannerDisplayStatus(banner.status, banner.startDate, banner.endDate);
                 return (
@@ -9271,6 +9326,7 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
+        )}
 
         {previewBannerId && (() => {
           const banner = banners.find((row) => row.id === previewBannerId);
