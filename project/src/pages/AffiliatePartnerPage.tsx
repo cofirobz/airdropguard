@@ -46,6 +46,15 @@ function renderList(items: string[] | null) {
   );
 }
 
+function websiteHostLabel(url: string | null): string {
+  if (!url) return 'Not provided yet';
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '');
+  } catch {
+    return url;
+  }
+}
+
 export default function AffiliatePartnerPage() {
   const { slug } = useParams();
   const [partner, setPartner] = useState<AffiliatePartner | null>(null);
@@ -88,10 +97,25 @@ export default function AffiliatePartnerPage() {
   const title = partner?.seo_title || (partner ? `${partner.name} Review | AirdropGuard Recommended Tool` : 'Recommended Tool | AirdropGuard');
   const description = partner?.meta_description || partner?.description || 'AirdropGuard manual review of a recommended security partner.';
   const canonical = canonicalFromPath(`/tools/${encodeURIComponent(slug || '')}`);
+  const seoSchema = partner
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: partner.name,
+        description,
+        url: canonical,
+        category: partner.category || 'Security Tool',
+        image: partner.logo_url || partner.banner_image_url || undefined,
+        brand: {
+          '@type': 'Brand',
+          name: partner.name,
+        },
+      }
+    : undefined;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-      <SEO title={title} description={description} canonical={canonical} />
+      <SEO title={title} description={description} canonical={canonical} schema={seoSchema} />
 
       <div className="mb-4">
         <Link to="/recommended-tools" className="text-xs text-cyan-200 hover:text-cyan-100">Back to recommended tools</Link>
@@ -175,6 +199,28 @@ export default function AffiliatePartnerPage() {
               <h3 className="text-sm font-semibold text-rose-100">Cons</h3>
               {renderList(partner.cons) || <p className="mt-2 text-sm text-rose-50/90">No considerations listed yet.</p>}
             </article>
+          </section>
+
+          <section className="mt-5 rounded-[26px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-300">Safety Snapshot</h3>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Review Type</p>
+                <p className="mt-1 text-sm text-slate-100">Manual Curation</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Tracking Route</p>
+                <p className="mt-1 text-sm text-slate-100">AirdropGuard /go Redirect</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Primary Category</p>
+                <p className="mt-1 text-sm text-slate-100">{partner.category || 'Security Tool'}</p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Official Domain</p>
+                <p className="mt-1 text-sm text-slate-100">{websiteHostLabel(partner.official_website)}</p>
+              </div>
+            </div>
           </section>
 
           <section className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
