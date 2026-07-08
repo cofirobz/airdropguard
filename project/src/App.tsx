@@ -23,6 +23,7 @@ const TermsPage = lazy(() => import('./pages/TermsPage'));
 const WalletCheckerPage = lazy(() => import('./pages/WalletCheckerPage'));
 const GoRedirectPage = lazy(() => import('./pages/GoRedirectPage'));
 const RecommendedToolsPage = lazy(() => import('./pages/RecommendedToolsPage'));
+const AffiliatePartnerPage = lazy(() => import('./pages/AffiliatePartnerPage'));
 const ArticlesPage = lazy(() => import('./pages/ArticlesPage'));
 const Layer2page = lazy(() => import('./pages/Layer2page'));
 const VerifyCryptoAirdropsSafely2026Page = lazy(() => import('./pages/VerifyCryptoAirdropsSafely2026Page'));
@@ -76,6 +77,7 @@ function App() {
                 <Route path="api-pricing" element={<Navigate to="/pricing" replace />} />
                 <Route path="pricing" element={<PricingPage />} />
                 <Route path="recommended-tools" element={<RecommendedToolsPage />} />
+                <Route path="recommended-tools/:slug" element={<AffiliatePartnerPage />} />
                 <Route path="scam-alerts" element={<ScamAlertsPage />} />
                 <Route path="submit" element={<SubmitAirdropPage />} />
                 <Route path="terms" element={<TermsPage />} />

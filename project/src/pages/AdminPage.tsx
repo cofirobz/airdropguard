@@ -2346,6 +2346,7 @@ export default function AdminPage() {
   const [analyzingSub, setAnalyzingSub] = useState<string | null>(null);
   const [discordOpsLoading, setDiscordOpsLoading] = useState(false);
   const [discordOpsBusy, setDiscordOpsBusy] = useState(false);
+  const [discordOpsError, setDiscordOpsError] = useState<string | null>(null);
   const [discordSocialUpdates, setDiscordSocialUpdates] = useState<DiscordSocialUpdate[]>([]);
   const [discordSettings, setDiscordSettings] = useState<DiscordSocialSettings | null>(null);
   const [discordEditBody, setDiscordEditBody] = useState<Record<string, string>>({});
@@ -5984,6 +5985,7 @@ export default function AdminPage() {
 
   const fetchDiscordSocialOps = useCallback(async () => {
     setDiscordOpsLoading(true);
+    setDiscordOpsError(null);
     try {
       const { data, error } = await supabase.functions.invoke('discord-social-ops', {
         body: { action: 'get_state' },
@@ -6009,13 +6011,18 @@ export default function AdminPage() {
         return next;
       });
     } catch (error) {
-      showToast(`Unable to load Discord Social Ops: ${describeError(error)}`, 'error');
+      const detailed = await describeFunctionInvokeErrorDetailed(error);
+      console.error('[Admin][DiscordSocialOps] Failed to load get_state', {
+        details: detailed,
+        error,
+      });
+      setDiscordOpsError(detailed);
       setDiscordSocialUpdates([]);
       setDiscordSettings(null);
     } finally {
       setDiscordOpsLoading(false);
     }
-  }, [describeError, showToast]);
+  }, [describeFunctionInvokeErrorDetailed]);
 
   const generateDiscordUpdates = useCallback(async () => {
     setDiscordOpsBusy(true);
@@ -6280,20 +6287,28 @@ export default function AdminPage() {
     }
   }, [describeError, showToast]);
 
+  const runSectionLoad = useCallback((section: string, task: () => Promise<unknown> | unknown) => {
+    void Promise.resolve()
+      .then(task)
+      .catch((error) => {
+        console.error(`[Admin][Load][${section}] Failed`, describeError(error));
+      });
+  }, [describeError]);
+
   useEffect(() => {
     if (!authLoading && isAdmin) {
-      fetchAirdrops();
-      fetchStats();
-      fetchSubmissions();
-      fetchScamReports();
-      fetchAuditLogs();
-      fetchArticleTrustData();
-      fetchAIDrafts();
-      fetchCompetitorWatchData();
-      fetchAdminNotifications();
-      fetchDiscordSocialOps();
+      runSectionLoad('airdrops', fetchAirdrops);
+      runSectionLoad('stats', fetchStats);
+      runSectionLoad('submissions', fetchSubmissions);
+      runSectionLoad('scamReports', fetchScamReports);
+      runSectionLoad('auditLogs', fetchAuditLogs);
+      runSectionLoad('articleTrust', fetchArticleTrustData);
+      runSectionLoad('aiDrafts', fetchAIDrafts);
+      runSectionLoad('competitorWatch', fetchCompetitorWatchData);
+      runSectionLoad('notifications', fetchAdminNotifications);
+      runSectionLoad('discordSocialOps', fetchDiscordSocialOps);
     }
-  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications, fetchDiscordSocialOps]);
+  }, [authLoading, isAdmin, fetchAirdrops, fetchStats, fetchSubmissions, fetchScamReports, fetchAuditLogs, fetchArticleTrustData, fetchAIDrafts, fetchCompetitorWatchData, fetchAdminNotifications, fetchDiscordSocialOps, runSectionLoad]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -6931,7 +6946,18 @@ export default function AdminPage() {
               : <Brain className="w-4 h-4" />}
             {refreshingAll ? 'Analyzing…' : 'Refresh All AI'}
           </button>
-          <button onClick={() => { setExpandedAdminPanels({}); fetchAirdrops(); fetchStats(); fetchSubmissions(); fetchScamReports(); fetchAuditLogs(); fetchAIDrafts(); fetchCompetitorWatchData(); fetchAdminNotifications(); fetchDiscordSocialOps(); }}
+          <button onClick={() => {
+            setExpandedAdminPanels({});
+            runSectionLoad('airdrops', fetchAirdrops);
+            runSectionLoad('stats', fetchStats);
+            runSectionLoad('submissions', fetchSubmissions);
+            runSectionLoad('scamReports', fetchScamReports);
+            runSectionLoad('auditLogs', fetchAuditLogs);
+            runSectionLoad('aiDrafts', fetchAIDrafts);
+            runSectionLoad('competitorWatch', fetchCompetitorWatchData);
+            runSectionLoad('notifications', fetchAdminNotifications);
+            runSectionLoad('discordSocialOps', fetchDiscordSocialOps);
+          }}
             aria-label="Refresh admin data"
             className="min-h-[44px] px-3 py-2 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
@@ -7218,6 +7244,18 @@ export default function AdminPage() {
           <h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-200">Social Admin · Discord Ops</h3>
           <p className="text-[11px] text-gray-400 mt-1">Generate two weekly Discord updates, review, approve, schedule, and send to announcements safely.</p>
         </div>
+
+        {discordOpsLoading ? (
+          <div className="rounded-xl border border-white/10 bg-dark-900/35 p-3 text-xs text-gray-400">
+            Loading Discord Social Ops...
+          </div>
+        ) : null}
+
+        {discordOpsError ? (
+          <div className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs text-rose-100">
+            Unable to load Discord Social Ops. {discordOpsError}
+          </div>
+        ) : null}
 
         {discordSettings ? (
           <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] p-3 space-y-3">

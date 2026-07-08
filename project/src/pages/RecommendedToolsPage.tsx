@@ -11,8 +11,10 @@ interface RecommendedTool {
   slug: string;
   category: string | null;
   description: string | null;
+  why_we_recommend: string | null;
   disclosure_text: string | null;
   logo_url: string | null;
+  button_text: string | null;
   is_featured: boolean;
   priority_order: number;
 }
@@ -30,7 +32,7 @@ export default function RecommendedToolsPage() {
       try {
         const { data, error } = await supabase
           .from('affiliate_links_public')
-          .select('id, name, slug, category, description, disclosure_text, logo_url, is_featured, priority_order')
+          .select('id, name, slug, category, description, why_we_recommend, disclosure_text, logo_url, button_text, is_featured, priority_order')
           .order('is_featured', { ascending: false })
           .order('priority_order', { ascending: true });
 
@@ -85,15 +87,26 @@ export default function RecommendedToolsPage() {
                 </div>
                 {tool.is_featured ? <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-100">Featured</span> : null}
               </div>
-              <h2 className="mt-1 text-lg font-semibold text-white">{tool.name}</h2>
+              <h2 className="mt-1 text-lg font-semibold text-white">
+                <Link to={`/recommended-tools/${encodeURIComponent(tool.slug)}`} className="hover:text-cyan-200">
+                  {tool.name}
+                </Link>
+              </h2>
               <p className="mt-2 min-h-[44px] text-sm text-gray-300">{tool.description || 'Security-focused tool recommended by AirdropGuard.'}</p>
+              <p className="mt-2 text-xs text-cyan-100/90">{tool.why_we_recommend || 'Reviewed manually by AirdropGuard for security relevance.'}</p>
+              <p className="mt-2 text-[11px] leading-relaxed text-gray-400">{tool.disclosure_text || DISCLOSURE}</p>
               <div className="mt-4 flex items-center justify-between gap-2">
-                <span className="text-[11px] text-gray-500">Internal link: {buildAffiliateGoUrl(tool.slug, 'recommended-tools')}</span>
+                <Link
+                  to={`/recommended-tools/${encodeURIComponent(tool.slug)}`}
+                  className="rounded-lg border border-white/15 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-white/[0.1]"
+                >
+                  View Details
+                </Link>
                 <Link
                   to={buildAffiliateGoUrl(tool.slug, 'recommended-tools')}
                   className="rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20"
                 >
-                  Visit Partner
+                  {tool.button_text || 'Visit Partner'}
                 </Link>
               </div>
             </article>
