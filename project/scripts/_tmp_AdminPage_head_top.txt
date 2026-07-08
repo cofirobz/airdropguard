@@ -1,0 +1,420 @@
+import { Fragment, useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  Loader2, Brain, CheckCircle2,
+  Eye, EyeOff,
+  RefreshCw,
+  Inbox, CheckCheck, XCircle, ChevronDown, ChevronUp, ExternalLink,
+  FileText, Plus, X, Pencil, Trash2, AlertTriangle, LogOut, ShieldCheck, Gift,
+  ImagePlus, Monitor, CalendarClock, BadgeCheck, Bell, Newspaper, Radar, Sparkles, Menu, Search,
+} from 'lucide-react';
+import type { Airdrop, Blockchain, Category, OpportunityTypeKey, PastDistributionStatusKey } from '../lib/types';
+import { BLOCKCHAIN_OPTIONS, CATEGORY_OPTIONS } from '../lib/types';
+import { getOpportunityType, getOpportunityTypeTone } from '../lib/utils';
+import {
+  DEFAULT_ARTICLE_CHECKLIST,
+  DEFAULT_ARTICLE_TRUST_PROFILES,
+  type ArticleReviewChecklist,
+  type ArticleTrustProfile,
+  type VerificationStatus,
+  verificationStatusLabel,
+  verificationStatusTone,
+} from '../lib/articleTrust';
+import SEO from '../components/SEO';
+import { canonicalFromPath } from '../lib/seo';
+import { AffiliateHubSection } from '../components/admin/AffiliateHubSectionPremium.tsx';
+
+// ิ๖วิ๖วิ๖ว Toast ิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖ว
+
+interface Toast { msg: string; type: 'success' | 'error' }
+
+function ToastBar({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 3500);
+    return () => clearTimeout(t);
+  }, [toast, onDismiss]);
+  return (
+    <div className={`fixed bottom-4 left-1/2 z-[60] flex w-[calc(100vw-1.5rem)] max-w-md -translate-x-1/2 items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
+      toast.type === 'success'
+        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+        : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+    }`}>
+      {toast.type === 'success'
+        ? <CheckCircle2 className="w-4 h-4 shrink-0" />
+        : <AlertTriangle className="w-4 h-4 shrink-0" />}
+      <span className="ag-text-safe min-w-0">{toast.msg}</span>
+      <button onClick={onDismiss} aria-label="Dismiss notification" className="ml-1 opacity-60 hover:opacity-100 transition-opacity">
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function VerificationNotesModal({
+  open,
+  actionLabel,
+  notes,
+  onNotesChange,
+  onCancel,
+  onConfirm,
+  saving,
+}: {
+  open: boolean;
+  actionLabel: string;
+  notes: string;
+  onNotesChange: (value: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+  saving: boolean;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm px-4 py-8 overflow-y-auto" role="dialog" aria-modal="true" aria-label="Verification audit notes">
+      <div className="max-w-lg mx-auto rounded-2xl border border-white/10 bg-dark-900/95 shadow-2xl p-5 sm:p-6">
+        <p className="text-[11px] uppercase tracking-[0.14em] text-sky-200">Human Verification Required</p>
+        <h3 className="mt-2 text-lg font-bold text-white">Save Verification</h3>
+        <p className="mt-2 text-xs text-gray-400 leading-relaxed">{actionLabel}</p>
+
+        <label className="mt-4 block space-y-1.5">
+          <span className="text-[11px] text-gray-300">Audit Notes <span className="text-rose-300">(required)</span></span>
+          <textarea
+            value={notes}
+            onChange={(event) => onNotesChange(event.target.value)}
+            rows={4}
+            placeholder="Explain why this verification decision was approved."
+            className="w-full bg-dark-800/70 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-sky-400/40 resize-none"
+          />
+        </label>
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            onClick={onCancel}
+            disabled={saving}
+            className="px-4 py-2 rounded-xl border border-white/15 text-sm text-gray-300 hover:text-white hover:border-white/30 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={saving || !notes.trim()}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-sky-400/30 bg-sky-500/15 text-sm font-medium text-sky-100 hover:bg-sky-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Save Verification
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionCard({
+  title,
+  count,
+  status,
+  blurb,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  count: number;
+  status: string;
+  blurb: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <article className="glass-card p-4 border border-white/10 rounded-2xl">
+      <p className="text-lg font-bold text-white tabular-nums">{count}</p>
+      <p className="text-sm font-semibold text-gray-100 mt-1">{title}</p>
+      <p className="text-xs text-neon-blue mt-1">{status}</p>
+      <p className="text-xs text-gray-500 mt-2 min-h-[34px]">{blurb}</p>
+      <button
+        onClick={onAction}
+        className="mt-3 inline-flex items-center justify-center rounded-lg border border-white/15 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-gray-200 hover:bg-white/[0.08] transition-colors"
+      >
+        {actionLabel}
+      </button>
+    </article>
+  );
+}
+
+// ิ๖วิ๖วิ๖ว Types ิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖ว
+
+interface Stats {
+  totalAirdrops: number; publishedAirdrops: number;
+  scoredAirdrops: number; analyzedAirdrops: number;
+  totalTasks: number; newsletterSubs: number;
+  proSubs: number; businessSubs: number;
+  activeKeys: number; apiCallsToday: number; apiCallsTotal: number;
+  pendingSubmissions: number; approvedSubmissions: number; rejectedSubmissions: number;
+}
+
+interface Submission {
+  id: string; project_name: string;
+  website_url: string | null; twitter_url: string | null;
+  discord_url: string | null; telegram_url: string | null;
+  blockchain: string | null; category: string | null;
+  airdrop_type: string | null; description: string | null;
+  tasks_required: string | null; deadline: string | null;
+  reward_confirmed: string | null; token_confirmed: string | null;
+  eligibility_requirements: string | null; team_info: string | null;
+  funding_investors: string | null; whitepaper_url: string | null;
+  github_url: string | null; contract_address: string | null;
+  audit_url: string | null; requires_wallet_connection: boolean;
+  requires_transaction: boolean; requires_payment: boolean;
+  requires_seed_phrase: boolean; additional_notes: string | null;
+  status: string; admin_notes: string | null; submitted_at: string;
+  ai_recommendation: string | null; token_name: string | null;
+  token_symbol: string | null; token_address: string | null;
+  token_verification: string | null; scam_warnings: string[] | null;
+}
+
+interface ScamReport {
+  id: string;
+  user_id: string | null;
+  reporter_email: string | null;
+  project_name: string;
+  website_url: string | null;
+  project_url: string | null;
+  wallet_address: string | null;
+  contract_address: string | null;
+  reason: string | null;
+  description: string | null;
+  evidence_url: string | null;
+  status: 'pending' | 'approved' | 'rejected' | string;
+  admin_notes: string | null;
+  rep_awarded: boolean | null;
+  created_at: string;
+  reviewed_at: string | null;
+}
+
+type AirdropClassificationAuditRow = {
+  id: string;
+  slug: string;
+  name: string;
+  currentOpportunityType: OpportunityTypeKey;
+  currentPastDistributionStatus: PastDistributionStatusKey;
+  currentPointsName: string;
+  currentSeasonName: string;
+  currentRewardStatus: string;
+  currentClaimStatus: string;
+  suggestedOpportunityType: OpportunityTypeKey;
+  suggestedPastDistributionStatus: PastDistributionStatusKey;
+  suggestedPointsName: string;
+  suggestedSeasonName: string;
+  suggestedRewardStatus: string;
+  suggestedClaimStatus: string;
+  missingClassification: boolean;
+  conflictingFields: boolean;
+  missingContractForLiveToken: boolean;
+  pointsNameMissing: boolean;
+  riskReasonsMissing: boolean;
+  conflictMessages: string[];
+};
+
+// ิ๖วิ๖วิ๖ว Airdrop form data ิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖วิ๖ว
+
+type AirdropFormData = {
+  name: string; ticker: string; logo_url: string; ai_summary: string;
+  website_url: string; twitter_url: string; discord_url: string;
+  telegram_url: string; github_url: string; contract_address: string;
+  docs_url: string; funding_info: string; investors: string; team_info: string;
+  estimated_reward: string; expiry_date: string; time_required: string;
+  blockchain: Blockchain[]; category: Category[];
+  status: Airdrop['status']; risk_level: Airdrop['risk_level'];
+  reward_potential: Airdrop['reward_potential']; difficulty: Airdrop['difficulty'];
+  opportunity_type: OpportunityTypeKey;
+  past_distribution_status: PastDistributionStatusKey;
+  ai_suggested_opportunity_type: OpportunityTypeKey | '';
+  ai_suggested_past_distribution_status: PastDistributionStatusKey | '';
+  ai_classification_reason: string;
+  admin_classification_confirmed: boolean;
+  points_name: string; season_name: string; snapshot_date: string; claim_status: string; reward_status: string;
+  risk_reasons: string; official_safe_url: string; network_name: string; faucet_url: string;
+  ai_recommendation_override: '' | 'verify' | 'review_further' | 'blacklist';
+  human_override_score: string;
+  human_decision: string;
+  published: boolean; is_featured: boolean; is_trending: boolean; is_sponsored: boolean;
+  tasks_text: string;
+};
+
+const BLANK_FORM: AirdropFormData = {
+  name: '', ticker: '', logo_url: '', ai_summary: '',
+  website_url: '', twitter_url: '', discord_url: '', telegram_url: '',
+  github_url: '', contract_address: '',
+  docs_url: '', funding_info: '', investors: '', team_info: '',
+  estimated_reward: '', expiry_date: '', time_required: 'Varies',
+  blockchain: [], category: [],
+  status: 'Active', risk_level: 'Medium', reward_potential: 'Medium', difficulty: 'Moderate',
+  opportunity_type: 'potential_airdrop',
+  past_distribution_status: 'none',
+  ai_suggested_opportunity_type: '',
+  ai_suggested_past_distribution_status: '',
+  ai_classification_reason: '',
+  admin_classification_confirmed: false,
+  points_name: '', season_name: '', snapshot_date: '', claim_status: '', reward_status: '',
+  risk_reasons: '', official_safe_url: '', network_name: '', faucet_url: '',
+  ai_recommendation_override: '',
+  human_override_score: '',
+  human_decision: '',
+  published: false, is_featured: false, is_trending: false, is_sponsored: false,
+  tasks_text: '',
+};
+
+const OPPORTUNITY_TYPE_OPTIONS: Array<{ value: OpportunityTypeKey; label: string; tone: string }> = [
+  { value: 'confirmed_airdrop', label: 'Confirmed Airdrop', tone: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200' },
+  { value: 'potential_airdrop', label: 'Potential Airdrop', tone: 'border-amber-500/25 bg-amber-500/10 text-amber-100' },
+  { value: 'points_program', label: 'Points Program', tone: 'border-sky-500/25 bg-sky-500/10 text-sky-100' },
+  { value: 'rewards_program', label: 'Rewards Program', tone: 'border-violet-500/25 bg-violet-500/10 text-violet-100' },
+  { value: 'testnet', label: 'Testnet', tone: 'border-cyan-500/25 bg-cyan-500/10 text-cyan-100' },
+  { value: 'scam_alert', label: 'Scam Alert', tone: 'border-rose-500/25 bg-rose-500/10 text-rose-100' },
+];
+
+const PAST_DISTRIBUTION_STATUS_OPTIONS: Array<{ value: PastDistributionStatusKey; label: string; tone: string }> = [
+  { value: 'none', label: 'None', tone: 'border-white/10 bg-white/[0.03] text-gray-300' },
+  { value: 'confirmed_past_airdrop', label: 'Past Airdrop Confirmed', tone: 'border-cyan-500/25 bg-cyan-500/10 text-cyan-100' },
+  { value: 'claim_live', label: 'Claim Live', tone: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-100' },
+  { value: 'claim_ended', label: 'Claim Ended', tone: 'border-amber-500/25 bg-amber-500/10 text-amber-100' },
+  { value: 'distribution_complete', label: 'Distribution Complete', tone: 'border-violet-500/25 bg-violet-500/10 text-violet-100' },
+];
+
+function getOpportunityTypeLabel(value: OpportunityTypeKey): string {
+  return OPPORTUNITY_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? 'Potential Airdrop';
+}
+
+function getPastDistributionStatusLabel(value: PastDistributionStatusKey): string {
+  return PAST_DISTRIBUTION_STATUS_OPTIONS.find((option) => option.value === value)?.label ?? 'None';
+}
+
+function normalizeOpportunityTypeKey(value: unknown): OpportunityTypeKey {
+  if (typeof value !== 'string') return 'potential_airdrop';
+
+  switch (value.trim()) {
+    case 'confirmed_airdrop':
+    case 'Verified Airdrop':
+      return 'confirmed_airdrop';
+    case 'potential_airdrop':
+    case 'Potential Airdrop':
+      return 'potential_airdrop';
+    case 'points_program':
+    case 'Points Program':
+      return 'points_program';
+    case 'rewards_program':
+    case 'Rewards Program':
+      return 'rewards_program';
+    case 'testnet':
+    case 'Testnet':
+      return 'testnet';
+    case 'scam_alert':
+    case 'Scam Alert':
+      return 'scam_alert';
+    default:
+      return 'potential_airdrop';
+  }
+}
+
+function normalizePastDistributionStatusKey(value: unknown): PastDistributionStatusKey {
+  if (typeof value !== 'string') return 'none';
+
+  switch (value.trim()) {
+    case 'none':
+      return 'none';
+    case 'confirmed_past_airdrop':
+      return 'confirmed_past_airdrop';
+    case 'claim_live':
+      return 'claim_live';
+    case 'claim_ended':
+      return 'claim_ended';
+    case 'distribution_complete':
+      return 'distribution_complete';
+    default:
+      return 'none';
+  }
+}
+
+function getContractAddressGuidance(opportunityType: OpportunityTypeKey): string {
+  if (opportunityType === 'confirmed_airdrop') {
+    return 'Add the contract address when the token or claim is confirmed/live.';
+  }
+  if (opportunityType === 'scam_alert') {
+    return 'Add a contract address only if it helps explain the risk signal.';
+  }
+  return 'Optional for this type. Leave blank unless you have a verified on-chain address.';
+}
+
+function getOpportunityTypeHelperText(opportunityType: OpportunityTypeKey): string {
+  switch (opportunityType) {
+    case 'confirmed_airdrop':
+      return 'Use for officially confirmed token/claim/snapshot announcements. If token is live, include contract address.';
+    case 'potential_airdrop':
+      return 'Use for strong future airdrop signals when no token is launched yet. Display as Token not launched yet.';
+    case 'points_program':
+      return 'Use for points, XP, petals, credits, seasons, and campaign score systems.';
+    case 'rewards_program':
+      return 'Use for ongoing incentives after or beyond initial airdrop window.';
+    case 'testnet':
+      return 'Use for faucet/test-token based testnet participation and task completion campaigns.';
+    case 'scam_alert':
+      return 'Use for suspicious, phishing, fake, blacklisted, or dangerous listings. Risk reasons are required.';
+    default:
+      return 'Use Opportunity Type as the source of truth for listing classification.';
+  }
+}
+
+function getPastDistributionHelperText(value: PastDistributionStatusKey): string {
+  switch (value) {
+    case 'none':
+      return 'No known previous token distribution or claim cycle has been confirmed.';
+    case 'confirmed_past_airdrop':
+      return 'Project previously distributed tokens/rewards. Use this with the current opportunity users can take now.';
+    case 'claim_live':
+      return 'A previous distribution claim is currently live.';
+    case 'claim_ended':
+      return 'A previous distribution claim window ended.';
+    case 'distribution_complete':
+      return 'Distribution and claim cycle are complete.';
+    default:
+      return 'Track what happened before, separately from what users can do now.';
+  }
+}
+
+function hasLiveTokenSignal(form: Pick<AirdropFormData, 'claim_status' | 'status'>): boolean {
+  const signal = `${form.claim_status ?? ''} ${form.status ?? ''}`.toLowerCase();
+  return /(token\s+live|live\s+token|launched|mainnet|tge|claim\s*(is\s*)?(open|live|active)|claimable)/i.test(signal);
+}
+
+function looksSuspiciousUrl(value: string): boolean {
+  const raw = value.trim();
+  if (!raw) return false;
+
+  const lowered = raw.toLowerCase();
+  const suspiciousHostTerms = ['bit.ly', 'tinyurl', 't.ly', 'rb.gy', 'shorturl', 'cutt.ly'];
+  const suspiciousPathTerms = ['airdrop-claim', 'claim-now', 'wallet-verify', 'seed-verify', 'connect-wallet'];
+  return suspiciousHostTerms.some((term) => lowered.includes(term)) || suspiciousPathTerms.some((term) => lowered.includes(term));
+}
+
+function getClaimUrlCandidate(form: Pick<AirdropFormData, 'website_url' | 'docs_url' | 'official_safe_url' | 'faucet_url'>): string {
+  const candidates = [form.official_safe_url, form.website_url, form.docs_url, form.faucet_url]
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const claimLike = candidates.find((value) => /claim|airdrop|reward/i.test(value));
+  return claimLike ?? '';
+}
+
+type OpportunityConflict = {
+  tone: 'warning' | 'suggestion';
+  message: string;
+};
+
+type AIClassificationSuggestion = {
+  suggestedOpportunityType: OpportunityTypeKey;
+  suggestedPastDistributionStatus: PastDistributionStatusKey;
+  confidence: 'Low' | 'Medium' | 'High';
+  reason: string;
+};
+

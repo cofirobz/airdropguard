@@ -6738,7 +6738,7 @@ export default function AdminPage() {
     } finally {
       setBulkActionBusy(false);
     }
-  }, [selectedAirdropIds, airdrops, fetchAirdrops, fetchStats, runAnalysis, showToast]);
+  }, [selectedAirdropIds, airdrops, showToast]);
 
   const moderateAirdrop = useCallback(async (
     airdrop: Airdrop,
