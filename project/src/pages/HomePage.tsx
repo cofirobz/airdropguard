@@ -71,6 +71,86 @@ type LeadOpportunity = {
   detail: string;
 };
 
+type HomepageBannerStatus = 'Enquiry' | 'Awaiting Artwork' | 'Ready to Publish' | 'Live' | 'Expired';
+
+type HomepageBannerRecord = {
+  id: string;
+  advertiserName: string;
+  bannerImageUrl: string;
+  destinationUrl: string;
+  altText: string;
+  placement: string;
+  startDate: string;
+  endDate: string;
+  status: HomepageBannerStatus;
+  enabled: boolean;
+  archived: boolean;
+  updatedAt: string;
+};
+
+const BANNERS_STORAGE_KEY = 'ag.admin.banners.v1';
+const HOMEPAGE_HERO_PLACEMENT = 'Homepage Hero Banner';
+
+function parseDateMs(value: string): number {
+  if (!value) return Number.NaN;
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function normalizeBannerRows(value: unknown): HomepageBannerRecord[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((row) => {
+      const candidate = (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
+      const status = String(candidate.status ?? 'Enquiry') as HomepageBannerStatus;
+      const normalizedStatus: HomepageBannerStatus =
+        status === 'Awaiting Artwork' || status === 'Ready to Publish' || status === 'Live' || status === 'Expired'
+          ? status
+          : 'Enquiry';
+
+      return {
+        id: String(candidate.id ?? ''),
+        advertiserName: String(candidate.advertiserName ?? ''),
+        bannerImageUrl: String(candidate.bannerImageUrl ?? ''),
+        destinationUrl: String(candidate.destinationUrl ?? ''),
+        altText: String(candidate.altText ?? ''),
+        placement: String(candidate.placement ?? ''),
+        startDate: String(candidate.startDate ?? ''),
+        endDate: String(candidate.endDate ?? ''),
+        status: normalizedStatus,
+        enabled: Boolean(candidate.enabled),
+        archived: Boolean(candidate.archived),
+        updatedAt: String(candidate.updatedAt ?? ''),
+      };
+    })
+    .filter((row) => row.id.trim().length > 0 && row.destinationUrl.trim().length > 0);
+}
+
+function selectHomepageHeroBanner(rows: HomepageBannerRecord[]): HomepageBannerRecord | null {
+  const now = Date.now();
+
+  const eligible = rows.filter((row) => {
+    if (row.archived || !row.enabled || row.status !== 'Live') return false;
+    if (row.placement !== HOMEPAGE_HERO_PLACEMENT) return false;
+
+    const startMs = parseDateMs(row.startDate);
+    const endMs = parseDateMs(row.endDate);
+
+    if (Number.isFinite(startMs) && startMs > now) return false;
+    if (Number.isFinite(endMs) && endMs < now) return false;
+    return true;
+  });
+
+  if (eligible.length === 0) return null;
+
+  return [...eligible].sort((a, b) => {
+    const aMs = parseDateMs(a.updatedAt);
+    const bMs = parseDateMs(b.updatedAt);
+    return bMs - aMs;
+  })[0] ?? null;
+}
+
 function safeDisplayCount(value: number, suffix = ''): string {
   return value > 0 ? `${value.toLocaleString()}${suffix}` : 'Growing daily';
 }
@@ -1513,12 +1593,32 @@ export default function HomePage() {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_AIRDROPS);
   const [communityCount, setCommunityCount] = useState(0);
   const [walletCount, setWalletCount] = useState(0);
+  const [homepageHeroBanner, setHomepageHeroBanner] = useState<HomepageBannerRecord | null>(null);
 
   const tab = (searchParams.get('filter') as Tab) ?? 'all';
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_AIRDROPS);
   }, [tab, filters]);
+
+  useEffect(() => {
+    const loadBannerFromStorage = () => {
+      if (typeof window === 'undefined') return;
+
+      try {
+        const raw = window.localStorage.getItem(BANNERS_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const rows = normalizeBannerRows(parsed);
+        setHomepageHeroBanner(selectHomepageHeroBanner(rows));
+      } catch {
+        setHomepageHeroBanner(null);
+      }
+    };
+
+    loadBannerFromStorage();
+    window.addEventListener('storage', loadBannerFromStorage);
+    return () => window.removeEventListener('storage', loadBannerFromStorage);
+  }, []);
 
   useEffect(() => {
     const activeFilters = [filters.blockchain, filters.category, filters.reward, filters.risk, filters.difficulty]
@@ -1640,6 +1740,20 @@ export default function HomePage() {
   }, []);
 
   const hasMoreAirdrops = visibleCount < filtered.length;
+
+  const homepageHeroBannerHref = useMemo(() => {
+    if (!homepageHeroBanner) return null;
+
+    try {
+      const parsed = new URL(homepageHeroBanner.destinationUrl);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return parsed.toString();
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, [homepageHeroBanner]);
 
   const homepageSchema = {
     '@context': 'https://schema.org',
@@ -1858,6 +1972,44 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {homepageHeroBanner && homepageHeroBannerHref && (
+        <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+          <a
+            href={homepageHeroBannerHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group block overflow-hidden rounded-3xl border border-cyan-400/25 bg-[linear-gradient(135deg,rgba(34,211,238,0.12),rgba(59,130,246,0.08),rgba(3,7,18,0.94))] shadow-[0_20px_50px_rgba(2,12,27,0.35)]"
+            aria-label={`Open sponsor campaign for ${homepageHeroBanner.advertiserName}`}
+          >
+            <div className="grid gap-0 md:grid-cols-[1.2fr_0.8fr]">
+              <div className="p-4 sm:p-6">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Homepage hero banner</p>
+                <h2 className="mt-2 text-xl font-black text-white sm:text-2xl">{homepageHeroBanner.advertiserName}</h2>
+                <p className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-cyan-100">
+                  Visit sponsor site
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                </p>
+              </div>
+
+              <div className="relative min-h-[140px] border-t border-white/10 bg-white/[0.03] md:border-l md:border-t-0">
+                {homepageHeroBanner.bannerImageUrl ? (
+                  <img
+                    src={homepageHeroBanner.bannerImageUrl}
+                    alt={homepageHeroBanner.altText || `${homepageHeroBanner.advertiserName} banner`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm font-semibold text-cyan-100/85">
+                    {homepageHeroBanner.advertiserName}
+                  </div>
+                )}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#020711]/35 to-transparent" />
+              </div>
+            </div>
+          </a>
+        </section>
+      )}
 
       <WhySection />
       <LiveOpportunitiesSection airdrops={opportunityAirdrops} />

@@ -1408,6 +1408,64 @@ const BLANK_BANNER_FORM: BannerFormData = {
   archived: false,
 };
 
+const BANNERS_STORAGE_KEY = 'ag.admin.banners.v1';
+
+function coerceBannerPlacement(value: unknown): BannerPlacement {
+  return BANNER_PLACEMENT_OPTIONS.includes(value as BannerPlacement)
+    ? (value as BannerPlacement)
+    : 'Homepage Hero Banner';
+}
+
+function coerceBannerStatus(value: unknown): BannerStatus {
+  return BANNER_STATUS_OPTIONS.includes(value as BannerStatus)
+    ? (value as BannerStatus)
+    : 'Enquiry';
+}
+
+function coercePaymentState(value: unknown): BannerPaymentState {
+  if (value === 'Paid' || value === 'Pending' || value === 'Unpaid') return value;
+  return 'Unpaid';
+}
+
+function loadPersistedBanners(): BannerAd[] {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = window.localStorage.getItem(BANNERS_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map((row, index) => {
+      const candidate = (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
+      const fallbackId = `banner_${Date.now()}_${index}`;
+
+      return {
+        id: typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id : fallbackId,
+        advertiserName: String(candidate.advertiserName ?? ''),
+        contactEmail: String(candidate.contactEmail ?? ''),
+        websiteLink: String(candidate.websiteLink ?? ''),
+        bannerImageUrl: String(candidate.bannerImageUrl ?? ''),
+        destinationUrl: String(candidate.destinationUrl ?? ''),
+        altText: String(candidate.altText ?? ''),
+        placement: coerceBannerPlacement(candidate.placement),
+        startDate: String(candidate.startDate ?? ''),
+        endDate: String(candidate.endDate ?? ''),
+        status: coerceBannerStatus(candidate.status),
+        enabled: Boolean(candidate.enabled),
+        exclusivePlacement: candidate.exclusivePlacement === undefined ? true : Boolean(candidate.exclusivePlacement),
+        notes: String(candidate.notes ?? ''),
+        paymentState: coercePaymentState(candidate.paymentState),
+        archived: Boolean(candidate.archived),
+        updatedAt: String(candidate.updatedAt ?? new Date().toISOString()),
+      };
+    }).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  } catch {
+    return [];
+  }
+}
+
 function deriveBannerStatus(status: BannerStatus, _startDate: string, endDate: string): BannerStatus {
   if (status === 'Expired') return 'Expired';
   const now = new Date().getTime();
@@ -2421,35 +2479,17 @@ export default function AdminPage() {
   const [specSecurityFilter, setSpecSecurityFilter] = useState<'all' | 'high' | 'medium' | 'low' | 'missing'>('all');
   const [specMissingContractFilter, setSpecMissingContractFilter] = useState<'all' | 'missing' | 'present'>('all');
 
-  const [banners, setBanners] = useState<BannerAd[]>(() => {
-    const today = new Date();
-    const end = new Date(today.getTime() + 7 * 86_400_000);
-    return [
-      {
-        id: `banner_${today.getTime()}`,
-        advertiserName: 'Example Campaign',
-        contactEmail: 'ads@example.com',
-        websiteLink: 'https://example.com',
-        bannerImageUrl: '',
-        destinationUrl: 'https://example.com',
-        altText: 'Example campaign banner',
-        placement: 'Homepage Hero Banner',
-        startDate: today.toISOString().split('T')[0],
-        endDate: end.toISOString().split('T')[0],
-        status: 'Enquiry',
-        enabled: true,
-        exclusivePlacement: true,
-        notes: 'Starter banner to seed admin workflow.',
-        paymentState: 'Pending',
-        archived: false,
-        updatedAt: new Date().toISOString(),
-      },
-    ];
-  });
+  const [banners, setBanners] = useState<BannerAd[]>(() => loadPersistedBanners());
   const [bannerModalMode, setBannerModalMode] = useState<'add' | 'edit' | null>(null);
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [bannerForm, setBannerForm] = useState<BannerFormData>(BLANK_BANNER_FORM);
   const [previewBannerId, setPreviewBannerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(BANNERS_STORAGE_KEY, JSON.stringify(banners));
+  }, [banners]);
+
   const [adminView, setAdminView] = useState<AdminView>('affiliate-hub');
   const [contentView, setContentView] = useState<ContentView>('airdrops');
   const [controlArticles, setControlArticles] = useState<ControlArticle[]>([
