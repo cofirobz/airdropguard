@@ -31,7 +31,31 @@ function parseSource(req: Request): string | null {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 
-  return /^[a-z0-9-]+$/.test(normalized) ? normalized : null;
+  if (!/^[a-z0-9-]+$/.test(normalized)) return null;
+
+  const aliases: Record<string, string> = {
+    'affiliate-detail': 'affiliate-page',
+    'api-docs': 'articles',
+    dashboard: 'homepage',
+    'scam-alert': 'scam-alerts',
+  };
+
+  return aliases[normalized] || normalized;
+}
+
+function mapTrackerValue(source: string | null): string | null {
+  if (!source) return null;
+
+  const mapping: Record<string, string> = {
+    homepage: 'homepage',
+    'recommended-tools': 'recommended-tools',
+    learn: 'learn',
+    articles: 'articles',
+    'scam-alerts': 'scam-alerts',
+    'affiliate-page': 'affiliate-page',
+  };
+
+  return mapping[source] || null;
 }
 
 function applyTracker(destination: string, trackerValue: string | null): string {
@@ -39,7 +63,9 @@ function applyTracker(destination: string, trackerValue: string | null): string 
 
   try {
     const url = new URL(destination);
-    url.searchParams.set('tracker', trackerValue);
+    if (!url.searchParams.has('tracker')) {
+      url.searchParams.set('tracker', trackerValue);
+    }
     return url.toString();
   } catch {
     return destination;
@@ -134,18 +160,7 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  let trackerValue: string | null = null;
-  if (source) {
-    const { data: placement } = await supabase
-      .from('affiliate_placements')
-      .select('tracker_value, enabled')
-      .eq('affiliate_link_id', link.id)
-      .eq('placement_name', source)
-      .eq('enabled', true)
-      .maybeSingle();
-
-    trackerValue = placement?.tracker_value ?? null;
-  }
+  const trackerValue = mapTrackerValue(source);
 
   const finalDestination = applyTracker(destination, trackerValue);
 

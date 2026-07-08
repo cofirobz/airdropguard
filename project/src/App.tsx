@@ -78,6 +78,7 @@ function App() {
                 <Route path="pricing" element={<PricingPage />} />
                 <Route path="recommended-tools" element={<RecommendedToolsPage />} />
                 <Route path="recommended-tools/:slug" element={<AffiliatePartnerPage />} />
+                <Route path="tools/:slug" element={<AffiliatePartnerPage />} />
                 <Route path="scam-alerts" element={<ScamAlertsPage />} />
                 <Route path="submit" element={<SubmitAirdropPage />} />
                 <Route path="terms" element={<TermsPage />} />

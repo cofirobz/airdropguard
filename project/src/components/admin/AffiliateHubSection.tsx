@@ -198,6 +198,15 @@ function getInitial(name: string): string {
   return (name.trim().charAt(0) || '?').toUpperCase();
 }
 
+const PLACEMENT_LABELS: Array<{ key: string; label: string }> = [
+  { key: 'homepage', label: 'Homepage' },
+  { key: 'recommended-tools', label: 'Recommended Tools' },
+  { key: 'learn', label: 'Learn' },
+  { key: 'articles', label: 'Articles' },
+  { key: 'scam-alerts', label: 'Scam Alerts' },
+  { key: 'affiliate-page', label: 'Affiliate Pages' },
+];
+
 export function AffiliateHubSection({
   visible,
   showToast,
@@ -305,13 +314,16 @@ export function AffiliateHubSection({
   }, []);
 
   const clickStatsById = useMemo(() => {
+    const startToday = new Date();
+    startToday.setHours(0, 0, 0, 0);
     const start7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const start30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const stats = new Map<string, { total: number; d7: number; d30: number; lastClick: string | null }>();
+    const stats = new Map<string, { total: number; today: number; d7: number; d30: number; lastClick: string | null }>();
 
     rows.forEach((row) => {
       stats.set(row.id, {
         total: 0,
+        today: 0,
         d7: 0,
         d30: 0,
         lastClick: row.last_click_at,
@@ -320,8 +332,9 @@ export function AffiliateHubSection({
 
     recentClicks.forEach((click) => {
       const at = new Date(click.created_at);
-      const current = stats.get(click.affiliate_link_id) || { total: 0, d7: 0, d30: 0, lastClick: null };
+      const current = stats.get(click.affiliate_link_id) || { total: 0, today: 0, d7: 0, d30: 0, lastClick: null };
       current.total += 1;
+      if (at >= startToday) current.today += 1;
       if (at >= start7d) current.d7 += 1;
       if (at >= start30d) current.d30 += 1;
       if (!current.lastClick || at > new Date(current.lastClick)) current.lastClick = click.created_at;
@@ -332,12 +345,16 @@ export function AffiliateHubSection({
   }, [recentClicks, rows]);
 
   const groupedPlacementClicks = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, number>(PLACEMENT_LABELS.map((placement) => [placement.key, 0]));
     recentClicks.forEach((click) => {
       const key = click.placement_name || click.tracker_value || 'unknown';
       map.set(key, (map.get(key) || 0) + 1);
     });
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 12);
+    return PLACEMENT_LABELS.map((placement) => ({
+      key: placement.key,
+      label: placement.label,
+      count: map.get(placement.key) || 0,
+    }));
   }, [recentClicks]);
 
   const groupedSourceClicks = useMemo(() => {
@@ -506,7 +523,7 @@ export function AffiliateHubSection({
           <input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="Partner name *" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.slug} onChange={(e) => setForm((p) => ({ ...p, slug: normalizeSlug(e.target.value) }))} placeholder="Slug *" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} placeholder="Category" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
-          <input value={form.destination_url} onChange={(e) => setForm((p) => ({ ...p, destination_url: e.target.value }))} placeholder="Destination URL *" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
+          <input value={form.destination_url} onChange={(e) => setForm((p) => ({ ...p, destination_url: e.target.value }))} placeholder="Base Affiliate URL *" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.logo_url} onChange={(e) => setForm((p) => ({ ...p, logo_url: e.target.value }))} placeholder="Logo URL" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.banner_image_url} onChange={(e) => setForm((p) => ({ ...p, banner_image_url: e.target.value }))} placeholder="Banner Image URL (optional)" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
           <input value={form.official_website} onChange={(e) => setForm((p) => ({ ...p, official_website: e.target.value }))} placeholder="Official Website" className="rounded-lg border border-white/10 bg-dark-900/60 px-3 py-2 text-xs text-white" />
@@ -580,6 +597,7 @@ export function AffiliateHubSection({
                 <th className="px-2 py-2">Slug</th>
                 <th className="px-2 py-2">Internal URL</th>
                 <th className="px-2 py-2">Total</th>
+                <th className="px-2 py-2">Today</th>
                 <th className="px-2 py-2">7d</th>
                 <th className="px-2 py-2">30d</th>
                 <th className="px-2 py-2">Last click</th>
@@ -589,7 +607,7 @@ export function AffiliateHubSection({
             </thead>
             <tbody>
               {filteredRows.map((row) => {
-                const stats = clickStatsById.get(row.id) || { total: 0, d7: 0, d30: 0, lastClick: null };
+                const stats = clickStatsById.get(row.id) || { total: 0, today: 0, d7: 0, d30: 0, lastClick: null };
                 const internalUrl = `${safeHost()}/go/${row.slug}`;
                 return (
                   <tr key={row.id} className="border-t border-white/10">
@@ -615,6 +633,7 @@ export function AffiliateHubSection({
                       </button>
                     </td>
                     <td className="px-2 py-2">{stats.total}</td>
+                    <td className="px-2 py-2">{stats.today}</td>
                     <td className="px-2 py-2">{stats.d7}</td>
                     <td className="px-2 py-2">{stats.d30}</td>
                     <td className="px-2 py-2">{formatWhen(stats.lastClick)}</td>
@@ -641,7 +660,7 @@ export function AffiliateHubSection({
               })}
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-2 py-4 text-center text-xs text-gray-400">No affiliate records match the current filters.</td>
+                  <td colSpan={12} className="px-2 py-4 text-center text-xs text-gray-400">No affiliate records match the current filters.</td>
                 </tr>
               ) : null}
             </tbody>
@@ -691,10 +710,10 @@ export function AffiliateHubSection({
           <article className="rounded-xl border border-white/10 bg-dark-900/45 p-3">
             <h3 className="text-xs font-semibold text-white">Clicks By Placement</h3>
             <div className="mt-2 space-y-1.5 text-xs text-gray-200">
-              {groupedPlacementClicks.map(([key, count]) => (
-                <div key={key} className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] px-2 py-1">
-                  <span className="truncate pr-2">{key}</span>
-                  <span className="font-semibold text-emerald-200">{count}</span>
+              {groupedPlacementClicks.map((placement) => (
+                <div key={placement.key} className="flex items-center justify-between rounded-md border border-white/10 bg-white/[0.02] px-2 py-1">
+                  <span className="truncate pr-2">{placement.label}</span>
+                  <span className="font-semibold text-emerald-200">{placement.count}</span>
                 </div>
               ))}
               {groupedPlacementClicks.length === 0 ? <p className="text-gray-400">No placement data yet.</p> : null}
