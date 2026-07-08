@@ -80,15 +80,26 @@ export default function RecommendedToolsPage() {
         ) : (
           tools.map((tool) => (
             <article key={tool.id} className="rounded-xl border border-white/10 bg-dark-900/50 p-4">
+              {(() => {
+                const partnerUrl = buildAffiliateGoUrl(tool.slug, 'recommended-tools');
+
+                return (
+                  <>
               <div className="flex items-center justify-between gap-2">
-                <div className="inline-flex items-center gap-2">
-                  {tool.logo_url ? <img src={tool.logo_url} alt={tool.name} className="h-7 w-7 rounded-md object-cover" /> : null}
+                <Link to={partnerUrl} className="inline-flex items-center gap-3 hover:opacity-90">
+                  {tool.logo_url ? (
+                    <img src={tool.logo_url} alt={tool.name} className="h-12 w-12 rounded-lg border border-white/10 bg-white p-1 object-contain" />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-sm font-semibold text-cyan-100">
+                      {tool.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                   <p className="text-[11px] uppercase tracking-[0.1em] text-cyan-200">{tool.category || 'Security Tool'}</p>
-                </div>
+                </Link>
                 {tool.is_featured ? <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-100">Featured</span> : null}
               </div>
               <h2 className="mt-1 text-lg font-semibold text-white">
-                <Link to={`/recommended-tools/${encodeURIComponent(tool.slug)}`} className="hover:text-cyan-200">
+                <Link to={partnerUrl} className="hover:text-cyan-200">
                   {tool.name}
                 </Link>
               </h2>
@@ -103,12 +114,15 @@ export default function RecommendedToolsPage() {
                   View Details
                 </Link>
                 <Link
-                  to={buildAffiliateGoUrl(tool.slug, 'recommended-tools')}
+                  to={partnerUrl}
                   className="rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-100 hover:bg-cyan-500/20"
                 >
                   {tool.button_text || 'Visit Partner'}
                 </Link>
               </div>
+                  </>
+                );
+              })()}
             </article>
           ))
         )}
