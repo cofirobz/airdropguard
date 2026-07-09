@@ -29,7 +29,7 @@ AirdropGuard helps you:
 
 ## Tech Stack
 
-- **Frontend**: [Your framework]
+- **Frontend**: React
 - **Backend**: Supabase
 - **AI Layer**: Custom trust scoring
 - **Deployment**: Netlify
