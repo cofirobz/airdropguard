@@ -7,6 +7,7 @@ import { canonicalFromPath } from '../lib/seo';
 import { supabase } from '../lib/supabase';
 import type { Airdrop } from '../lib/types';
 import { getOpportunityType } from '../lib/utils';
+import { buildPathWithSearch } from '../lib/routeLinks';
 
 const SIGNS = [
   'Asks for your seed phrase or private key — legitimate projects never need these',
@@ -44,15 +45,23 @@ function WarningCard({ airdrop }: { airdrop: Airdrop }) {
                 <Link to={detailTarget} className="hover:text-rose-200 transition-colors">{airdrop.name}</Link>
               </h3>
               {airdrop.ticker && (
-                <span className="text-[10px] font-bold font-mono text-rose-400/80 bg-rose-500/10 border border-rose-500/20 rounded-md px-1.5 py-0.5">
+                <Link
+                  to={detailTarget}
+                  aria-label={`Open ${airdrop.name} scam alert details`}
+                  className="text-[10px] font-bold font-mono text-rose-400/80 bg-rose-500/10 border border-rose-500/20 rounded-md px-1.5 py-0.5 transition-colors hover:bg-rose-500/15 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/35"
+                >
                   ${airdrop.ticker}
-                </span>
+                </Link>
               )}
             </div>
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/25 rounded-full px-2 py-0.5 mt-1">
+            <Link
+              to={buildPathWithSearch('/', { listingState: 'scam_alert' }, 'airdrops')}
+              aria-label="Open scam alerts filtered listing"
+              className="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2 py-0.5 mt-1 text-[10px] font-semibold text-rose-400 transition-colors hover:bg-rose-500/15 hover:text-rose-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/35"
+            >
               <ShieldX className="w-2.5 h-2.5" />
               Scam Alert
-            </span>
+            </Link>
           </div>
           {showWebsiteLink && (
             <a href={airdrop.website_url} target="_blank" rel="noopener noreferrer"
@@ -96,7 +105,14 @@ function WarningCard({ airdrop }: { airdrop: Airdrop }) {
 
         <div className="flex flex-wrap gap-2 mt-3 text-[10px] text-gray-600">
           {airdrop.blockchain.map(b => (
-            <span key={b} className="bg-dark-700/60 border border-white/5 rounded-full px-2 py-0.5">{b}</span>
+            <Link
+              key={b}
+              to={buildPathWithSearch('/', { blockchain: b }, 'airdrops')}
+              aria-label={`Filter scam alerts by ${b}`}
+              className="rounded-full border border-white/5 bg-dark-700/60 px-2 py-0.5 transition-colors hover:bg-dark-700 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/25"
+            >
+              {b}
+            </Link>
           ))}
         </div>
       </div>

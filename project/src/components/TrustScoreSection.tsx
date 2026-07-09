@@ -1,4 +1,5 @@
 import { Github, Users, ShieldCheck, MessageSquare, Globe, BarChart3, UserCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const CRITERIA = [
   {
@@ -82,7 +83,7 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-export function TrustScoreBadge({ score, size = 'sm' }: { score: number | null; size?: 'sm' | 'lg' }) {
+export function TrustScoreBadge({ score, size = 'sm', to }: { score: number | null; size?: 'sm' | 'lg'; to?: string }) {
   if (score === null || score === undefined) return null;
 
   const color =
@@ -93,21 +94,49 @@ export function TrustScoreBadge({ score, size = 'sm' }: { score: number | null; 
       : 'text-rose-400 bg-rose-500/10 border-rose-500/25';
 
   if (size === 'lg') {
-    return (
-      <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 ${color}`}>
+    const content = (
+      <div className={`inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 transition-colors ${color}`}>
         <ShieldCheck className="h-4 w-4" />
         <span className="text-sm font-bold">{score}</span>
         <span className="text-xs opacity-70">/100</span>
       </div>
     );
+
+    if (to) {
+      return (
+        <Link
+          to={to}
+          aria-label="Open scoring methodology"
+          className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/40"
+        >
+          {content}
+        </Link>
+      );
+    }
+
+    return content;
   }
 
-  return (
-    <div className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${color}`}>
+  const content = (
+    <div className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold transition-colors ${color}`}>
       <ShieldCheck className="h-3 w-3" />
       {score}
     </div>
   );
+
+  if (to) {
+    return (
+      <Link
+        to={to}
+        aria-label="Open scoring methodology"
+        className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/40"
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 }
 
 export default function TrustScoreSection() {
@@ -117,10 +146,14 @@ export default function TrustScoreSection() {
     <section className="border-t border-white/5 bg-gradient-to-b from-dark-900/60 to-transparent py-12 sm:py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] font-semibold text-emerald-400 sm:text-xs">
+          <Link
+            to="/whitepaper#methodology"
+            aria-label="Open scoring methodology"
+            className="mb-5 inline-flex min-h-[40px] items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] font-semibold text-emerald-400 transition-colors hover:bg-emerald-500/10 hover:text-emerald-300 sm:text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/35"
+          >
             <UserCheck className="h-3.5 w-3.5 shrink-0" />
             Human Verified — Every Single Listing
-          </div>
+          </Link>
 
           <h2 className="mb-4 text-2xl font-black text-white sm:text-4xl">
             How We Score Projects

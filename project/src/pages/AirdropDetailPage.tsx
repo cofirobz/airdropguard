@@ -21,6 +21,7 @@ import {
   getOpportunityTypeKey, getOpportunityScoreLabel,
   getPastDistributionStatusKey, getPastDistributionStatusLabel, getPastDistributionStatusTone,
 } from '../lib/utils';
+import { buildPathWithSearch } from '../lib/routeLinks';
 import { TrustScoreBadge } from '../components/TrustScoreSection';
 import CommunityResults from '../components/CommunityResults';
 import WalletSafetySnapshot from '../components/WalletSafetySnapshot';
@@ -3153,9 +3154,13 @@ export default function AirdropDetailPage() {
               <div>
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <h1 className="text-2xl font-black leading-tight text-white sm:text-4xl">{airdrop.name}</h1>
-                  <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]', getOpportunityTypeTone(opportunityType))}>
+                  <Link
+                    to={buildPathWithSearch('/', { opportunityType: getOpportunityTypeKey(airdrop) }, 'airdrops')}
+                    aria-label={`Open ${opportunityType} listings`}
+                    className={cn('inline-flex min-h-[36px] items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/35', getOpportunityTypeTone(opportunityType))}
+                  >
                     Current Opportunity: {opportunityType}
-                  </span>
+                  </Link>
                   {hasPastDistribution && (
                     <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]', getPastDistributionStatusTone(pastDistributionStatusKey))}>
                       Past Distribution: {getPastDistributionStatusLabel(pastDistributionStatusKey)}
@@ -3168,28 +3173,54 @@ export default function AirdropDetailPage() {
                   )}
                   {airdrop.trust_score !== null && (
                     <div className="flex items-center gap-2">
-                      <TrustScoreBadge score={airdrop.trust_score} size="lg" />
-                      <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-300">
+                      <TrustScoreBadge score={airdrop.trust_score} size="lg" to="/whitepaper#methodology" />
+                      <Link
+                        to="/whitepaper#methodology"
+                        aria-label="Open scoring methodology"
+                        className="inline-flex min-h-[36px] items-center rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-300 transition-colors hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+                      >
                         {scoreLabel}
-                      </span>
+                      </Link>
                     </div>
                   )}
                   {airdrop.human_verified && (
-                    <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5">
+                    <Link
+                      to="/whitepaper#methodology"
+                      aria-label="Open scoring methodology"
+                      className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 transition-colors hover:bg-emerald-500/15 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/35"
+                    >
                       <UserCheck className="w-3 h-3" />
                       Human Verified
-                    </span>
+                    </Link>
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className={cn('badge border text-xs', getStatusColor(airdrop.status))}>
+                  <Link
+                    to={airdrop.listing_state === 'scam_alert' ? '/scam-alerts' : buildPathWithSearch('/', { listingState: airdrop.listing_state }, 'airdrops')}
+                    aria-label={airdrop.listing_state === 'scam_alert' ? 'Open scam alerts' : `Open ${airdrop.listing_state ?? 'listing'} listings`}
+                    className={cn('inline-flex min-h-[36px] items-center badge border text-xs transition-colors hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20', getStatusColor(airdrop.status))}
+                  >
                     {airdrop.status}
-                  </span>
+                  </Link>
                   {airdrop.blockchain.map(b => (
-                    <span key={b} className="badge bg-dark-600/60 text-gray-400 border border-white/8 text-xs">{b}</span>
+                    <Link
+                      key={b}
+                      to={buildPathWithSearch('/', { blockchain: b }, 'airdrops')}
+                      aria-label={`Filter by ${b}`}
+                      className="inline-flex min-h-[36px] items-center badge bg-dark-600/60 text-gray-400 border border-white/8 text-xs transition-colors hover:bg-dark-600/80 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/25"
+                    >
+                      {b}
+                    </Link>
                   ))}
                   {airdrop.category.map(c => (
-                    <span key={c} className="badge bg-dark-600/60 text-gray-500 border border-white/8 text-xs">{c}</span>
+                    <Link
+                      key={c}
+                      to={buildPathWithSearch('/', { category: c }, 'airdrops')}
+                      aria-label={`Filter by category ${c}`}
+                      className="inline-flex min-h-[36px] items-center badge bg-dark-600/60 text-gray-500 border border-white/8 text-xs transition-colors hover:bg-dark-600/80 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/25"
+                    >
+                      {c}
+                    </Link>
                   ))}
                 </div>
               </div>

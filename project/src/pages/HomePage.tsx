@@ -39,6 +39,7 @@ import SocialLinksStrip from '../components/SocialLinksStrip';
 import AffiliatePlacementCta from '../components/AffiliatePlacementCta';
 import { openCopilotWithPrompt } from '../lib/copilot';
 import { canonicalFromPath, homeSeoTitle } from '../lib/seo';
+import { buildPathWithSearch } from '../lib/routeLinks';
 import { daysUntil, isMainAirdropListing, isSpeculativeTokenListing, getOpportunityTypeKey } from '../lib/utils';
 
 const DEFAULT_FILTERS: Filters = {
@@ -49,6 +50,7 @@ const DEFAULT_FILTERS: Filters = {
   risk: '',
   difficulty: '',
   opportunityType: '',
+  listingState: '',
   sortBy: 'highest_score',
 };
 
@@ -130,11 +132,12 @@ const ENGINE_BOOT_STEPS = [
 const ENGINE_STATUS_CHIPS: Array<{
   label: 'Verified' | 'Under Review' | 'Scam Alert' | 'Need Review';
   tone: string;
+  to: string;
 }> = [
-  { label: 'Verified', tone: 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.12)]' },
-  { label: 'Under Review', tone: 'border-cyan-300/25 bg-cyan-500/10 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]' },
-  { label: 'Scam Alert', tone: 'border-rose-300/25 bg-rose-500/10 text-rose-100 shadow-[0_0_18px_rgba(244,63,94,0.12)]' },
-  { label: 'Need Review', tone: 'border-amber-300/25 bg-amber-500/10 text-amber-100 shadow-[0_0_18px_rgba(245,158,11,0.12)]' },
+  { label: 'Verified', tone: 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.12)]', to: buildPathWithSearch('/', { listingState: 'verified' }, 'airdrops') },
+  { label: 'Under Review', tone: 'border-cyan-300/25 bg-cyan-500/10 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]', to: buildPathWithSearch('/', { listingState: 'under_review' }, 'airdrops') },
+  { label: 'Scam Alert', tone: 'border-rose-300/25 bg-rose-500/10 text-rose-100 shadow-[0_0_18px_rgba(244,63,94,0.12)]', to: '/scam-alerts' },
+  { label: 'Need Review', tone: 'border-amber-300/25 bg-amber-500/10 text-amber-100 shadow-[0_0_18px_rgba(245,158,11,0.12)]', to: '/submit' },
 ];
 
 type LeadOpportunity = {
@@ -437,10 +440,14 @@ function HeroMockup({ item, projects }: { item: Airdrop | null; projects: Airdro
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">AI Security Engine</div>
           <div className="mt-1 text-lg font-black text-white">Trust intelligence core</div>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">
+        <Link
+          to="/whitepaper#methodology"
+          aria-label="Open scoring methodology"
+          className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/15 hover:text-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/40"
+        >
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
           AI Ready
-        </span>
+        </Link>
       </div>
 
       <div className="relative mt-4 grid gap-4">
@@ -494,12 +501,14 @@ function HeroMockup({ item, projects }: { item: Airdrop | null; projects: Airdro
 
           <div className="mt-4 grid gap-2 sm:grid-cols-4">
             {ENGINE_STATUS_CHIPS.map((chip) => (
-              <span
+              <Link
                 key={chip.label}
-                className={`rounded-full border px-3 py-1.5 text-[10px] font-semibold tracking-[0.12em] ${chip.tone} ${chip.label === reviewStatus ? 'ring-1 ring-white/10' : 'opacity-75'}`}
+                to={chip.to}
+                aria-label={`${chip.label === 'Need Review' ? 'Open submit airdrop' : `Open ${chip.label.toLowerCase()} listings`}`}
+                className={`inline-flex min-h-[40px] items-center justify-center rounded-full border px-3 py-1.5 text-[10px] font-semibold tracking-[0.12em] transition-colors hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/35 ${chip.tone} ${chip.label === reviewStatus ? 'ring-1 ring-white/10' : 'opacity-75'}`}
               >
                 {chip.label}
-              </span>
+              </Link>
             ))}
           </div>
         </div>
@@ -520,12 +529,14 @@ function HeroMockup({ item, projects }: { item: Airdrop | null; projects: Airdro
             {safeProjects.map((project) => {
               const active = project.name === projectName;
               return (
-                <span
+                <Link
                   key={project.slug || project.name}
-                  className={`rounded-full border px-2.5 py-1 transition-colors ${active ? 'border-cyan-300/35 bg-cyan-500/12 text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.12)]' : 'border-white/10 bg-white/[0.04] text-gray-400'}`}
+                  to={`/airdrop/${project.slug}`}
+                  aria-label={`Open ${project.name} listing`}
+                  className={`inline-flex min-h-[36px] items-center rounded-full border px-2.5 py-1 transition-colors hover:border-cyan-300/35 hover:bg-cyan-500/12 hover:text-cyan-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/35 ${active ? 'border-cyan-300/35 bg-cyan-500/12 text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.12)]' : 'border-white/10 bg-white/[0.04] text-gray-400'}`}
                 >
                   {project.name}
-                </span>
+                </Link>
               );
             })}
           </div>
@@ -1762,12 +1773,42 @@ export default function HomePage() {
 
   const tab = (searchParams.get('filter') as Tab) ?? 'all';
 
+  const updateSearchParams = useCallback((nextParams: Record<string, string | null | undefined>) => {
+    const params = new URLSearchParams(searchParams);
+
+    Object.entries(nextParams).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') params.delete(key);
+      else params.set(key, value);
+    });
+
+    setSearchParams(params);
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const hasFilterParams = ['search', 'blockchain', 'category', 'reward', 'risk', 'difficulty', 'opportunityType', 'listingState', 'sortBy']
+      .some((key) => searchParams.has(key));
+
+    if (!hasFilterParams) return;
+
+    setFilters({
+      search: searchParams.get('search') ?? '',
+      blockchain: (searchParams.get('blockchain') as Filters['blockchain']) ?? '',
+      category: (searchParams.get('category') as Filters['category']) ?? '',
+      reward: (searchParams.get('reward') as Filters['reward']) ?? '',
+      risk: (searchParams.get('risk') as Filters['risk']) ?? '',
+      difficulty: (searchParams.get('difficulty') as Filters['difficulty']) ?? '',
+      opportunityType: (searchParams.get('opportunityType') as Filters['opportunityType']) ?? '',
+      listingState: (searchParams.get('listingState') as Filters['listingState']) ?? '',
+      sortBy: (searchParams.get('sortBy') as Filters['sortBy']) ?? DEFAULT_FILTERS.sortBy,
+    });
+  }, [searchParams]);
+
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_AIRDROPS);
   }, [tab, filters]);
 
   useEffect(() => {
-    const activeFilters = [filters.blockchain, filters.category, filters.reward, filters.risk, filters.difficulty, filters.opportunityType]
+    const activeFilters = [filters.blockchain, filters.category, filters.reward, filters.risk, filters.difficulty, filters.opportunityType, filters.listingState]
       .filter(Boolean)
       .join(', ') || 'none';
 
@@ -1912,6 +1953,7 @@ export default function HomePage() {
     if (filters.reward) list = list.filter(a => a.reward_potential === filters.reward);
     if (filters.risk) list = list.filter(a => a.risk_level === filters.risk);
     if (filters.difficulty) list = list.filter(a => a.difficulty === filters.difficulty);
+    if (filters.listingState) list = list.filter(a => a.listing_state === filters.listingState);
     if (filters.opportunityType) {
       list = list.filter((item) => getOpportunityTypeKey(item) === filters.opportunityType);
     }
@@ -2436,8 +2478,7 @@ export default function HomePage() {
             <button
               key={item.key}
               onClick={() => {
-                if (item.key === 'all') setSearchParams({});
-                else setSearchParams({ filter: item.key });
+                updateSearchParams({ filter: item.key === 'all' ? null : item.key });
               }}
               className={`flex min-h-[42px] items-center justify-center gap-1.5 rounded-2xl px-4 py-2 text-sm font-medium transition-colors sm:rounded-t-lg ${tab === item.key
                 ? 'border border-sky-400/25 bg-white/5 text-white sm:border-b-2 sm:border-x-0 sm:border-t-0 sm:border-sky-400'
@@ -2468,7 +2509,7 @@ export default function HomePage() {
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => setFilters({ ...filters, opportunityType: '' })}
+              onClick={() => updateSearchParams({ opportunityType: null, listingState: null })}
               className={`inline-flex min-h-[40px] items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${!filters.opportunityType
                 ? 'border-white/30 bg-white/[0.12] text-white'
                 : 'border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.08] hover:text-white'
@@ -2483,7 +2524,7 @@ export default function HomePage() {
                 <button
                   key={section.key}
                   type="button"
-                  onClick={() => setFilters({ ...filters, opportunityType: section.key })}
+                  onClick={() => updateSearchParams({ opportunityType: section.key, listingState: null })}
                   className={`inline-flex min-h-[40px] items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${selected
                     ? section.badgeClassName
                     : 'border-white/10 bg-white/[0.03] text-gray-300 hover:bg-white/[0.08] hover:text-white'

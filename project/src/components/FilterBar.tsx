@@ -12,6 +12,7 @@ export interface Filters {
   risk: RiskLevel | '';
   difficulty: Difficulty | '';
   opportunityType: OpportunityTypeKey | '';
+  listingState: 'verified' | 'under_review' | 'scam_alert' | '';
   sortBy: 'highest_score' | 'newest' | 'lowest_risk' | 'most_active' | 'ending_soon';
 }
 
@@ -30,6 +31,7 @@ export default function FilterBar({ filters, onChange }: Props) {
     filters.risk,
     filters.difficulty,
     filters.opportunityType,
+    filters.listingState,
   ].filter(Boolean).length;
 
   const hasActiveFilters = activeFilterCount > 0;
@@ -53,6 +55,13 @@ export default function FilterBar({ filters, onChange }: Props) {
     { value: 'lowest_risk', label: 'Lowest risk' },
     { value: 'most_active', label: 'Most active' },
     { value: 'ending_soon', label: 'Ending soon' },
+  ];
+
+  const listingStateOptions: Array<{ value: Filters['listingState']; label: string; tone: string }> = [
+    { value: '', label: 'All listings', tone: 'border-white/10 bg-white/[0.03] text-gray-300' },
+    { value: 'verified', label: 'Verified', tone: 'border-emerald-300/30 bg-emerald-500/10 text-emerald-100' },
+    { value: 'under_review', label: 'Under Review', tone: 'border-amber-300/30 bg-amber-500/10 text-amber-100' },
+    { value: 'scam_alert', label: 'Scam Alerts', tone: 'border-rose-300/35 bg-rose-500/10 text-rose-100' },
   ];
 
   return (
@@ -117,6 +126,26 @@ export default function FilterBar({ filters, onChange }: Props) {
                     type="button"
                     onClick={() => onChange({ ...filters, opportunityType: option.value })}
                     className={`inline-flex min-h-[40px] items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${selected ? tone : 'border-white/10 bg-white/[0.03] text-gray-400 hover:bg-white/[0.06] hover:text-white'}`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {listingStateOptions.map((option) => {
+                const selected = filters.listingState === option.value;
+
+                return (
+                  <button
+                    key={option.label}
+                    type="button"
+                    onClick={() => onChange({ ...filters, listingState: option.value })}
+                    className={`inline-flex min-h-[40px] items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${selected
+                      ? option.tone
+                      : 'border-white/10 bg-white/[0.03] text-gray-400 hover:bg-white/[0.06] hover:text-white'
+                    }`}
                   >
                     {option.label}
                   </button>
@@ -234,6 +263,7 @@ export default function FilterBar({ filters, onChange }: Props) {
                   risk: '',
                   difficulty: '',
                   opportunityType: '',
+                    listingState: '',
                   sortBy: 'highest_score',
                 })
               }
