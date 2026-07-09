@@ -2228,6 +2228,7 @@ export default function HomePage() {
     return risk === 'low' || risk === 'very low';
   }).length;
   const trendingNow = opportunityAirdrops.filter(item => item.is_trending).length;
+  const topLead = topVerified[0] ?? featured ?? null;
   const topProjectName = (topVerified[0]?.name || featured?.name || 'Curated watchlist').trim();
 
   return (
@@ -2270,18 +2271,57 @@ export default function HomePage() {
                   AirdropGuard scans live listings for risk, trust and effort so you can browse first, connect later, and focus only on the projects worth your time.
                 </p>
 
-                <div className="mt-3 grid grid-cols-1 gap-2 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(180deg,rgba(6,17,40,0.88),rgba(4,11,26,0.8))] p-2.5 text-left sm:hidden">
-                  <div className="flex items-center justify-between rounded-xl border border-cyan-300/20 bg-cyan-400/8 px-3 py-2">
-                    <p className="text-[11px] font-semibold text-cyan-100">Trust momentum</p>
-                    <p className={`text-xs font-black ${trustScoreTextTone}`}>{trustScoreValue}%</p>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-800/85">
-                    <div className={`trust-bar-glow h-full rounded-full ${trustScoreBarTone}`} style={{ width: `${trustScoreValue}%` }} />
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 text-[10px] font-semibold text-cyan-100/90">
-                    <span className="inline-flex items-center rounded-full border border-emerald-300/35 bg-emerald-500/10 px-2 py-1">Low-risk picks</span>
-                    <span className="inline-flex items-center rounded-full border border-amber-300/35 bg-amber-500/10 px-2 py-1">Hot now</span>
-                    <span className="inline-flex items-center rounded-full border border-fuchsia-300/35 bg-fuchsia-500/10 px-2 py-1">AI watched</span>
+                <div className="mt-3 sm:hidden">
+                  <div className="relative overflow-hidden rounded-[24px] border border-cyan-300/35 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.14),transparent_42%),linear-gradient(180deg,rgba(6,18,42,0.98),rgba(5,11,25,0.95))] p-3.5 text-left shadow-[0_20px_40px_rgba(3,10,28,0.45),0_0_0_1px_rgba(34,211,238,0.08)]">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/75 to-transparent" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-100/80">Live signal today</p>
+                        <p className="mt-1.5 truncate text-[1.1rem] font-black leading-tight text-white">{topProjectName}</p>
+                        <p className="mt-1 text-xs leading-relaxed text-cyan-100/78">
+                          Top-confidence pick with {trustScoreBand.toLowerCase()} trust momentum and active AI review coverage.
+                        </p>
+                      </div>
+                      <div className="shrink-0 rounded-2xl border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-center shadow-[0_12px_26px_rgba(6,182,212,0.18)]">
+                        <p className={`text-lg font-black leading-none ${trustScoreTextTone}`}>{trustScoreValue}%</p>
+                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/70">Trust</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/8 px-2.5 py-2">
+                        <p className="text-base font-black leading-none text-cyan-100">{safeDisplayCount(verifiedProjects.length, '+')}</p>
+                        <p className="mt-1 text-[10px] text-cyan-100/70">Verified</p>
+                      </div>
+                      <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/8 px-2.5 py-2">
+                        <p className="text-base font-black leading-none text-emerald-100">{safeDisplayCount(lowRiskPool, '+')}</p>
+                        <p className="mt-1 text-[10px] text-emerald-100/70">Low risk</p>
+                      </div>
+                      <div className="rounded-2xl border border-fuchsia-300/20 bg-fuchsia-500/8 px-2.5 py-2">
+                        <p className="text-base font-black leading-none text-fuchsia-100">{safeDisplayCount(trendingNow, '+')}</p>
+                        <p className="mt-1 text-[10px] text-fuchsia-100/70">Trending</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      <Link
+                        to={topLead ? `/airdrop/${topLead.slug}` : '/wallet-checker'}
+                        className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-2xl bg-[linear-gradient(98deg,#1fb6ff_0%,#4f8dfb_42%,#7c4dff_100%)] px-4 py-2.5 text-sm font-black text-white shadow-[0_14px_26px_rgba(59,130,246,0.3)]"
+                      >
+                        View top pick
+                      </Link>
+                      <a
+                        href="#airdrops"
+                        className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-white/15 bg-white/[0.05] px-4 py-2.5 text-sm font-bold text-white backdrop-blur"
+                      >
+                        Browse live
+                      </a>
+                    </div>
+
+                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800/85">
+                      <div className={`trust-bar-glow h-full rounded-full ${trustScoreBarTone}`} style={{ width: `${trustScoreValue}%` }} />
+                    </div>
+                    <p className={`mt-2 text-[10px] font-semibold uppercase tracking-[0.14em] ${trustScoreTextTone}`}>{trustScoreBand} scan momentum</p>
                   </div>
                 </div>
 
@@ -2335,7 +2375,7 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                <div className="mt-3.5 grid gap-2 sm:grid-cols-3">
+                <div className="mt-3.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <Link
                     to="/wallet-checker"
                     className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(98deg,#1fb6ff_0%,#4f8dfb_42%,#7c4dff_100%)] px-5 py-3 text-sm font-black text-white shadow-[0_14px_26px_rgba(59,130,246,0.35)] transition-transform hover:translate-y-[-1px]"
@@ -2351,7 +2391,7 @@ export default function HomePage() {
                   </a>
                   <Link
                     to="/auth"
-                    className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-500/10 px-5 py-3 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/18"
+                    className="col-span-2 inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-500/10 px-5 py-3 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/18 sm:col-span-1"
                   >
                     Start Free
                   </Link>

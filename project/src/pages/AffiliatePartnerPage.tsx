@@ -100,16 +100,42 @@ export default function AffiliatePartnerPage() {
   const seoSchema = partner
     ? {
         '@context': 'https://schema.org',
-        '@type': 'Product',
-        name: partner.name,
-        description,
-        url: canonical,
-        category: partner.category || 'Security Tool',
-        image: partner.logo_url || partner.banner_image_url || undefined,
-        brand: {
-          '@type': 'Brand',
-          name: partner.name,
-        },
+        '@graph': [
+          {
+            '@type': 'WebPage',
+            '@id': `${canonical}#webpage`,
+            name: title,
+            description,
+            url: canonical,
+            breadcrumb: {
+              '@id': `${canonical}#breadcrumb`,
+            },
+          },
+          {
+            '@type': 'BreadcrumbList',
+            '@id': `${canonical}#breadcrumb`,
+            itemListElement: [
+              {
+                '@type': 'ListItem',
+                position: 1,
+                name: 'Home',
+                item: 'https://airdropguard.com/',
+              },
+              {
+                '@type': 'ListItem',
+                position: 2,
+                name: 'Recommended Tools',
+                item: 'https://airdropguard.com/recommended-tools',
+              },
+              {
+                '@type': 'ListItem',
+                position: 3,
+                name: partner.name,
+                item: canonical,
+              },
+            ],
+          },
+        ],
       }
     : undefined;
 
