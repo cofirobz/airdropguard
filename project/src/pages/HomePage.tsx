@@ -581,6 +581,8 @@ function LiveOpportunitiesSection({ airdrops }: { airdrops: Airdrop[] }) {
     { title: 'Ending Soon', item: endingSoon, label: 'Act now', tone: 'border-amber-300/25 bg-amber-500/10 text-amber-100', detail: 'Fastest decisions need clarity.' },
     { title: 'Biggest Estimated Reward', item: biggestReward, label: 'Reward focus', tone: 'border-violet-300/25 bg-violet-500/10 text-violet-100', detail: 'Forecasts where the upside is highest.' },
   ];
+  const [leadOpportunity, ...secondaryOpportunities] = opportunities;
+  const leadItem = leadOpportunity.item;
 
   return (
     <section id="live-opportunities" className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
@@ -594,10 +596,56 @@ function LiveOpportunitiesSection({ airdrops }: { airdrops: Airdrop[] }) {
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {opportunities.map((opportunity) => (
-          <OpportunityCard key={opportunity.title} {...opportunity} />
-        ))}
+      <div className="grid gap-4 lg:grid-cols-[1.02fr_0.98fr] lg:items-stretch">
+        <div className="relative overflow-hidden rounded-[30px] border border-cyan-300/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(99,102,241,0.14),transparent_36%),linear-gradient(180deg,rgba(6,18,42,0.98),rgba(4,10,24,0.98))] p-5 shadow-[0_18px_50px_rgba(2,8,23,0.35)] sm:p-6">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/75 to-transparent" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Best live signal</div>
+              <h3 className="mt-2 text-2xl font-black text-white sm:text-3xl">{leadItem?.name ?? 'Curated watchlist'}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-cyan-50/88">
+                {leadOpportunity.detail} Start with the strongest signal before expanding into the wider board.
+              </p>
+            </div>
+            <span className={`shrink-0 rounded-full border px-3 py-1 text-[10px] font-semibold ${leadOpportunity.tone}`}>{leadOpportunity.label}</span>
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/8 px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/70">Trust</p>
+              <p className="mt-1 text-sm font-black text-white">{leadItem?.trust_score ?? 'TBA'}</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/8 px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-100/70">Reward</p>
+              <p className="mt-1 truncate text-sm font-black text-white">{leadItem?.estimated_reward ?? 'Forecasting'}</p>
+            </div>
+            <div className="rounded-2xl border border-violet-300/20 bg-violet-500/8 px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-100/70">Time</p>
+              <p className="mt-1 text-sm font-black text-white">{leadItem?.time_required ?? 'TBA'}</p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <Link
+              to={leadItem ? `/airdrop/${leadItem.slug}` : '/wallet-checker'}
+              className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-[linear-gradient(98deg,#22d3ee_0%,#3b82f6_48%,#6366f1_100%)] px-5 py-3 text-sm font-black text-white shadow-[0_12px_24px_rgba(59,130,246,0.28)]"
+            >
+              Review this pick
+            </Link>
+            <a
+              href="#airdrops"
+              className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]"
+            >
+              Open full board
+            </a>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {secondaryOpportunities.map((opportunity) => (
+            <OpportunityCard key={opportunity.title} {...opportunity} />
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -636,6 +684,8 @@ function WhySection() {
       tone: 'border-sky-300/20 bg-sky-500/10 text-sky-100',
     },
   ];
+  const [leadCard, ...supportCards] = cards;
+  const LeadIcon = leadCard.icon;
 
   return (
     <section className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
@@ -649,19 +699,63 @@ function WhySection() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <div key={card.title} className="glass-card rounded-[28px] border border-white/10 p-5">
-              <div className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border ${card.tone}`}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <h3 className="mt-5 text-lg font-black text-white">{card.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-gray-400">{card.body}</p>
+      <div className="grid gap-4 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
+        <div className="relative overflow-hidden rounded-[30px] border border-cyan-300/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_34%),linear-gradient(180deg,rgba(7,18,37,0.98),rgba(4,10,24,0.98))] p-5 shadow-[0_18px_50px_rgba(2,8,23,0.35)] sm:p-6">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/75 to-transparent" />
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-500/10 text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.12)]">
+            <LeadIcon className="h-5 w-5" />
+          </div>
+          <div className="mt-5 max-w-xl">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Why it feels safer</div>
+            <h3 className="mt-2 text-2xl font-black text-white sm:text-3xl">{leadCard.title}</h3>
+            <p className="mt-3 text-sm leading-relaxed text-cyan-50/88 sm:text-base">{leadCard.body}</p>
+          </div>
+
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/8 px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/70">Scan layer</p>
+              <p className="mt-1 text-sm font-black text-white">Live signals</p>
             </div>
-          );
-        })}
+            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/8 px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-100/70">Safety</p>
+              <p className="mt-1 text-sm font-black text-white">No wallet first</p>
+            </div>
+            <div className="rounded-2xl border border-violet-300/20 bg-violet-500/8 px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-100/70">Review</p>
+              <p className="mt-1 text-sm font-black text-white">AI + human</p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <Link
+              to="/wallet-checker"
+              className="inline-flex min-h-[46px] items-center justify-center rounded-2xl bg-[linear-gradient(98deg,#22d3ee_0%,#3b82f6_48%,#6366f1_100%)] px-5 py-3 text-sm font-black text-white shadow-[0_12px_24px_rgba(59,130,246,0.28)]"
+            >
+              Open safety scan
+            </Link>
+            <a
+              href="#airdrops"
+              className="inline-flex min-h-[46px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]"
+            >
+              Explore live board
+            </a>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {supportCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <div key={card.title} className="glass-card rounded-[26px] border border-white/10 p-4 sm:p-5">
+                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border ${card.tone}`}>
+                  <Icon className="h-4.5 w-4.5" />
+                </div>
+                <h3 className="mt-4 text-base font-black text-white sm:text-lg">{card.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-400">{card.body}</p>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
@@ -669,10 +763,10 @@ function WhySection() {
 
 function HomepageHowItWorksSection() {
   const steps = [
-    'Browse verified projects',
-    'Let AI prioritise them',
-    'Complete missions',
-    'Track rewards',
+    { title: 'Browse verified projects', body: 'Start with a short scan of live listings.', cue: '01 / Start clean' },
+    { title: 'Let AI prioritise them', body: 'AI ranks trust, reward and effort.', cue: '02 / Cut noise' },
+    { title: 'Complete missions', body: 'Complete the best-fit tasks first.', cue: '03 / Focus effort' },
+    { title: 'Track rewards', body: 'Keep a simple record of progress and value.', cue: '04 / Stay organised' },
   ];
 
   return (
@@ -687,21 +781,38 @@ function HomepageHowItWorksSection() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {steps.map((step, index) => (
-          <div key={step} className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-300/20 bg-sky-500/10 text-sm font-black text-sky-100">
-              0{index + 1}
-            </div>
-            <h3 className="mt-4 text-lg font-black text-white">{step}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-gray-400">
-              {index === 0 && 'Start with a short scan of live listings.'}
-              {index === 1 && 'AI ranks trust, reward and effort.'}
-              {index === 2 && 'Complete the best-fit tasks first.'}
-              {index === 3 && 'Keep a simple record of progress and value.'}
-            </p>
+      <div className="grid gap-4 lg:grid-cols-[0.88fr_1.12fr] lg:items-start">
+        <div className="relative overflow-hidden rounded-[30px] border border-sky-300/20 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.12),transparent_38%),linear-gradient(180deg,rgba(7,18,37,0.98),rgba(4,10,24,0.98))] p-5 shadow-[0_18px_50px_rgba(2,8,23,0.35)] sm:p-6">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/75 to-transparent" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-300/20 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-100">
+            <CheckSquare className="h-4 w-4" />
+            Guided flow
           </div>
-        ))}
+          <h3 className="mt-4 text-2xl font-black text-white sm:text-3xl">Move from scan to action without guesswork.</h3>
+          <p className="mt-3 text-sm leading-relaxed text-sky-50/82 sm:text-base">
+            The mobile experience should answer one question fast: what do I do next? This flow keeps the decision path short and visible.
+          </p>
+          <div className="mt-5 space-y-2">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white">Browse the board</div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white">Let AI rank the best fit</div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white">Act on the highest-conviction task</div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {steps.map((step, index) => (
+            <div key={step.title} className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-sky-300/20 bg-sky-500/10 text-sm font-black text-sky-100">
+                  0{index + 1}
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-100/80">{step.cue}</span>
+              </div>
+              <h3 className="mt-4 text-lg font-black text-white">{step.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-gray-400">{step.body}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -711,7 +822,8 @@ function CopilotPreviewSection() {
   return (
     <section className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="grid gap-4 lg:grid-cols-[0.94fr_1.06fr] lg:items-stretch">
-        <div className="rounded-[30px] border border-violet-300/20 bg-[linear-gradient(160deg,rgba(139,92,246,0.12),rgba(6,10,22,0.96))] p-5">
+        <div className="relative overflow-hidden rounded-[30px] border border-violet-300/20 bg-[radial-gradient(circle_at_top_left,rgba(167,139,250,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.1),transparent_38%),linear-gradient(160deg,rgba(139,92,246,0.12),rgba(6,10,22,0.96))] p-5 shadow-[0_18px_50px_rgba(14,8,29,0.34)] sm:p-6">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/75 to-transparent" />
           <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-100">
             <AiOrb className="h-4 w-4" />
             AirdropGuard AI
@@ -720,6 +832,20 @@ function CopilotPreviewSection() {
           <p className="mt-3 text-sm leading-relaxed text-gray-300">
             It gives a clear next move, not generic chatbot noise.
           </p>
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-violet-300/20 bg-violet-500/10 px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-100/70">Response style</p>
+              <p className="mt-1 text-sm font-black text-white">Short plan</p>
+            </div>
+            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-500/8 px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/70">Priority</p>
+              <p className="mt-1 text-sm font-black text-white">Trust first</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-300/20 bg-emerald-500/8 px-3 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-100/70">Outcome</p>
+              <p className="mt-1 text-sm font-black text-white">Next move</p>
+            </div>
+          </div>
           <CopilotCta
             prompt="What should I focus on next on AirdropGuard?"
             context="Homepage Copilot preview section. Give a direct short plan for what to do next."
@@ -730,15 +856,25 @@ function CopilotPreviewSection() {
           </CopilotCta>
         </div>
 
-        <div className="rounded-[30px] border border-white/10 bg-[#0b1224]/92 p-5">
-          <div className="space-y-3">
+        <div className="rounded-[30px] border border-white/10 bg-[#0b1224]/92 p-5 shadow-[0_18px_40px_rgba(2,6,23,0.32)] sm:p-6">
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Sample AI exchange</div>
+              <div className="mt-1 text-lg font-black text-white">What the guidance actually feels like</div>
+            </div>
+            <div className="rounded-2xl border border-cyan-300/20 bg-cyan-500/10 px-3 py-2 text-right">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/75">Intent</div>
+              <div className="mt-1 text-sm font-black text-white">20-min plan</div>
+            </div>
+          </div>
+          <div className="mt-4 space-y-3">
             <div className="flex justify-end">
-              <div className="max-w-[82%] rounded-2xl bg-cyan-500 px-4 py-3 text-sm font-medium text-white">
+              <div className="max-w-[82%] rounded-[22px] bg-cyan-500 px-4 py-3 text-sm font-medium text-white shadow-[0_12px_24px_rgba(6,182,212,0.18)]">
                 I only have 20 minutes today.
               </div>
             </div>
             <div className="flex justify-start">
-              <div className="max-w-[90%] rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-gray-200">
+              <div className="max-w-[90%] rounded-[22px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-gray-200">
                 Focus on your safest high-potential opportunities first. I’ll prioritise projects by trust, reward potential and time required.
               </div>
             </div>
@@ -757,6 +893,8 @@ function CopilotPreviewSection() {
 }
 
 function HomepageTrustSection({ counters }: { counters: CounterItem[] }) {
+  const [leadCounter, ...supportCounters] = counters;
+
   return (
     <section className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
@@ -769,14 +907,31 @@ function HomepageTrustSection({ counters }: { counters: CounterItem[] }) {
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        {counters.map((item) => (
-          <div key={item.label} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
-            <div className="text-xs uppercase tracking-[0.16em] text-gray-500">{item.label}</div>
-            <div className="mt-2 text-2xl font-black text-white">{item.value > 0 ? `${item.value.toLocaleString()}${item.suffix ?? ''}` : 'Growing daily'}</div>
-            <div className="mt-2 text-xs leading-relaxed text-gray-400">{item.sub}</div>
+      <div className="grid gap-4 lg:grid-cols-[0.94fr_1.06fr] lg:items-stretch">
+        <div className="relative overflow-hidden rounded-[30px] border border-sky-300/20 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,197,94,0.12),transparent_38%),linear-gradient(180deg,rgba(7,18,37,0.98),rgba(4,10,24,0.98))] p-5 shadow-[0_18px_50px_rgba(2,8,23,0.35)] sm:p-6">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/75 to-transparent" />
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">Signal snapshot</div>
+          <h3 className="mt-2 text-2xl font-black text-white sm:text-3xl">{leadCounter.label}</h3>
+          <div className="mt-4 text-5xl font-black tracking-tight text-white sm:text-6xl">
+            {leadCounter.value > 0 ? `${leadCounter.value.toLocaleString()}${leadCounter.suffix ?? ''}` : 'Growing daily'}
           </div>
-        ))}
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-sky-50/82 sm:text-base">{leadCounter.sub}</p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <span className="rounded-full border border-cyan-300/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold text-cyan-100">Updated live</span>
+            <span className="rounded-full border border-emerald-300/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-semibold text-emerald-100">Trust-first</span>
+            <span className="rounded-full border border-violet-300/20 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold text-violet-100">No fake hype</span>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {supportCounters.map((item) => (
+            <div key={item.label} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
+              <div className="text-xs uppercase tracking-[0.16em] text-gray-500">{item.label}</div>
+              <div className="mt-2 text-2xl font-black text-white">{item.value > 0 ? `${item.value.toLocaleString()}${item.suffix ?? ''}` : 'Growing daily'}</div>
+              <div className="mt-2 text-xs leading-relaxed text-gray-400">{item.sub}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

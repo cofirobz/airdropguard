@@ -503,8 +503,12 @@ export default function Layout() {
     {
       key: 'discover',
       title: 'Discover',
+      description: 'Live listings, trend entry points and research routes.',
+      panelClassName: 'border-cyan-400/16 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_36%),linear-gradient(180deg,rgba(10,18,36,0.96),rgba(7,13,28,0.94))]',
+      countClassName: 'border-cyan-400/20 bg-cyan-500/10 text-cyan-100',
+      iconClassName: 'border-cyan-400/16 bg-cyan-500/[0.08] text-cyan-200',
       items: [
-        { to: '/', label: 'Browse Airdrops', icon: Home },
+        { to: '/#airdrops', label: 'Browse Airdrops', icon: Home },
         { to: '/?filter=trending', label: 'Trending', icon: Flame },
         { to: '/recommended-tools', label: 'Recommended Tools', icon: Star },
         { to: '/learn', label: 'Learn', icon: BookOpen },
@@ -513,6 +517,10 @@ export default function Layout() {
     {
       key: 'tools',
       title: 'Tools',
+      description: 'Safety checks, alerts and product utilities.',
+      panelClassName: 'border-violet-400/16 bg-[radial-gradient(circle_at_top_left,rgba(167,139,250,0.12),transparent_36%),linear-gradient(180deg,rgba(12,14,34,0.96),rgba(8,12,26,0.94))]',
+      countClassName: 'border-violet-400/20 bg-violet-500/10 text-violet-100',
+      iconClassName: 'border-violet-400/16 bg-violet-500/[0.08] text-violet-200',
       items: [
         { to: '/wallet-checker', label: 'Wallet Intelligence', icon: Wallet },
         { to: user ? '/dashboard' : '/auth', label: 'AI Copilot', icon: Bot },
@@ -523,6 +531,10 @@ export default function Layout() {
     {
       key: 'account',
       title: 'Account',
+      description: user ? 'Your dashboard, watchlist and profile.' : 'Sign in to save progress and unlock AI help.',
+      panelClassName: 'border-emerald-400/16 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.12),transparent_36%),linear-gradient(180deg,rgba(10,18,30,0.96),rgba(7,13,24,0.94))]',
+      countClassName: 'border-emerald-400/20 bg-emerald-500/10 text-emerald-100',
+      iconClassName: 'border-emerald-400/16 bg-emerald-500/[0.08] text-emerald-200',
       items: user
         ? [
             { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -759,16 +771,16 @@ export default function Layout() {
           <>
             <button
               type="button"
-              className="fixed inset-0 top-20 z-40 bg-black/80 lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
+              className="fixed inset-0 top-20 z-40 bg-slate-950/92 backdrop-blur-md lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
               aria-label="Close menu overlay"
               onClick={() => setMobileOpen(false)}
             />
 
             <div
               id="mobile-menu"
-              className="fixed left-3 right-3 top-24 z-50 overflow-hidden rounded-[32px] border border-cyan-400/18 bg-[linear-gradient(160deg,rgba(6,14,30,0.98),rgba(8,20,42,0.96))] shadow-[0_24px_70px_rgba(0,0,0,0.72),0_0_34px_rgba(34,211,238,0.12)] lg:hidden animate-slide-up"
+              className="fixed left-3 right-3 top-24 z-50 overflow-hidden rounded-[32px] border border-cyan-300/16 bg-[linear-gradient(160deg,rgba(3,9,20,0.995),rgba(6,12,28,0.992))] shadow-[0_28px_90px_rgba(0,0,0,0.82),0_0_40px_rgba(34,211,238,0.1)] lg:hidden animate-slide-up"
             >
-              <div className="border-b border-cyan-400/12 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.14),transparent_28%),linear-gradient(135deg,rgba(14,165,233,0.12),rgba(15,23,42,0.96))] px-5 py-5">
+              <div className="border-b border-cyan-300/10 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_26%),linear-gradient(135deg,rgba(10,24,44,0.98),rgba(5,11,24,0.995))] px-5 py-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">
@@ -790,40 +802,69 @@ export default function Layout() {
                 </div>
               </div>
 
-              <div className="max-h-[calc(100dvh-8rem)] overflow-y-auto overscroll-contain px-3 py-3 pb-[calc(7rem+env(safe-area-inset-bottom))]" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <div className="max-h-[calc(100dvh-8rem)] overflow-y-auto overscroll-contain bg-[linear-gradient(180deg,rgba(4,9,21,0.98),rgba(4,9,20,0.995))] px-3 py-3 pb-[calc(7rem+env(safe-area-inset-bottom))]" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2 px-1">
+                    <Link
+                      to="/#airdrops"
+                      onClick={() => setMobileOpen(false)}
+                      className="rounded-[22px] border border-cyan-400/18 bg-[linear-gradient(135deg,rgba(34,211,238,0.14),rgba(8,18,38,0.92))] px-4 py-3 shadow-[0_10px_28px_rgba(34,211,238,0.12)] transition-colors hover:border-cyan-300/28 hover:bg-[linear-gradient(135deg,rgba(34,211,238,0.18),rgba(8,18,38,0.96))]"
+                    >
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">Jump in</p>
+                      <p className="mt-1 text-sm font-black text-white">Browse board</p>
+                    </Link>
+                    <Link
+                      to={user ? '/dashboard' : '/auth'}
+                      onClick={() => setMobileOpen(false)}
+                      className="rounded-[22px] border border-violet-400/18 bg-[linear-gradient(135deg,rgba(139,92,246,0.16),rgba(14,12,34,0.92))] px-4 py-3 shadow-[0_10px_28px_rgba(139,92,246,0.12)] transition-colors hover:border-violet-300/28 hover:bg-[linear-gradient(135deg,rgba(139,92,246,0.2),rgba(14,12,34,0.96))]"
+                    >
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-violet-200">Quick help</p>
+                      <p className="mt-1 text-sm font-black text-white">Open AI</p>
+                    </Link>
+                  </div>
+
                   {publicMenuSections.map((section) => {
                     const open = mobileMenuGroups[section.key];
                     return (
-                      <div key={section.key} className="rounded-[26px] border border-white/10 bg-white/[0.03] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+                      <div key={section.key} className={`rounded-[28px] border p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-sm ${section.panelClassName}`}>
                         <button
                           type="button"
                           onClick={() => toggleMobileGroup(section.key)}
-                          className="flex min-h-[56px] w-full items-center justify-between rounded-2xl px-3 py-3 text-left"
+                          className="flex min-h-[62px] w-full items-center justify-between rounded-[22px] px-3 py-3 text-left"
                         >
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-300">{section.title}</p>
-                            <p className="mt-1 text-xs text-gray-400">{section.items.length} item{section.items.length === 1 ? '' : 's'}</p>
+                            <p className="mt-1 text-xs text-gray-300">{section.description}</p>
                           </div>
-                          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-gray-200">
-                            <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
-                          </span>
+                          <div className="flex items-center gap-2 pl-3">
+                            <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${section.countClassName}`}>
+                              {section.items.length} item{section.items.length === 1 ? '' : 's'}
+                            </span>
+                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-gray-200">
+                              <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} />
+                            </span>
+                          </div>
                         </button>
 
                         {open && (
-                          <div className="grid gap-1 px-1 pb-1">
+                          <div className="grid gap-2 px-1 pb-1 pt-1">
                             {section.items.map(({ to, label, icon: Icon }) => (
                               <Link
                                 key={label}
                                 to={to}
                                 onClick={() => setMobileOpen(false)}
-                                className="group flex min-h-[58px] items-center justify-between rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-sm font-semibold text-gray-100 transition-all hover:border-cyan-400/20 hover:bg-white/[0.08] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
+                                className="group flex min-h-[60px] items-center justify-between rounded-[22px] border border-white/8 bg-[linear-gradient(180deg,rgba(17,24,39,0.9),rgba(10,16,29,0.96))] px-4 py-3 text-sm font-semibold text-gray-100 transition-all hover:border-cyan-400/20 hover:bg-[linear-gradient(180deg,rgba(23,33,52,0.96),rgba(12,18,34,0.98))] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-purple focus-visible:ring-offset-2 focus-visible:ring-offset-dark-950"
                               >
                                 <span className="flex items-center gap-3">
-                                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-gray-300 shadow-[0_8px_20px_rgba(0,0,0,0.18)] transition-transform duration-200 group-hover:scale-[1.03] group-hover:text-cyan-200">
+                                  <span className={`flex h-11 w-11 items-center justify-center rounded-[16px] border shadow-[0_8px_20px_rgba(0,0,0,0.18)] transition-transform duration-200 group-hover:scale-[1.03] group-hover:text-cyan-100 ${section.iconClassName}`}>
                                     <Icon className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" />
                                   </span>
-                                  {label}
+                                  <span>
+                                    <span className="block">{label}</span>
+                                    <span className="mt-0.5 block text-[11px] font-medium text-gray-400 group-hover:text-gray-300">
+                                      {section.key === 'discover' && label === 'Browse Airdrops' ? 'Open the live listings board' : section.key === 'discover' ? 'Explore this route next' : section.key === 'tools' ? 'Run a focused safety workflow' : 'Open your account area'}
+                                    </span>
+                                  </span>
                                 </span>
                                 <ChevronRight className="h-4 w-4 text-gray-400 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-200" />
                               </Link>
@@ -853,7 +894,7 @@ export default function Layout() {
                     );
                   })}
 
-                  <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-2">
+                  <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,18,30,0.92),rgba(8,12,22,0.96))] p-2">
                     <Link
                       to="/admin"
                       onClick={() => setMobileOpen(false)}
