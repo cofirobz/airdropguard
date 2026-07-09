@@ -118,6 +118,25 @@ type CounterItem = {
   sub: string;
 };
 
+const ENGINE_BOOT_STEPS = [
+  'Initialising AI Engine...',
+  'Contract analysed',
+  'Community analysed',
+  'Risk model completed',
+  'Human review verified',
+  'AI Confidence calculated',
+] as const;
+
+const ENGINE_STATUS_CHIPS: Array<{
+  label: 'Verified' | 'Under Review' | 'Scam Alert' | 'Need Review';
+  tone: string;
+}> = [
+  { label: 'Verified', tone: 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,0.12)]' },
+  { label: 'Under Review', tone: 'border-cyan-300/25 bg-cyan-500/10 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,0.12)]' },
+  { label: 'Scam Alert', tone: 'border-rose-300/25 bg-rose-500/10 text-rose-100 shadow-[0_0_18px_rgba(244,63,94,0.12)]' },
+  { label: 'Need Review', tone: 'border-amber-300/25 bg-amber-500/10 text-amber-100 shadow-[0_0_18px_rgba(245,158,11,0.12)]' },
+];
+
 type LeadOpportunity = {
   title: string;
   item: Airdrop | null;
@@ -360,114 +379,157 @@ function OpportunityCard({ item, title, label, tone, detail }: LeadOpportunity) 
   );
 }
 
-function HeroMockup({ item }: { item: Airdrop | null }) {
-  const primaryChain = item?.blockchain?.[0] ?? 'Chain';
+function HeroMockup({ item, projects }: { item: Airdrop | null; projects: Airdrop[] }) {
+  const safeProjects = useMemo(() => {
+    const seen = new Set<string>();
+    const combined = [item, ...projects].filter(Boolean) as Airdrop[];
+    return combined.filter((project) => {
+      const key = project.slug || project.name;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 5);
+  }, [item, projects]);
+
+  const [bootPhase, setBootPhase] = useState(0);
+  const [bootComplete, setBootComplete] = useState(false);
+
+  useEffect(() => {
+    const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion) {
+      setBootPhase(ENGINE_BOOT_STEPS.length - 1);
+      setBootComplete(true);
+      return;
+    }
+
+    const timers = [0, 650, 1300, 1950, 2600, 3250].map((delay, index) => window.setTimeout(() => {
+      setBootPhase(index);
+      if (index === ENGINE_BOOT_STEPS.length - 1) setBootComplete(true);
+    }, delay));
+
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
+  const currentProject = safeProjects[Math.min(bootPhase, safeProjects.length - 1)] ?? item;
+  const projectName = currentProject?.name ?? 'Watching live opportunities';
+  const projectChain = currentProject?.blockchain?.[0] ?? item?.blockchain?.[0] ?? 'Chain';
+  const confidenceScore = currentProject?.trust_score ?? item?.trust_score ?? 92;
+  const reviewStatus = currentProject?.risk_level === 'High'
+    ? 'Scam Alert'
+    : currentProject?.listing_state === 'verified' || currentProject?.human_verified
+      ? 'Verified'
+      : 'Under Review';
+  const progressRows = [
+    { label: 'Project Signal', percent: bootPhase >= 0 ? 100 : 0, tone: 'from-cyan-400 to-blue-500' },
+    { label: 'Contract Analysis', percent: bootPhase >= 1 ? 92 : 0, tone: 'from-sky-400 to-cyan-400' },
+    { label: 'Community Signals', percent: bootPhase >= 2 ? 98 : 0, tone: 'from-violet-400 to-fuchsia-400' },
+    { label: 'Human Review', percent: bootPhase >= 3 ? 100 : 0, tone: 'from-emerald-400 to-teal-400' },
+    { label: 'AI Confidence', percent: bootPhase >= 5 ? confidenceScore : 0, tone: 'from-amber-400 to-orange-400' },
+  ];
 
   return (
-    <div className="relative overflow-hidden rounded-[34px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(8,20,42,0.96),rgba(5,10,24,0.98))] p-4 shadow-[0_24px_60px_rgba(3,8,24,0.55),0_0_40px_rgba(34,211,238,0.12)] sm:p-5">
+    <div className="relative overflow-hidden rounded-[34px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(6,16,34,0.98),rgba(4,10,24,0.99))] p-4 shadow-[0_24px_60px_rgba(3,8,24,0.55),0_0_40px_rgba(34,211,238,0.12)] sm:p-5">
       <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-cyan-400/15 blur-3xl" />
-      <div className="pointer-events-none absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-blue-500/15 blur-3xl" />
+      <div className="pointer-events-none absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-violet-500/15 blur-3xl" />
 
       <div className="relative flex items-center justify-between gap-3 border-b border-white/10 pb-3">
         <div>
-          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">Today&apos;s Best Opportunity</div>
-          <div className="mt-1 text-lg font-black text-white">Mission control snapshot</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">AI Security Engine</div>
+          <div className="mt-1 text-lg font-black text-white">Trust intelligence core</div>
         </div>
         <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
-          AI Live
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+          AI Ready
         </span>
       </div>
 
-      <div className="relative mt-4 grid gap-4 sm:grid-cols-[0.9fr_1.1fr] sm:items-center">
-        <div className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4">
-          <div className="flex items-center gap-4">
-            <TrustRing score={item?.trust_score ?? null} />
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Trust Ring</div>
-              <div className="mt-1 text-2xl font-black text-white">{item?.trust_score ?? 'TBA'}</div>
-              <div className="mt-1 text-xs text-gray-400">High clarity, lower friction, faster decisions.</div>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center text-[10px] text-gray-300">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Reward</div>
-              <div className="mt-1 truncate text-sm font-black text-emerald-300">{item?.estimated_reward ?? 'TBA'}</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Risk</div>
-              <div className="mt-1 text-sm font-black text-amber-300">{item?.risk_level ?? 'TBA'}</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2">
-              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Time</div>
-              <div className="mt-1 text-sm font-black text-white">{item?.time_required ?? 'TBA'}</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(15,23,42,0.75),rgba(8,14,28,0.95))] p-4">
+      <div className="relative mt-4 grid gap-4">
+        <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(9,17,34,0.9),rgba(5,10,24,0.98))] p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Featured opportunity</div>
-              <div className="mt-1 truncate text-xl font-black text-white">{item?.name ?? 'Trending opportunities loading'}</div>
-              <div className="mt-1 text-sm text-gray-300">AI analysis, human verification and wallet safety in one view.</div>
+              <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Engine boot</div>
+              <div className={`mt-1 text-xl font-black text-white transition-opacity duration-300 ${bootComplete ? 'opacity-100' : 'opacity-95'}`}>
+                {ENGINE_BOOT_STEPS[bootPhase]}
+              </div>
+              <div className="mt-1 text-sm text-gray-300">AI scoring plus human review, with no wallet connection required.</div>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-500/10">
-              <AiOrb className="h-7 w-7" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-cyan-200/30 bg-[radial-gradient(circle,rgba(34,211,238,0.28),rgba(8,18,42,0.92))] shadow-[0_0_18px_rgba(34,211,238,0.18)]">
+                <ShieldCheck className="h-4.5 w-4.5 text-cyan-100" />
+              </div>
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
-            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-[#0b1e3a]">
-              {item?.logo_url ? (
-                <img src={item.logo_url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center text-sm font-black text-cyan-100">{item?.name?.[0] ?? 'A'}</span>
-              )}
+          <div className="mt-4 grid gap-2">
+            {progressRows.map((row) => (
+              <div key={row.label} className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                <div className="flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  <span>{row.label}</span>
+                  <span className="text-gray-300">{row.label === 'AI Confidence' ? `${row.percent}%` : `${row.percent}%`}</span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800/80">
+                  <div
+                    className={`h-full rounded-full bg-gradient-to-r ${row.tone} transition-[width,opacity] duration-700 ease-out`}
+                    style={{ width: `${row.percent}%`, opacity: row.percent > 0 ? 1 : 0.18 }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Project focus</div>
+              <div className="mt-1 text-sm font-black text-white">{projectName}</div>
             </div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-blue-300/25 bg-blue-500/10 px-2.5 py-1 text-[10px] font-semibold text-blue-100">
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/20 bg-white/[0.08] text-[9px] font-black text-white">
-                {primaryChain[0]}
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Review status</div>
+              <div className="mt-1 text-sm font-black text-white">{reviewStatus}</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+              <div className="text-[10px] uppercase tracking-[0.14em] text-gray-500">Network</div>
+              <div className="mt-1 text-sm font-black text-white">{projectChain}</div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-4">
+            {ENGINE_STATUS_CHIPS.map((chip) => (
+              <span
+                key={chip.label}
+                className={`rounded-full border px-3 py-1.5 text-[10px] font-semibold tracking-[0.12em] ${chip.tone} ${chip.label === reviewStatus ? 'ring-1 ring-white/10' : 'opacity-75'}`}
+              >
+                {chip.label}
               </span>
-              {primaryChain}
-            </span>
-            <span className="ml-auto rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-100">Verified</span>
-          </div>
-
-          <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
-            <span className="rounded-full border border-cyan-300/25 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-100">AI Analysed</span>
-            <span className="rounded-full border border-blue-300/25 bg-blue-500/10 px-2.5 py-1 font-semibold text-blue-100">Human Reviewed</span>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] text-gray-300">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-              <div className="text-gray-500">AI summary</div>
-              <div className="mt-1 font-semibold text-white">Prioritised for trust and timing</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-              <div className="text-gray-500">Estimated reward</div>
-              <div className="mt-1 line-clamp-2 font-semibold text-emerald-300">{item?.estimated_reward ?? 'Forecasting daily'}</div>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              to={item ? `/airdrop/${item.slug}` : '/auth'}
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-2xl bg-cyan-500 px-4 py-2 text-xs font-black text-white shadow-[0_12px_28px_rgba(14,165,233,0.32)] transition-colors hover:bg-cyan-400"
-            >
-              Open report
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-            <CopilotCta
-              prompt="What should I do next with this opportunity?"
-              context="Homepage featured opportunity context. Give direct next steps with trust, risk, reward, and wallet-safety notes."
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.05] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-white/[0.08]"
-            >
-              <AiOrb className="h-4 w-4" />
-              Ask AI
-            </CopilotCta>
+            ))}
           </div>
         </div>
+
+        <div className="grid gap-2 text-[10px] text-gray-300 sm:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+            <div className="uppercase tracking-[0.14em] text-gray-500">Reward context</div>
+            <div className="mt-1 truncate text-sm font-black text-emerald-300">{currentProject?.estimated_reward ?? item?.estimated_reward ?? 'Forecasting daily'}</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+            <div className="uppercase tracking-[0.14em] text-gray-500">Time required</div>
+            <div className="mt-1 text-sm font-black text-white">{currentProject?.time_required ?? item?.time_required ?? 'TBA'}</div>
+          </div>
+        </div>
+
+        {safeProjects.length > 1 && (
+          <div className="flex flex-wrap gap-2 text-[10px] font-semibold">
+            {safeProjects.map((project) => {
+              const active = project.name === projectName;
+              return (
+                <span
+                  key={project.slug || project.name}
+                  className={`rounded-full border px-2.5 py-1 transition-colors ${active ? 'border-cyan-300/35 bg-cyan-500/12 text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,0.12)]' : 'border-white/10 bg-white/[0.04] text-gray-400'}`}
+                >
+                  {project.name}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -528,22 +590,64 @@ function LiveOpportunitiesSection({ airdrops }: { airdrops: Airdrop[] }) {
 }
 
 function WhySection() {
+  const cards = [
+    {
+      icon: Activity,
+      title: 'Risk Radar preview',
+      body: 'Project signal, contract risk, community activity, human review and AI confidence in one glance.',
+      tone: 'border-cyan-300/20 bg-cyan-500/10 text-cyan-100',
+    },
+    {
+      icon: CheckCircle2,
+      title: 'Before you connect',
+      body: 'No wallet connection. No seed phrases. Check the link, the chain and the review state first.',
+      tone: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
+    },
+    {
+      icon: AlertCircle,
+      title: 'Why most lists fail',
+      body: 'They chase volume, bury risk and make you click before you understand what is actually live.',
+      tone: 'border-rose-300/20 bg-rose-500/10 text-rose-100',
+    },
+    {
+      icon: Users,
+      title: 'For hunters, projects and builders',
+      body: 'Hunters get faster prioritisation. Projects get safer review. Builders get a cleaner trust layer.',
+      tone: 'border-violet-300/20 bg-violet-500/10 text-violet-100',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Verified by AirdropGuard',
+      body: 'AI scoring plus human review keeps the platform protective, useful and easy to trust.',
+      tone: 'border-sky-300/20 bg-sky-500/10 text-sky-100',
+    },
+  ];
+
   return (
     <section className="defer-render mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Why AirdropGuard</div>
-          <h2 className="mt-2 text-2xl font-black text-white sm:text-4xl">Faster decisions. Less noise.</h2>
+          <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Trust layer</div>
+          <h2 className="mt-2 text-2xl font-black text-white sm:text-4xl">A premium airdrop safety screen</h2>
         </div>
         <p className="max-w-2xl text-sm leading-relaxed text-gray-400">
-          The page is designed to make users understand the value in seconds, not after a long explanation.
+          Every block on this page exists to create trust, curiosity and healthy urgency without fake stats or hype.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <OutcomeCard icon={Clock} title="Save Hours of Research" body="Filter signal from hype in seconds." tone="border-cyan-300/20 bg-cyan-500/10 text-cyan-100" />
-        <OutcomeCard icon={Shield} title="Avoid Risky Projects" body="See warnings before you connect." tone="border-rose-300/20 bg-rose-500/10 text-rose-100" />
-        <OutcomeCard icon={Target} title="Focus on Better Rewards" body="Spend time where the upside is clearer." tone="border-emerald-300/20 bg-emerald-500/10 text-emerald-100" />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {cards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div key={card.title} className="glass-card rounded-[28px] border border-white/10 p-5">
+              <div className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl border ${card.tone}`}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <h3 className="mt-5 text-lg font-black text-white">{card.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-gray-400">{card.body}</p>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -914,23 +1018,23 @@ function HeroSection({
         <div className="relative z-10">
           <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-100 sm:text-xs">
             <Sparkles className="h-3.5 w-3.5" />
-            Premium AI Mission Control
+            Premium AI Airdrop Safety
           </div>
 
           <h1 className="mt-4 max-w-3xl text-[1.9rem] font-black leading-[0.95] tracking-tight text-white sm:mt-6 sm:text-5xl lg:text-6xl">
-            Find crypto airdrops worth your time.
+            Check every airdrop before you connect.
           </h1>
 
           <p className="mt-3 max-w-xl text-sm font-medium text-gray-200 sm:mt-5 sm:text-lg">
-            AI finds them. Humans verify them. You stay safe.
+            AI scoring plus human review. No wallet connection required. Spot risk before you waste time or click the wrong link.
           </p>
 
           <div className="mt-5 grid grid-cols-2 gap-2 sm:mt-6 sm:flex sm:flex-wrap sm:gap-2.5">
             {[
-              { label: 'AI Online', tone: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100' },
-              { label: 'Human Verified', tone: 'border-emerald-300/35 bg-emerald-400/10 text-emerald-100' },
-              { label: 'Updated Live', tone: 'border-blue-300/35 bg-blue-400/10 text-blue-100' },
-              { label: 'No Seed Phrases', tone: 'border-violet-300/35 bg-violet-400/10 text-violet-100' },
+              { label: 'No wallet connection', tone: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100' },
+              { label: 'Never asks for seed phrases', tone: 'border-emerald-300/35 bg-emerald-400/10 text-emerald-100' },
+              { label: 'AI scoring + human review', tone: 'border-blue-300/35 bg-blue-400/10 text-blue-100' },
+              { label: 'Built for hunters, projects, builders', tone: 'border-violet-300/35 bg-violet-400/10 text-violet-100' },
             ].map(item => (
               <span key={item.label} className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold ${item.tone}`}>
                 {item.label}
@@ -938,21 +1042,26 @@ function HeroSection({
             ))}
           </div>
 
-          <div className="mt-5 flex flex-col gap-2.5 sm:mt-7 sm:flex-row">
-            <a
-              href="#airdrops"
+          <div className="mt-5 grid gap-2 sm:mt-7 sm:grid-cols-3">
+            <Link
+              to="/wallet-checker"
               className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-cyan-500 px-6 py-3 text-sm font-black text-white shadow-[0_12px_26px_rgba(34,211,238,0.26)] transition-colors hover:bg-cyan-400"
             >
-              Browse Airdrops
+              Scan an Airdrop
               <ArrowRight className="h-4 w-4" />
-            </a>
-            <CopilotCta
-              prompt="What should I prioritize first from the current listings?"
-              context="Homepage hero section. Recommend the best next listing with practical steps and safety warnings."
+            </Link>
+            <a
+              href="#airdrops"
               className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] px-6 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/[0.1]"
             >
-              Ask AI
-            </CopilotCta>
+              Browse Verified Airdrops
+            </a>
+            <Link
+              to="/submit"
+              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-500/10 px-6 py-3 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/18"
+            >
+              Submit for Review
+            </Link>
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-2 sm:hidden">
@@ -975,8 +1084,8 @@ function HeroSection({
           <div className="rounded-[30px] border border-cyan-300/20 bg-[linear-gradient(150deg,rgba(6,12,28,0.95),rgba(5,16,36,0.94)_48%,rgba(9,10,28,0.94))] p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_56px_rgba(15,23,42,0.6),0_0_40px_rgba(34,211,238,0.12)] backdrop-blur-xl sm:p-5">
             <div className="mb-3 flex items-center justify-between gap-3 border-b border-white/10 pb-3">
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">Live command board</div>
-                <div className="mt-1 text-sm font-black text-white sm:text-base">Today&apos;s priority queue</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">Intelligence core</div>
+                <div className="mt-1 text-sm font-black text-white sm:text-base">Today&apos;s security engine</div>
               </div>
               {featured && <div className="rounded-full border border-white/15 bg-white/[0.05] px-2.5 py-1 text-[10px] font-semibold text-gray-200">Featured: {featured.name}</div>}
             </div>
@@ -2135,22 +2244,22 @@ export default function HomePage() {
                   <div className="flex items-center gap-2 rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-2">
                     <Brain className="h-4 w-4 text-cyan-300" />
                     <div>
-                      <p className="text-xs font-semibold text-white">AI Analysed</p>
-                      <p className="text-[11px] text-cyan-100/70">Advanced risk scoring</p>
+                      <p className="text-xs font-semibold text-white">No wallet connection</p>
+                      <p className="text-[11px] text-cyan-100/70">You browse first, connect later</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 rounded-xl border border-violet-300/35 bg-violet-400/10 px-2.5 py-2">
                     <Users className="h-4 w-4 text-violet-300" />
                     <div>
-                      <p className="text-xs font-semibold text-white">Human Reviewed</p>
-                      <p className="text-[11px] text-violet-100/70">Expert verification</p>
+                      <p className="text-xs font-semibold text-white">Never asks for seed phrases</p>
+                      <p className="text-[11px] text-violet-100/70">Read-only research only</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 rounded-xl border border-emerald-300/35 bg-emerald-400/10 px-2.5 py-2">
                     <Shield className="h-4 w-4 text-emerald-300" />
                     <div>
-                      <p className="text-xs font-semibold text-white">Scam Detection</p>
-                      <p className="text-[11px] text-emerald-100/70">Filter out bad actors</p>
+                      <p className="text-xs font-semibold text-white">AI scoring + human review</p>
+                      <p className="text-[11px] text-emerald-100/70">Risk flags before wasted time</p>
                     </div>
                   </div>
                 </div>
@@ -2177,26 +2286,30 @@ export default function HomePage() {
                   </div>
                   <div className="rounded-xl border border-fuchsia-300/20 bg-[linear-gradient(170deg,rgba(60,26,68,0.45),rgba(18,13,31,0.35))] px-2 py-2 text-center">
                     <p className="text-[1.45rem] font-black leading-none text-white sm:text-[1.55rem]">24/7</p>
-                    <p className="mt-1 text-[11px] text-fuchsia-100/70">Monitoring</p>
+                    <p className="mt-1 text-[11px] text-fuchsia-100/70">Ready to analyse</p>
                   </div>
                 </div>
 
-                <div className="mt-3.5 grid gap-2 sm:grid-cols-2">
-                  <a
-                    href="#live-opportunities"
+                <div className="mt-3.5 grid gap-2 sm:grid-cols-3">
+                  <Link
+                    to="/wallet-checker"
                     className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(98deg,#1fb6ff_0%,#4f8dfb_42%,#7c4dff_100%)] px-5 py-3 text-sm font-black text-white shadow-[0_14px_26px_rgba(59,130,246,0.35)] transition-transform hover:translate-y-[-1px]"
                   >
-                    Explore Airdrops
+                    Scan an Airdrop
                     <ArrowRight className="h-4 w-4" />
-                  </a>
-                  <CopilotCta
-                    prompt="Review current airdrop opportunities and rank my safest next action."
-                    context="homepage-hero-primary"
+                  </Link>
+                  <a
+                    href="#airdrops"
                     className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-bold text-white backdrop-blur transition-colors hover:bg-white/[0.1]"
                   >
-                    <Sparkles className="h-4 w-4 text-cyan-300" />
-                    Ask AI
-                  </CopilotCta>
+                    Browse Verified Airdrops
+                  </a>
+                  <Link
+                    to="/submit"
+                    className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-500/10 px-5 py-3 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/18"
+                  >
+                    Submit for Review
+                  </Link>
                 </div>
 
                 <div className="mt-3.5 space-y-2.5">
@@ -2223,26 +2336,13 @@ export default function HomePage() {
                     </div>
                   </div>
                   <p className="text-center text-xs leading-relaxed text-cyan-100/85 sm:text-left">
-                    Stay for 30 seconds and you get a clearer picture than most users get in 30 minutes of random scrolling.
+                    Airdrops move fast. Bad links move faster. Most users check too late.
                   </p>
                 </div>
               </div>
 
               <div className="relative pt-2 sm:pt-2">
-                <div className="mx-auto flex h-[210px] w-[210px] items-center justify-center rounded-full border border-cyan-400/35 bg-[radial-gradient(circle,rgba(34,211,238,0.26),rgba(8,18,42,0.16)_46%,rgba(2,8,20,0.72)_78%)] shadow-[0_0_0_1px_rgba(34,211,238,0.2),0_28px_48px_rgba(3,8,28,0.68)] sm:h-[280px] sm:w-[280px]">
-                  <div className="absolute h-[68%] w-[68%] rounded-full border border-cyan-400/20" />
-                  <div className="absolute h-[86%] w-[86%] rounded-full border border-blue-500/20" />
-                  <ShieldCheck className="h-24 w-24 text-cyan-200 drop-shadow-[0_0_24px_rgba(34,211,238,0.68)] sm:h-28 sm:w-28" />
-                </div>
-                <div className="absolute left-0 top-7 rounded-lg border border-cyan-300/30 bg-cyan-400/15 px-2 py-1 text-[10px] font-semibold text-cyan-100 backdrop-blur sm:left-2">
-                  AI guard active
-                </div>
-                <div className="absolute right-0 top-14 rounded-lg border border-emerald-300/30 bg-emerald-500/15 px-2 py-1 text-[10px] font-semibold text-emerald-100 backdrop-blur sm:right-2">
-                  Threat filter on
-                </div>
-                <div className="mt-4 hidden lg:block">
-                  <HeroMockup item={topVerified[0] ?? featured ?? null} />
-                </div>
+                <HeroMockup item={topVerified[0] ?? featured ?? null} projects={topVerified} />
               </div>
             </div>
           </div>

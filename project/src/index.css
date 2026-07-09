@@ -31,7 +31,6 @@
   *::-webkit-scrollbar {
     width: 6px;
   }
-
   *::-webkit-scrollbar-track {
     background: transparent;
   }
@@ -42,6 +41,17 @@
   }
 }
 
+@keyframes terminal-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
 @layer components {
   .glass {
     background: rgba(8, 16, 32, 0.78);
@@ -325,6 +335,10 @@
     animation: trust-bar-sweep 2.8s ease-in-out infinite;
     pointer-events: none;
   }
+
+  .terminal-pulse {
+    animation: terminal-pulse 3.6s ease-in-out infinite;
+  }
 }
 
 @keyframes flow-pan {
@@ -467,6 +481,18 @@
   }
 }
 
+@keyframes terminal-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mission-grid::before,
   .mission-network,
@@ -477,7 +503,9 @@
   .ai-orb-core,
   .hero-stagger,
   .attention-card::after,
-  .trust-bar-glow::after {
+  .trust-bar-glow::after,
+  .terminal-pulse,
+  .shimmer-line::after {
     animation: none !important;
   }
 
