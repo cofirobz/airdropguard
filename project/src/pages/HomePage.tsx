@@ -431,9 +431,12 @@ function HeroMockup({ item, projects }: { item: Airdrop | null; projects: Airdro
   ];
 
   return (
-    <div className="relative overflow-hidden rounded-[34px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(6,16,34,0.98),rgba(4,10,24,0.99))] p-4 shadow-[0_24px_60px_rgba(3,8,24,0.55),0_0_40px_rgba(34,211,238,0.12)] sm:p-5">
+    <div className="ag-signal-panel ag-signal-core relative overflow-hidden rounded-[34px] border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(6,16,34,0.98),rgba(4,10,24,0.99))] p-4 shadow-[0_24px_60px_rgba(3,8,24,0.55),0_0_40px_rgba(34,211,238,0.12)] sm:p-5">
       <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-cyan-400/15 blur-3xl" />
       <div className="pointer-events-none absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-violet-500/15 blur-3xl" />
+      <div className="pointer-events-none absolute left-5 top-12 h-[calc(100%-3.25rem)] w-px bg-gradient-to-b from-cyan-300/0 via-cyan-300/20 to-cyan-300/0 opacity-70" />
+      <div className="pointer-events-none absolute left-5 top-12 h-px w-14 bg-gradient-to-r from-cyan-300/40 to-transparent" />
+      <div className="pointer-events-none absolute right-5 top-12 h-px w-14 bg-gradient-to-l from-blue-300/40 to-transparent" />
 
       <div className="relative flex items-center justify-between gap-3 border-b border-white/10 pb-3">
         <div>
@@ -443,7 +446,7 @@ function HeroMockup({ item, projects }: { item: Airdrop | null; projects: Airdro
         <Link
           to="/whitepaper#methodology"
           aria-label="Open scoring methodology"
-          className="inline-flex min-h-[40px] items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/15 hover:text-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/40"
+          className="ag-signal-chip inline-flex min-h-[40px] items-center gap-1 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/15 hover:text-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/40"
         >
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
           AI Ready
@@ -451,7 +454,7 @@ function HeroMockup({ item, projects }: { item: Airdrop | null; projects: Airdro
       </div>
 
       <div className="relative mt-4 grid gap-4">
-        <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(9,17,34,0.9),rgba(5,10,24,0.98))] p-4">
+        <div className="ag-signal-core rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(9,17,34,0.9),rgba(5,10,24,0.98))] p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[10px] uppercase tracking-[0.16em] text-gray-500">Engine boot</div>
@@ -505,7 +508,7 @@ function HeroMockup({ item, projects }: { item: Airdrop | null; projects: Airdro
                 key={chip.label}
                 to={chip.to}
                 aria-label={`${chip.label === 'Need Review' ? 'Open submit airdrop' : `Open ${chip.label.toLowerCase()} listings`}`}
-                className={`inline-flex min-h-[40px] items-center justify-center rounded-full border px-3 py-1.5 text-[10px] font-semibold tracking-[0.12em] transition-colors hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/35 ${chip.tone} ${chip.label === reviewStatus ? 'ring-1 ring-white/10' : 'opacity-75'}`}
+                className={`ag-signal-chip inline-flex min-h-[40px] items-center justify-center rounded-full border px-3 py-1.5 text-[10px] font-semibold tracking-[0.12em] transition-colors hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/35 ${chip.tone} ${chip.label === reviewStatus ? 'ring-1 ring-white/10' : 'opacity-75'}`}
               >
                 {chip.label}
               </Link>
@@ -2253,18 +2256,18 @@ export default function HomePage() {
               <div className="text-center sm:text-left">
                 <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-400/10 px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.18em] text-cyan-100 sm:text-xs">
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  AI + Human Verified
+                  Verified Airdrop Scanner
                 </div>
 
                 <h1 className="mt-3.5 max-w-3xl text-[2.15rem] font-black leading-[0.92] tracking-tight text-white sm:mt-4 sm:text-5xl lg:text-[3.65rem]">
-                  Check Before
+                  Find verified airdrops
                   <span className="block bg-[linear-gradient(95deg,#34d399_2%,#22d3ee_35%,#3b82f6_68%,#8b5cf6_100%)] bg-clip-text text-transparent">
-                    You Connect.
+                    before you connect.
                   </span>
                 </h1>
 
                 <p className="mt-2.5 max-w-2xl text-[15px] font-medium leading-relaxed text-cyan-50 sm:mt-3 sm:text-lg">
-                  AI analysed. Human reviewed. Trust the airdrops that are actually worth your time.
+                  AirdropGuard scans live listings for risk, trust and effort so you can browse first, connect later, and focus only on the projects worth your time.
                 </p>
 
                 <div className="mt-3 grid grid-cols-1 gap-2 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(180deg,rgba(6,17,40,0.88),rgba(4,11,26,0.8))] p-2.5 text-left sm:hidden">
@@ -2347,12 +2350,16 @@ export default function HomePage() {
                     Browse Verified Airdrops
                   </a>
                   <Link
-                    to="/submit"
+                    to="/auth"
                     className="inline-flex min-h-[50px] w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/25 bg-emerald-500/10 px-5 py-3 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/18"
                   >
-                    Submit for Review
+                    Start Free
                   </Link>
                 </div>
+
+                <p className="mt-3 text-center text-xs leading-relaxed text-cyan-100/75 sm:text-left">
+                  Free to start. No wallet connection required to browse, and sign-up saves your watchlist for faster decisions.
+                </p>
 
                 <div className="mt-3.5 space-y-2.5">
                   <div className="flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-100/85 sm:justify-start">
@@ -2378,7 +2385,7 @@ export default function HomePage() {
                     </div>
                   </div>
                   <p className="text-center text-xs leading-relaxed text-cyan-100/85 sm:text-left">
-                    Airdrops move fast. Bad links move faster. Most users check too late.
+                    Airdrops move fast. Bad links move faster. A quick scan now saves time, protects your wallet and helps you act with confidence.
                   </p>
                 </div>
               </div>
@@ -2400,6 +2407,7 @@ export default function HomePage() {
       )}
 
       <WhySection />
+      <HomepageTrustSection counters={trustCounters} />
       <LiveOpportunitiesSection airdrops={opportunityAirdrops} />
 
       {activeHomepageMidBanner && (
@@ -2411,7 +2419,6 @@ export default function HomePage() {
       )}
       <HomepageHowItWorksSection />
       <CopilotPreviewSection />
-      <HomepageTrustSection counters={trustCounters} />
       <FreeVsProSection />
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
