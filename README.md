@@ -55,3 +55,8 @@ This project is built in public for maximum trust in the Web3 space. All major c
 **Made with ❤️ for a safer Web3**
 
 Star the repo if you're building or hunting airdrops safely ⭐
+## Screenshots
+
+![Dashboard](https://github.com/cofirobz/airdropguard/raw/main/screenshots/dashboard.png)
+![Trust Score Example](https://github.com/cofirobz/airdropguard/raw/main/screenshots/trust-score.png)
+![Mobile View](https://github.com/cofirobz/airdropguard/raw/main/screenshots/mobile.png)
