@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,29 @@ const corsHeaders = {
 
 const RSS_URL = "https://airdropalert.com/feed/rssfeed";
 const UA = "Mozilla/5.0 (compatible; AirdropGuard/1.0)";
+
+// Security: admin-only helper ensures this importer cannot be abused anonymously.
+async function ensureAdminUser(
+  authHeader: string,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+): Promise<{ userId: string } | null> {
+  const jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!jwt) return null;
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const { data: authData, error: authError } = await supabase.auth.getUser(jwt);
+  if (authError || !authData.user) return null;
+
+  const { data: adminRow, error: adminError } = await supabase
+    .from("admin_users")
+    .select("id")
+    .eq("id", authData.user.id)
+    .maybeSingle();
+
+  if (adminError || !adminRow) return null;
+  return { userId: authData.user.id };
+}
 
 export interface ScrapedAirdrop {
   id: string;
@@ -603,7 +627,34 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
-  const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+  // Security: this endpoint is write-adjacent admin tooling; reject unexpected methods.
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) {
+    return new Response(JSON.stringify({ error: "Server misconfiguration" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Security: require admin JWT so public internet callers cannot scrape through this proxy.
+  const authHeader = req.headers.get("Authorization") || "";
+  const adminUser = await ensureAdminUser(authHeader, supabaseUrl, serviceRoleKey);
+  if (!adminUser) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const body = await req.json().catch(() => ({}));
   const limit = Math.min(Number(body.limit ?? 30), 50);
   const existingUrls: string[] = Array.isArray(body.existing_urls) ? body.existing_urls : [];
   const existingSet = new Set(existingUrls);

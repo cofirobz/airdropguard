@@ -7,6 +7,29 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+// Security: admin-only helper blocks unauthenticated callers from using service-role writes.
+async function ensureAdminUser(
+  authHeader: string,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+): Promise<{ userId: string } | null> {
+  const jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!jwt) return null;
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const { data: authData, error: authError } = await supabase.auth.getUser(jwt);
+  if (authError || !authData.user) return null;
+
+  const { data: adminRow, error: adminError } = await supabase
+    .from("admin_users")
+    .select("id")
+    .eq("id", authData.user.id)
+    .maybeSingle();
+
+  if (adminError || !adminRow) return null;
+  return { userId: authData.user.id };
+}
+
 /**
  * AirdropGuard Intelligence Engine v17
  *
@@ -3574,9 +3597,25 @@ async function handleScamWatch(body: Record<string, unknown>): Promise<Response>
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: corsHeaders });
 
+  // Security: restrict this endpoint to expected write method only.
+  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceRoleKey) {
+      return jsonResponse({ error: "Server misconfiguration" }, 500);
+    }
+
+    // Security: enforce admin JWT before parsing body or running any expensive write path.
+    const authHeader = req.headers.get("Authorization") || "";
+    const adminUser = await ensureAdminUser(authHeader, supabaseUrl, serviceRoleKey);
+    if (!adminUser) {
+      return jsonResponse({ error: "Forbidden" }, 403);
+    }
+
     const body = await req.json();
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     if (body.mode === "scam_watch" || body.scam_watch) return await handleScamWatch(body);
     if (body.submission_id) return await handleSubmissionAnalysis(body.submission_id, supabase);

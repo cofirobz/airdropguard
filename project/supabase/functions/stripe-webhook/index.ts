@@ -8,9 +8,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const PLAN_BY_AMOUNT: Record<number, string> = {
-  1900: "pro",
-  9900: "business",
+// Security/correctness: map plans by immutable Stripe Price IDs, not mutable amount values.
+const PLAN_BY_PRICE_ID: Record<string, string> = {
+  [Deno.env.get("STRIPE_API_PRO_PRICE_ID") ?? ""]: "pro",
+  [Deno.env.get("STRIPE_API_BUSINESS_PRICE_ID") ?? ""]: "business",
 };
 
 const PLAN_REQUEST_LIMITS: Record<string, number> = {
@@ -104,8 +105,11 @@ Deno.serve(async (req: Request) => {
           break;
         }
 
-        const amount = sub.items.data[0]?.price?.unit_amount ?? 0;
-        const plan = PLAN_BY_AMOUNT[amount] || "free";
+        // Security/correctness: derive entitlement from Stripe price ID to prevent silent plan downgrades.
+        const priceId = sub.items.data[0]?.price?.id ?? "";
+        const planFromMetadata = typeof sub.metadata?.plan === "string" ? sub.metadata.plan.toLowerCase() : "";
+        const derivedPlan = PLAN_BY_PRICE_ID[priceId] || planFromMetadata || "free";
+        const plan = derivedPlan in PLAN_REQUEST_LIMITS ? derivedPlan : "free";
 
         await supabase.from("api_subscriptions")
           .update({

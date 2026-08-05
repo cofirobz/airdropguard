@@ -54,6 +54,12 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  // Security: this debug endpoint is intentionally disabled in production to remove public attack surface.
+  return new Response(
+    JSON.stringify({ error: "This debug endpoint is disabled in production." }),
+    { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+
   const results: object[] = [];
 
   // ── 1. Fetch RSS ────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,6 +21,76 @@ const HIGH_RISK_TERMS = [
 ];
 
 const APPROVAL_TERMS = ["approval", "approve", "permissions", "signature"];
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 20;
+
+function resolveClientIp(req: Request): string {
+  const forwarded = req.headers.get("x-forwarded-for") || "";
+  return forwarded.split(",")[0]?.trim() || "unknown";
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// Security: server-side limiter prevents public scripted abuse of paid provider calls.
+async function enforceRateLimit(req: Request, functionName: string, maxRequests: number, windowMs: number) {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { allowed: false, status: 500, body: { error: "Server misconfiguration" } };
+  }
+
+  const clientIp = resolveClientIp(req);
+  const salt = Deno.env.get("EDGE_RATE_LIMIT_SALT") || "";
+  const ipHash = await sha256Hex(`${salt}:${clientIp}`);
+  const now = Date.now();
+  const windowStartMs = now - (now % windowMs);
+  const windowStartIso = new Date(windowStartMs).toISOString();
+  const limiterKey = `${functionName}:${ipHash}`;
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  const { data: existing, error: readError } = await supabase
+    .from("edge_rate_limits")
+    .select("request_count")
+    .eq("limiter_key", limiterKey)
+    .eq("window_start", windowStartIso)
+    .maybeSingle();
+
+  if (readError) {
+    return { allowed: false, status: 503, body: { error: "Rate limiter unavailable" } };
+  }
+
+  if (existing && Number(existing.request_count) >= maxRequests) {
+    const retryAfter = Math.max(1, Math.ceil((windowStartMs + windowMs - now) / 1000));
+    return { allowed: false, status: 429, body: { error: "Rate limit exceeded", retry_after_seconds: retryAfter } };
+  }
+
+  if (existing) {
+    const { error: updateError } = await supabase
+      .from("edge_rate_limits")
+      .update({ request_count: Number(existing.request_count) + 1, updated_at: new Date().toISOString() })
+      .eq("limiter_key", limiterKey)
+      .eq("window_start", windowStartIso);
+    if (updateError) {
+      return { allowed: false, status: 503, body: { error: "Rate limiter unavailable" } };
+    }
+  } else {
+    const { error: insertError } = await supabase.from("edge_rate_limits").insert({
+      limiter_key: limiterKey,
+      window_start: windowStartIso,
+      request_count: 1,
+    });
+    if (insertError) {
+      return { allowed: false, status: 503, body: { error: "Rate limiter unavailable" } };
+    }
+  }
+
+  return { allowed: true, status: 200, body: null };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -27,6 +98,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const rateLimit = await enforceRateLimit(req, "wallet-intelligence", RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
+    if (!rateLimit.allowed) {
+      return json(rateLimit.body, rateLimit.status);
+    }
+
     const body = await req.json();
     const address = String(body.address || "").trim();
     const chainId = String(body.chainId || "1");
