@@ -60,7 +60,10 @@ Deno.serve(async (req: Request) => {
         const userId = session.metadata?.user_id;
         if (!userId) break;
 
-        const plan = session.metadata?.plan || "pro";
+        const checkoutPriceId = session.line_items?.data?.[0]?.price?.id ?? "";
+        const planFromMetadata = typeof session.metadata?.plan === "string" ? session.metadata.plan.toLowerCase() : "";
+        const derivedPlan = PLAN_BY_PRICE_ID[checkoutPriceId] || planFromMetadata || "free";
+        const plan = derivedPlan in PLAN_REQUEST_LIMITS ? derivedPlan : "free";
         const purchaseType = session.metadata?.purchase_type;
         if (purchaseType === "advertising") {
           console.log(`Advertising checkout completed for user ${userId}, plan: ${plan}`);
@@ -70,7 +73,6 @@ Deno.serve(async (req: Request) => {
         const customerId = session.customer as string;
 
         const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
-        const normalizedPlan = plan in PLAN_REQUEST_LIMITS ? plan : "free";
         const { data: existingSub } = await supabase
           .from("api_subscriptions")
           .select("key_value")
@@ -81,11 +83,11 @@ Deno.serve(async (req: Request) => {
           user_id: userId,
           stripe_customer_id: customerId,
           stripe_subscription_id: subscriptionId,
-          plan: normalizedPlan,
+          plan,
           status: "active",
           key_value: existingSub?.key_value || generateApiKey(),
           requests_used: 0,
-          requests_limit: PLAN_REQUEST_LIMITS[normalizedPlan] ?? 100,
+          requests_limit: PLAN_REQUEST_LIMITS[plan] ?? 100,
           current_period_start: new Date(stripeSub.current_period_start * 1000).toISOString(),
           current_period_end: new Date(stripeSub.current_period_end * 1000).toISOString(),
           updated_at: new Date().toISOString(),
