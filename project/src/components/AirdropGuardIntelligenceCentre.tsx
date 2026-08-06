@@ -452,7 +452,7 @@ export default function AirdropGuardIntelligenceCentre() {
       )}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <QuickAction to="/" label="Browse Airdrops" />
+        <QuickAction to="/#airdrops" label="Browse Airdrops" />
         <QuickAction to="/?filter=trending" label="Trending" />
         <QuickAction to="/dashboard" label="My Tasks" />
         <QuickAction to="/submit" label="Submit Airdrop" />
