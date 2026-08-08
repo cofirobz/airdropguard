@@ -96,7 +96,7 @@ export default function AuthPage() {
           {mode === 'signin' ? 'Welcome back' : 'Create your account'}
         </h1>
         <p className="text-sm text-gray-400 text-center mb-6">
-          {mode === 'signin' ? 'Sign in to access your API dashboard' : 'Get started with free API access'}
+          {mode === 'signin' ? 'Sign in to your AirdropGuard account' : 'Track airdrops and save your watchlist for free'}
         </p>
 
         {/* Toggle */}
